@@ -546,12 +546,16 @@ export function FileLightbox({
   onClose,
   readOnly,
   onRequestDelete,
+  showWorkOrder = false,
 }: {
   media: WorkOrderFile[];
   startIndex: number | null;
   onClose: () => void;
   readOnly: boolean;
   onRequestDelete: (f: WorkOrderFile) => void;
+  /** Add the file's work order number to the caption line — for galleries
+   *  that span jobs (equipment history), not a single job's own files. */
+  showWorkOrder?: boolean;
 }) {
   if (startIndex === null || media.length === 0) return null;
   return (
@@ -561,6 +565,7 @@ export function FileLightbox({
       onClose={onClose}
       readOnly={readOnly}
       onRequestDelete={onRequestDelete}
+      showWorkOrder={showWorkOrder}
     />
   );
 }
@@ -571,12 +576,14 @@ function LightboxInner({
   onClose,
   readOnly,
   onRequestDelete,
+  showWorkOrder,
 }: {
   media: WorkOrderFile[];
   startIndex: number;
   onClose: () => void;
   readOnly: boolean;
   onRequestDelete: (f: WorkOrderFile) => void;
+  showWorkOrder: boolean;
 }) {
   const [index, setIndex] = useState(startIndex);
   const total = media.length;
@@ -673,6 +680,9 @@ function LightboxInner({
               {current.equipmentName && <span>{current.equipmentName}</span>}
               {current.uploadedByName && <span>· {current.uploadedByName}</span>}
               <span>· {formatTimestamp(current.createdAt)}</span>
+              {showWorkOrder && current.workOrderNumber && (
+                <span className="font-mono">· {current.workOrderNumber}</span>
+              )}
               {total > 1 && (
                 <span className="font-mono tabular-nums">
                   · {safeIndex + 1} / {total}

@@ -76,6 +76,9 @@ export default function PurchaseOrderFormPage() {
   // Attached work order (from ?workOrderId on create, or the PO in edit) — for
   // the label + back link. Stock POs (no WO) are allowed but not the WO-tab path.
   const workOrderId = editing ? (po?.workOrderId ?? null) : params.get('workOrderId');
+  // Launched from a work item (?workItemId on create): the PO is tied to that
+  // item, and saving returns to it on the WO's Work items tab.
+  const workItemId = !editing && workOrderId ? params.get('workItemId') : null;
   const { data: workOrder } = useQuery({
     queryKey: ['work-orders', workOrderId],
     queryFn: () => workOrderApi.getById(workOrderId!),
@@ -236,6 +239,7 @@ export default function PurchaseOrderFormPage() {
       receiptAttachFailed.current = false;
       const created = await purchaseOrderApi.create({
         workOrderId: workOrderId || null,
+        ...(workItemId ? { workItemId } : {}),
         type,
         status,
         ...common,
@@ -259,7 +263,12 @@ export default function PurchaseOrderFormPage() {
       } else {
         showSuccess(editing ? 'Purchase order saved' : 'Purchase order created');
       }
-      // Land on the saved PO's detail, carrying the ?from=vendor context through.
+      // Back to the work item it was raised for; otherwise land on the saved
+      // PO's detail, carrying the ?from=vendor context through.
+      if (workItemId && workOrderId) {
+        navigate(`/work-orders/${workOrderId}?tab=items&item=${workItemId}`);
+        return;
+      }
       navigate(`/purchase-orders/${saved.id}${fromSuffix}`);
     },
     onError: (err: unknown) => showError('Could not save the purchase order', extractApiError(err) ?? undefined),

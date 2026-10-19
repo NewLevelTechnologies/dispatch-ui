@@ -57,6 +57,9 @@
   color: var(--fg-accent);
 }
 .card-action:hover { text-decoration: underline; }
+/* Secondary header action (Cancel, "No equipment needed") — same link, muted. */
+.card-action.is-muted { color: var(--fg-muted); }
+.card-action.is-muted:hover { color: var(--fg-strong); }
 .card-action svg { width: 14px; height: 14px; }
 .card-body { padding: 14px; }
 .card-body.flush { padding: 0; }
