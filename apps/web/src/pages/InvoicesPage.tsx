@@ -59,10 +59,10 @@ const VIEW_LABEL: Record<InvoiceView, string> = {
 };
 
 // BE sort whitelist (InvoiceController): invoiceDate, dueDate, totalAmount,
-// status, createdAt, updatedAt. Status is an enum sorted by name (meaningless
-// order) and Balance isn't whitelisted, so neither is offered.
+// status, createdAt, updatedAt, invoiceNumber, customerName, balanceDue. Status
+// is an enum sorted by name (meaningless order), so it's not offered.
 const DEFAULT_SORT: SortState = { key: 'invoiceDate', dir: 'desc' };
-const SORT_KEYS = ['invoiceDate', 'totalAmount'] as const;
+const SORT_KEYS = ['invoiceDate', 'invoiceNumber', 'customerName', 'totalAmount', 'balanceDue'] as const;
 
 const day = (v: string | null | undefined) => formatDocDate(v, false) ?? '—';
 
@@ -86,7 +86,7 @@ export default function InvoicesPage() {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const { current: currentSort, onSort } = useUrlSort({
     defaultSort: DEFAULT_SORT,
-    descFirst: ['invoiceDate', 'totalAmount'],
+    descFirst: ['invoiceDate', 'totalAmount', 'balanceDue'],
     allowed: SORT_KEYS,
   });
   const sort = `${currentSort.key},${currentSort.dir}` as ListInvoicesParams['sort'];
@@ -281,14 +281,14 @@ export default function InvoicesPage() {
               <DenseTable className="min-w-[1180px]">
                 <DenseTHead>
                   <tr>
-                    <th style={{ minWidth: 150 }}>{entity}</th>
-                    <th>Bill to</th>
+                    <SortHeader sortKey="invoiceNumber" label={entity} current={currentSort} onSort={onSort} style={{ minWidth: 150 }} />
+                    <SortHeader sortKey="customerName" label="Bill to" current={currentSort} onSort={onSort} />
                     <th>{getName('service_location')}</th>
                     <th>{`${getName('customer')} PO`}</th>
                     <SortHeader sortKey="invoiceDate" label="Issued" current={currentSort} onSort={onSort} />
                     <th>Status</th>
                     <SortHeader sortKey="totalAmount" label="Total" align="right" current={currentSort} onSort={onSort} />
-                    <th className="right">Balance</th>
+                    <SortHeader sortKey="balanceDue" label="Balance" align="right" current={currentSort} onSort={onSort} />
                   </tr>
                 </DenseTHead>
                 <tbody>

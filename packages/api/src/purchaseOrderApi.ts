@@ -233,10 +233,11 @@ interface ListPurchaseOrdersParams {
   overdue?: boolean;
   page?: number;
   size?: number;
+  sort?: string; // poNumber | vendorName | createdAt | totalCost, e.g. 'totalCost,desc'
 }
 
 // Summary takes the list's filters, minus paging.
-type PurchaseOrderSummaryParams = Omit<ListPurchaseOrdersParams, 'page' | 'size'>;
+type PurchaseOrderSummaryParams = Omit<ListPurchaseOrdersParams, 'page' | 'size' | 'sort'>;
 
 export const purchaseOrderApi = {
   list: async (params: ListPurchaseOrdersParams = {}): Promise<Page<PurchaseOrderListItem>> => {

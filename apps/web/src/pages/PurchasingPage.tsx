@@ -22,6 +22,8 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 
 // Purchasing — records-level list of POs across every job + vendor (the office
 // companion to the WO Purchasing tab). Server-side paged + filtered
@@ -36,6 +38,10 @@ const TO_BILL: PurchaseOrderStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED', 'RECEIV
 const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
 const PAGE_SIZE = 50;
+// BE sort whitelist (PurchaseOrderController): poNumber, vendorName, createdAt,
+// totalCost. Default createdAt,desc = the "no sort param" state.
+const DEFAULT_SORT: SortState = { key: 'createdAt', dir: 'desc' };
+const SORT_KEYS = ['poNumber', 'vendorName', 'createdAt', 'totalCost'] as const;
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const money = (n?: number | null) => currency.format(n ?? 0);
 const formatDate = (iso?: string | null) =>
@@ -49,6 +55,11 @@ export default function PurchasingPage() {
 
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const { current: currentSort, sortParam, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['createdAt', 'totalCost'],
+    allowed: SORT_KEYS,
+  });
   // Status is multi (repeated ?status=…); memoize so the query key is stable per URL.
   const statusSel = useMemo(() => searchParams.getAll('status') as PurchaseOrderStatus[], [searchParams]);
   const type = (searchParams.get('type') as PurchaseOrderType | null) || null;
@@ -92,8 +103,8 @@ export default function PurchasingPage() {
   };
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['purchase-orders', 'list', page, deferredSearch, statusSel, type, overdue],
-    queryFn: () => purchaseOrderApi.list({ page: page - 1, size: PAGE_SIZE, ...filterArgs }),
+    queryKey: ['purchase-orders', 'list', page, deferredSearch, statusSel, type, overdue, sortParam],
+    queryFn: () => purchaseOrderApi.list({ page: page - 1, size: PAGE_SIZE, sort: sortParam, ...filterArgs }),
   });
   // Header aggregate over the whole filtered set (open count + committed cost).
   const { data: summary } = useQuery({
@@ -273,12 +284,12 @@ export default function PurchasingPage() {
                   <DenseTable className="dense-stack">
                     <DenseTHead>
                       <tr>
-                        <th>Purchase order</th>
-                        <th>Vendor</th>
+                        <SortHeader sortKey="poNumber" label="Purchase order" current={currentSort} onSort={onSort} />
+                        <SortHeader sortKey="vendorName" label="Vendor" current={currentSort} onSort={onSort} />
                         <th>For</th>
                         <th className="whitespace-nowrap">Status</th>
-                        <th className="whitespace-nowrap">Date</th>
-                        <th className="right whitespace-nowrap">Cost</th>
+                        <SortHeader sortKey="createdAt" label="Date" current={currentSort} onSort={onSort} />
+                        <SortHeader sortKey="totalCost" label="Cost" align="right" current={currentSort} onSort={onSort} />
                       </tr>
                     </DenseTHead>
                     <tbody>

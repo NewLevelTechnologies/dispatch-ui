@@ -315,7 +315,9 @@ export interface Page<T> {
   last?: boolean;
 }
 
-export type WorkOrderSortField = 'scheduledDate' | 'createdAt' | 'workOrderNumber' | 'priority';
+// priority orders by severity (desc = URGENT → LOW); locationName by what the
+// location cell shows (location name, else customer name).
+export type WorkOrderSortField = 'scheduledDate' | 'completedDate' | 'createdAt' | 'workOrderNumber' | 'priority' | 'locationName';
 export type SortDirection = 'asc' | 'desc';
 
 export interface CreateWorkItemRequest {
@@ -463,7 +465,7 @@ export interface ListWorkOrdersParams {
   page?: number;
   size?: number;
 
-  // Sort — whitelist enforced server-side: scheduledDate, createdAt, workOrderNumber, priority
+  // Sort — whitelist enforced server-side: see WorkOrderSortField
   sort?: `${WorkOrderSortField},${SortDirection}`;
 }
 

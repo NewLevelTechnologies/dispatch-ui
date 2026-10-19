@@ -640,7 +640,10 @@ export type InvoiceSortField =
   | 'totalAmount'
   | 'status'
   | 'createdAt'
-  | 'updatedAt';
+  | 'updatedAt'
+  | 'invoiceNumber'
+  | 'customerName'
+  | 'balanceDue';
 
 /**
  * Filters for the paged invoice list — all AND-ed together. Quirks worth
@@ -1234,7 +1237,7 @@ export interface ListQuotesParams {
   regionIds?: string[];
   page?: number;
   size?: number; // ≤ 200
-  sort?: string; // quoteDate | firstSentAt | expirationDate | totalAmount | quoteNumber, e.g. 'quoteDate,desc'
+  sort?: string; // quoteDate | firstSentAt | lastSentAt | decidedAt | expirationDate | totalAmount | quoteNumber | customerName, e.g. 'quoteDate,desc'
 }
 
 /** Same shape as an invoice's inline freeform line. */
@@ -1675,7 +1678,7 @@ export interface ListPaymentsParams {
   q?: string;
   page?: number;
   size?: number; // ≤ 200
-  sort?: string; // paymentDate | amount | paymentNumber, e.g. 'paymentDate,desc'
+  sort?: string; // paymentDate | amount | paymentNumber | payerName, e.g. 'paymentDate,desc'
 }
 
 /**

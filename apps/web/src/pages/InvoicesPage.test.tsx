@@ -95,6 +95,17 @@ describe('InvoicesPage', () => {
     });
   });
 
+  it('sorts on the server: issued newest first by default, biggest balance first on Balance', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<InvoicesPage />, { initialPath: '/invoices' });
+
+    await screen.findByText('INV-3307');
+    expect(listParams()[0]).toMatchObject({ sort: 'invoiceDate,desc' });
+
+    await user.click(screen.getByRole('button', { name: /sort by balance/i }));
+    await waitFor(() => expect(listParams()).toContainEqual(expect.objectContaining({ sort: 'balanceDue,desc' })));
+  });
+
   it('searches the server', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InvoicesPage />, { initialPath: '/invoices' });
