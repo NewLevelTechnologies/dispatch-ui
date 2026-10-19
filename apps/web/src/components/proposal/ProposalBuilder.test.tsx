@@ -101,6 +101,13 @@ describe('ProposalBuilder', () => {
     expect(within(essential).getByTestId('proposal-system-thumb')).toBeInTheDocument();
     expect(within(comfort).getByTestId('proposal-system-thumb')).toBeInTheDocument();
     expect(within(essential).getByTestId('proposal-system-meta')).not.toHaveTextContent('Edit for this quote');
+    // One structure in both views: thumbnail, body (name, sub, specs, meta), amount.
+    const line = within(essential).getAllByTestId('proposal-option-line')[0];
+    expect(line).toHaveClass('pb-line--system');
+    expect(line.children).toHaveLength(3);
+    expect(line.children[0]).toHaveAttribute('data-testid', 'proposal-system-thumb');
+    expect(line.children[1]).toContainElement(within(essential).getByTestId('proposal-system-meta'));
+    expect(line.children[2]).toHaveTextContent('$');
   });
 
   it('renames an option, sending it back whole', async () => {

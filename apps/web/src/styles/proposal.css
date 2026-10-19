@@ -110,12 +110,7 @@
   line-height: 16px;
 }
 
-/* The system line: its pricebook photo, whole on white; dashed when there is none. */
-.pb-line--system { grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; border-bottom: 0; }
-.pb-thumb { width: 44px; height: 44px; border: 1px solid var(--border-soft); border-radius: 6px; background: #fff; object-fit: contain; }
-.pb-thumb--empty { display: block; border-style: dashed; border-color: var(--border-strong); background: transparent; }
 .pb-sysmeta { display: flex; flex-direction: column; gap: 4px; padding: 0 0 6px; border-bottom: 1px solid var(--border-soft); }
-.pb-line--system + .pb-sysmeta { padding-left: 52px; }
 .pb-sysmeta-row { font-size: 10.5px; color: var(--fg-muted); }
 .pb-sysmeta-edit { border: 0; padding: 0; background: transparent; font-size: 10.5px; font-weight: 600; color: var(--fg-accent); cursor: pointer; }
 .pb-sysmeta-edit:hover { text-decoration: underline; }
@@ -143,7 +138,14 @@
 }
 .pb-line-name { font-size: 12px; font-weight: 500; line-height: 1.35; color: var(--fg-strong); overflow-wrap: anywhere; }
 .pb-line-sub { font-size: 10.5px; color: var(--fg-muted); }
-.pb-line-amt { font-size: 12.5px; color: var(--fg-strong); }
+.pb-line-amt { font-size: 12.5px; color: var(--fg-strong); white-space: nowrap; text-align: right; }
+
+/* The system line, edit or read-only: [thumbnail] [name, sub, specs, meta] [amount].
+   After .pb-line so its columns win; the thumbnail always renders, dashed when there is no photo. */
+.pb-line--system { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 9px; align-items: start; }
+.pb-thumb { display: block; width: 44px; height: 44px; max-width: none; border: 1px solid var(--border-soft); border-radius: 6px; background: #fff; object-fit: cover; }
+.pb-thumb--empty { border-style: dashed; border-color: var(--border-strong); background: transparent; }
+.pb-line--system .pb-sysmeta { padding: 5px 0 0; border-bottom: 0; }
 .pb-line-x,
 .pb-row-x {
   display: grid;
