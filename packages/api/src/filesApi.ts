@@ -345,6 +345,11 @@ export interface RequestWorkOrderFileUploadUrlRequest {
   dispatchId?: string | null;
   // Before/After tag for the captured photo/video. Optional.
   captureTag?: WorkOrderFileCaptureTag | null;
+  // The work item the capture belongs to. When equipmentId is absent the
+  // server tags the file with the item's equipment. Optional.
+  workItemId?: string | null;
+  // Explicit subject tag. Optional.
+  equipmentId?: string | null;
 }
 
 // PATCH semantics: omitted key = unchanged; explicit null clears.
@@ -394,6 +399,8 @@ export const workOrderFilesApi = {
       caption?: string | null;
       dispatchId?: string | null;
       captureTag?: WorkOrderFileCaptureTag | null;
+      workItemId?: string | null;
+      equipmentId?: string | null;
       onProgress?: (stage: 'requesting' | 'uploading' | 'confirming') => void;
     } = {}
   ): Promise<WorkOrderFile> => {
@@ -405,6 +412,9 @@ export const workOrderFilesApi = {
       caption: options.caption ?? null,
       dispatchId: options.dispatchId ?? null,
       captureTag: options.captureTag ?? null,
+      // Only sent when set, so existing callers' request bodies don't change.
+      ...(options.workItemId ? { workItemId: options.workItemId } : {}),
+      ...(options.equipmentId ? { equipmentId: options.equipmentId } : {}),
     });
     options.onProgress?.('uploading');
     await putToS3(uploadUrl, file.type, file);

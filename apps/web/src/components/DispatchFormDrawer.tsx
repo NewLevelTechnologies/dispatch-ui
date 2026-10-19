@@ -64,6 +64,10 @@ interface Props {
    *  timeline lane does (x is the clock); a map drop carries a person and
    *  nothing else. */
   prefill?: MapPrefill | null;
+  /** Create-mode seed for the addressed items — a work item's own "Schedule"
+   *  opens the form with just that item ticked. Absent = the default (every
+   *  item that still needs a visit). */
+  initialWorkItemIds?: string[] | null;
   /** The job's division, when the caller knows it — every caller does today.
    *
    *  It ORDERS the technician picker and nothing else. A tech's divisions are a
@@ -177,6 +181,7 @@ export default function DispatchFormDrawer({
   workOrderHref,
   dispatch,
   prefill,
+  initialWorkItemIds,
   divisionId,
 }: Props) {
   const { t } = useTranslation();
@@ -236,11 +241,15 @@ export default function DispatchFormDrawer({
       setAssignedUserId('');
       setDate(defaultDate());
       setWinKey(DEFAULT_WIN_KEY);
-      setAddressed(workItems.filter((wi) => NEEDY.has(wi.statusCategory)).map((wi) => wi.id));
+      setAddressed(
+        initialWorkItemIds?.length
+          ? initialWorkItemIds
+          : workItems.filter((wi) => NEEDY.has(wi.statusCategory)).map((wi) => wi.id),
+      );
       setRelease('now');
       setNotifyCustomer(true);
     }
-  }, [open, dispatch, prefill, workItems, timeZone]);
+  }, [open, dispatch, prefill, initialWorkItemIds, workItems, timeZone]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Field workers only. This is a PICKER, so it must offer exactly who can be

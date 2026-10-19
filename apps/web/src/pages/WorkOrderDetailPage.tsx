@@ -185,6 +185,8 @@ export default function WorkOrderDetailPage() {
   );
   // Same dialog handles edit — when set, the dialog opens prefilled in PUT mode.
   const [editingDispatch, setEditingDispatch] = useState<Dispatch | null>(null);
+  // A work item's own "Schedule" seeds the form with just that item.
+  const [scheduleWorkItemIds, setScheduleWorkItemIds] = useState<string[] | null>(null);
   // Row click opens the read+manage drawer (lifecycle audit, notification
   // history, edit/delete footer). Null = closed.
   const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null);
@@ -215,19 +217,6 @@ export default function WorkOrderDetailPage() {
     setDrawerEquipment(subUnit);
   };
 
-  // "+ Add unit" (from a work-item chip row) → the full-page create with the
-  // parent locked. Sub-units inherit the parent's location; no work-item link,
-  // so no attachTo — we just return to the Work items tab.
-  const handleAddSubUnit = (parent: { id: string; name: string }) => {
-    navigate(
-      equipmentCreateUrl({
-        returnTo: `/work-orders/${id}?tab=items`,
-        locationId: workOrder?.serviceLocationId || workOrder?.serviceLocation?.id,
-        parent: parent.id,
-      })
-    );
-  };
-
   const deleteWorkItemMutation = useMutation({
     mutationFn: ({ workItemId }: { workItemId: string }) =>
       workOrderApi.deleteWorkItem(id!, workItemId),
@@ -237,11 +226,7 @@ export default function WorkOrderDetailPage() {
       setWorkItemToDelete(null);
     },
     onError: (err: unknown) => {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorDelete', { entity: getName('work_item') }));
+      showError(t('common.form.errorDelete', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
     },
   });
 
@@ -264,11 +249,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     },
     onError: (err: unknown) => {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorCreate', { entity: getName('work_item') }));
+      showError(t('common.form.errorCreate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
     },
   });
 
@@ -306,11 +287,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      showError(t('common.form.errorUpdate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
       throw err;
     }
   };
@@ -323,11 +300,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      showError(t('common.form.errorUpdate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
       throw err;
     }
   };
@@ -342,11 +315,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      showError(t('common.form.errorUpdate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
     }
   };
 
@@ -364,11 +333,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      showError(t('common.form.errorUpdate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
     }
   };
 
@@ -945,6 +910,7 @@ export default function WorkOrderDetailPage() {
               transitions={workflowTransitions}
               enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
               readOnly={frozen}
+              dispatches={dispatches}
               onDelete={handleDeleteWorkItem}
               onDuplicate={(wi) => duplicateWorkItemMutation.mutate(wi)}
               onSaveDescription={handleSaveWorkItemDescription}
@@ -952,8 +918,13 @@ export default function WorkOrderDetailPage() {
               onAttachEquipment={handleAttachEquipmentToWorkItem}
               onSetEquipmentNeeded={handleSetWorkItemEquipmentNeeded}
               onAddEquipment={handleAddEquipmentToWorkItem}
-              onSelectSubUnit={handleSelectSubUnit}
-              onAddSubUnit={handleAddSubUnit}
+              onOpenEquipment={handleSelectSubUnit}
+              onScheduleDispatch={(wi) => {
+                setEditingDispatch(null);
+                setScheduleWorkItemIds([wi.id]);
+                setAssignDispatchDialogOpen(true);
+              }}
+              onSelectDispatch={(d) => setSelectedDispatch(d)}
               focusWorkItemId={focusWorkItemId}
               tripsByWorkItem={wiTrips}
               openComposerSignal={composeWorkItemSignal}
@@ -1049,6 +1020,7 @@ export default function WorkOrderDetailPage() {
         onClose={() => {
           setAssignDispatchDialogOpen(false);
           setEditingDispatch(null);
+          setScheduleWorkItemIds(null);
           if (searchParams.has('schedule'))
             setSearchParams(
               (prev) => {
@@ -1065,6 +1037,7 @@ export default function WorkOrderDetailPage() {
         workOrderNumber={woDisplayNumber}
         divisionId={workOrder.divisionId}
         dispatch={editingDispatch}
+        initialWorkItemIds={scheduleWorkItemIds}
       />
 
       {/* Equipment quickview drawer — slides in from the right when a
