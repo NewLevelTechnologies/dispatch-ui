@@ -6,6 +6,7 @@ import { Heading } from '../catalyst/heading';
 import { Text } from '../catalyst/text';
 import { Button } from '../catalyst/button';
 import { LoadingState } from '../ui/LoadingState';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 /** Back link + title row around a quote or invoice; loading and error states included. */
 export function DocumentPageFrame({
@@ -13,6 +14,7 @@ export function DocumentPageFrame({
   error,
   entityLabel,
   back,
+  workOrderHref,
   title,
   number,
   badges,
@@ -24,12 +26,15 @@ export function DocumentPageFrame({
   /** Glossary name, singular ("Quote"). */
   entityLabel: string;
   back: { to: string; label: string };
+  /** The document's work order — a "View work order" button leads the actions. */
+  workOrderHref?: string | null;
   title?: string;
   number?: string;
   badges?: ReactNode;
   actions?: ReactNode;
   children?: ReactNode;
 }) {
+  const { getName } = useGlossary();
   if (loading) {
     return (
       <AppLayout>
@@ -62,7 +67,16 @@ export function DocumentPageFrame({
           {number && <span className="font-mono text-[13px] text-fg-muted">{number}</span>}
           {badges}
           <span className="grow" />
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+          {(workOrderHref || actions) && (
+            <div className="flex items-center gap-2">
+              {workOrderHref && (
+                <Button outline size="xs" href={workOrderHref}>
+                  {`View ${getName('work_order').toLowerCase()}`}
+                </Button>
+              )}
+              {actions}
+            </div>
+          )}
         </div>
         {children}
       </div>

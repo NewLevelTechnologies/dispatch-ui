@@ -222,6 +222,7 @@ export default function InvoiceDetailPage() {
       error={false}
       entityLabel={entityLabel}
       back={back}
+      workOrderHref={invoice.workOrderId ? withDocumentBack(`/work-orders/${invoice.workOrderId}`, 'invoice', invoice.id, invoice.invoiceNumber) : null}
       number={invoice.invoiceNumber}
       actions={actions}
       badges={
