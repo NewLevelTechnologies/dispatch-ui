@@ -53,12 +53,13 @@ const VIEW_LABEL: Record<QuoteView, string> = {
   all: 'All',
 };
 
-// BE sort whitelist (QuoteController): quoteDate, firstSentAt, expirationDate,
-// totalAmount, quoteNumber. The Sent column shows the LAST send (and Accepted
-// shows decidedAt), so firstSentAt would visibly mis-order resent quotes — not
-// offered. Default quoteDate,desc has no column; it's the "no sort param" state.
+// BE sort whitelist (QuoteController): quoteDate, firstSentAt, lastSentAt,
+// decidedAt, expirationDate, totalAmount, quoteNumber, customerName. The date
+// column is Sent (lastSentAt) or, on the decided views, Accepted (decidedAt);
+// unsent/undecided quotes sort last either way. Default quoteDate,desc has no
+// column; it's the "no sort param" state.
 const DEFAULT_SORT: SortState = { key: 'quoteDate', dir: 'desc' };
-const SORT_KEYS = ['quoteDate', 'quoteNumber', 'expirationDate', 'totalAmount'] as const;
+const SORT_KEYS = ['quoteDate', 'quoteNumber', 'customerName', 'lastSentAt', 'decidedAt', 'expirationDate', 'totalAmount'] as const;
 
 const day = (v: string | null | undefined) => formatDocDate(v, false) ?? '—';
 const usd0 = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -94,7 +95,7 @@ export default function QuotesPage() {
   const regionId = searchParams.get('region');
   const { current: currentSort, sortParam, onSort } = useUrlSort({
     defaultSort: DEFAULT_SORT,
-    descFirst: ['totalAmount'],
+    descFirst: ['lastSentAt', 'decidedAt', 'totalAmount'],
     allowed: SORT_KEYS,
   });
 
@@ -244,10 +245,15 @@ export default function QuotesPage() {
                 <DenseTHead>
                   <tr>
                     <SortHeader sortKey="quoteNumber" label={entity} current={currentSort} onSort={onSort} style={{ minWidth: 130 }} />
-                    <th>Bill to</th>
+                    <SortHeader sortKey="customerName" label="Bill to" current={currentSort} onSort={onSort} />
                     <th>Description</th>
                     <th>Advisor</th>
-                    <th>{decided ? 'Accepted' : 'Sent'}</th>
+                    <SortHeader
+                      sortKey={decided ? 'decidedAt' : 'lastSentAt'}
+                      label={decided ? 'Accepted' : 'Sent'}
+                      current={currentSort}
+                      onSort={onSort}
+                    />
                     <SortHeader sortKey="expirationDate" label="Expires" current={currentSort} onSort={onSort} />
                     <th>Status</th>
                     <SortHeader sortKey="totalAmount" label="Total" align="right" current={currentSort} onSort={onSort} />

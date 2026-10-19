@@ -92,6 +92,18 @@ describe('PurchasingPage', () => {
     expect(await screen.findByText('PO detail page')).toBeInTheDocument();
   });
 
+  it('sends no sort by default, then the column key when a header is clicked', async () => {
+    const user = userEvent.setup();
+    mockList.mockResolvedValue(page([po()]));
+    render();
+    await screen.findByText('PO-00001');
+    expect(mockList.mock.calls[0][0].sort).toBeUndefined();
+
+    await user.click(screen.getByRole('button', { name: /sort by cost/i }));
+
+    await waitFor(() => expect(mockList.mock.calls.some((c) => c[0]?.sort === 'totalCost,desc')).toBe(true));
+  });
+
   it('clears an applied status filter via the chip ×', async () => {
     const user = userEvent.setup();
     mockList.mockResolvedValue(page([po()]));

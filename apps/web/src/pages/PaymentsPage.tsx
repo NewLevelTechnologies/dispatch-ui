@@ -32,10 +32,11 @@ import { PAYMENT_METHOD_KEY, isPaymentMethod } from '../lib/paymentMethods';
 import { FilterChip } from '../components/ui/FilterChipRow';
 
 const PAGE_SIZE = 25;
-// BE sort whitelist (PaymentController): paymentDate, amount, paymentNumber.
-// Default paymentDate,desc (then paymentNumber,desc) = the "no sort param" state.
+// BE sort whitelist (PaymentController): paymentDate, amount, paymentNumber,
+// payerName. Default paymentDate,desc (then paymentNumber,desc) = the "no sort
+// param" state.
 const DEFAULT_SORT: SortState = { key: 'paymentDate', dir: 'desc' };
-const SORT_KEYS = ['paymentDate', 'amount', 'paymentNumber'] as const;
+const SORT_KEYS = ['paymentDate', 'amount', 'paymentNumber', 'payerName'] as const;
 
 const STATUSES: PaymentStatus[] = ['RECEIVED', 'VOID'];
 
@@ -355,7 +356,7 @@ export default function PaymentsPage() {
                 <DenseTHead>
                   <tr>
                     <SortHeader sortKey="paymentNumber" label={t('payments.table.paymentNumber')} current={currentSort} onSort={onSort} />
-                    <th>{t('payments.table.payer')}</th>
+                    <SortHeader sortKey="payerName" label={t('payments.table.payer')} current={currentSort} onSort={onSort} />
                     <th>{t('payments.table.appliedTo')}</th>
                     <SortHeader sortKey="paymentDate" label={t('payments.table.paymentDate')} current={currentSort} onSort={onSort} />
                     <SortHeader sortKey="amount" label={t('payments.table.amount')} align="right" current={currentSort} onSort={onSort} />

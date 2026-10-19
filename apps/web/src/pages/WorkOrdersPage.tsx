@@ -86,12 +86,13 @@ function resolveStatusSelection(next: string[], prev: string[]): string[] {
 const PAGE_SIZE = 50;
 
 // BE sort whitelist (WorkOrderController): scheduledDate, completedDate,
-// createdAt, workOrderNumber, priority. Only the ones with a matching column are
-// headers; priority is a string enum on the wire (sorts alphabetically, not by
-// severity) so it's not offered. Default createdAt,desc has no column — it's
-// the "no sort param" state, so no header shows active until one is clicked.
+// createdAt, workOrderNumber, priority, locationName. Only the ones with a
+// matching column are headers (priority is a chip inside the WO cell, not a
+// column). locationName orders by what the location cell shows (location name,
+// else customer name). Default createdAt,desc has no column — it's the "no sort
+// param" state, so no header shows active until one is clicked.
 const DEFAULT_SORT: SortState = { key: 'createdAt', dir: 'desc' };
-const SORT_KEYS = ['createdAt', 'workOrderNumber', 'scheduledDate'] as const;
+const SORT_KEYS = ['createdAt', 'workOrderNumber', 'locationName', 'scheduledDate'] as const;
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 
@@ -965,7 +966,7 @@ export default function WorkOrdersPage() {
                 <DenseTHead>
                   <tr>
                     <SortHeader sortKey="workOrderNumber" label={getName('work_order')} current={currentSort} onSort={onSort} />
-                    <th>{getName('service_location')}</th>
+                    <SortHeader sortKey="locationName" label={getName('service_location')} current={currentSort} onSort={onSort} />
                     <th>{t('workOrders.table.statusHeader')}</th>
                     <th>{t('workOrders.table.assigned')}</th>
                     <SortHeader sortKey="scheduledDate" label={t('workOrders.table.scheduled')} current={currentSort} onSort={onSort} />
