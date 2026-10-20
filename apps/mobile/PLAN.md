@@ -58,8 +58,14 @@ that file in lockstep with web's if a token value changes there).
    `StatusPill`, `Card`, `Avatar`, `AppHeader`, `Stepper`, `DispatchRow` — assembled on
    a style-guide screen (`src/app/style-guide.tsx`, reachable from the home screen for
    now) so the look was dialed in before any real screen depended on it.
-1. **Shell**: tab nav (Today / Schedule / Lookup / Profile), sign-in open to any
-   authenticated user (no role gate), tenant/workspace switcher.
+1. **Shell** (done): tab nav (Today / Schedule / Lookup / Profile) via an
+   expo-router `(tabs)` group, sign-in open to any authenticated user (no role
+   gate), and a real tenant/workspace switcher — `src/tenant/` ports web's
+   `TenantContext`/`TenantGate` (one AsyncStorage tier instead of web's
+   session+local split, async hydration, no subdomain resolution). Profile is
+   real (signed-in-as, active workspace, switcher when there's more than one
+   membership, sign out); Today/Schedule/Lookup are placeholders for their own
+   phases below.
 2. **Today / Schedule / My Availability**: net-new, reshapes dispatcher-facing data
    into a single-tech view.
 3. **Dispatch detail**: lifecycle timeline + tech-initiated status transitions,
