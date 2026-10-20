@@ -53,10 +53,11 @@ that file in lockstep with web's if a token value changes there).
 
 ## Phased plan
 
-0. **Component library** (current phase): design tokens + `ThemeProvider`, and the
-   core primitives — `Button`, `StatusPill`, `Card`, `Avatar`, `AppHeader`, `Stepper`,
-   `DispatchRow` — assembled on a style-guide screen to dial in the look before any
-   real screen depends on it.
+0. **Component library** (done): design tokens (`src/theme/tokens.ts`, an oklch→hex
+   port of web's `tokens.css`) + `ThemeProvider`, and the core primitives — `Button`,
+   `StatusPill`, `Card`, `Avatar`, `AppHeader`, `Stepper`, `DispatchRow` — assembled on
+   a style-guide screen (`src/app/style-guide.tsx`, reachable from the home screen for
+   now) so the look was dialed in before any real screen depended on it.
 1. **Shell**: tab nav (Today / Schedule / Lookup / Profile), sign-in open to any
    authenticated user (no role gate), tenant/workspace switcher.
 2. **Today / Schedule / My Availability**: net-new, reshapes dispatcher-facing data
