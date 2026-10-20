@@ -2919,7 +2919,9 @@ vi.mock('../contexts/GlossaryContext', async () => {
 });
 
 // Mock useCurrentUser hook
-vi.mock('../hooks/useCurrentUser', () => ({
+// Partial mock — pure helpers (isAssignedOnly) stay real.
+vi.mock('../hooks/useCurrentUser', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../hooks/useCurrentUser')>()),
   useCurrentUser: vi.fn(() => ({
     data: {
       id: 'test-user-id',

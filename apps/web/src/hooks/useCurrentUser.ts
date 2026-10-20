@@ -43,3 +43,13 @@ export function useHasAllCapabilities(...capabilities: string[]): boolean {
   const { data: user } = useCurrentUser();
   return capabilities.every(cap => user?.capabilities?.includes(cap)) ?? false;
 }
+
+/**
+ * True for field roles that should only ever see their own work orders —
+ * VIEW_ASSIGNED_WORK_ORDERS without VIEW_ALL_WORK_ORDERS (the Technician
+ * template). Drives the post-login landing and pins the WO list's scope.
+ */
+export function isAssignedOnly(user: Pick<User, 'capabilities'> | undefined): boolean {
+  const caps = user?.capabilities ?? [];
+  return caps.includes('VIEW_ASSIGNED_WORK_ORDERS') && !caps.includes('VIEW_ALL_WORK_ORDERS');
+}

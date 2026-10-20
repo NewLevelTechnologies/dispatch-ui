@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import WorkOrdersPage from './WorkOrdersPage';
 import { apiClient } from '../api/setup';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 // Mock the API client
 vi.mock('@dispatch/api/src/client');
@@ -684,6 +685,35 @@ describe('WorkOrdersPage', () => {
       // Exact match so the chip's "Status — clear" × button doesn't collide.
       expect(await screen.findByRole('button', { name: /^status$/i })).toBeInTheDocument();
       expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Assigned-only users (Technician)', () => {
+    // The global mock's implementation is shared across files' tests —
+    // restore it so the tech user doesn't leak into later describes.
+    const defaultImpl = vi.mocked(useCurrentUser).getMockImplementation();
+    afterEach(() => {
+      if (defaultImpl) vi.mocked(useCurrentUser).mockImplementation(defaultImpl);
+    });
+
+    beforeEach(() => {
+      vi.mocked(useCurrentUser).mockReturnValue({
+        data: { id: 'tech-1', capabilities: ['VIEW_ASSIGNED_WORK_ORDERS'] },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof useCurrentUser>);
+    });
+
+    it('pins the list to their own work and hides the all-work scope', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
+      const { router } = renderWithProviders(<WorkOrdersPage />, { initialPath: '/?assigned=someone-else' });
+
+      await waitFor(() => {
+        expect(router.state.location.search).toContain('assigned=tech-1');
+      });
+      expect(router.state.location.search).not.toContain('someone-else');
+      expect(screen.queryByRole('button', { name: /assigned to me/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^unassigned/i })).not.toBeInTheDocument();
     });
   });
 

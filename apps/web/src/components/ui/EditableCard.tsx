@@ -15,7 +15,8 @@ type EditableCardProps = {
   title: string;
   subtitle?: ReactNode;
   editing: boolean;
-  onEdit: () => void;
+  // Omit for view-only users — the Edit button isn't rendered at all.
+  onEdit?: () => void;
   onCancel: () => void;
   onSave: () => void;
   saving?: boolean;
@@ -51,7 +52,7 @@ export function EditableCard({
       subtitle={subtitle}
       className={className}
       action={
-        editing ? undefined : (
+        editing || !onEdit ? undefined : (
           <Button outline size="xs" type="button" onClick={onEdit}>
             {editLabel}
           </Button>

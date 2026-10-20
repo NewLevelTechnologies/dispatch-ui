@@ -24,7 +24,7 @@ import {
   type DateRange,
 } from '../lib/dateRangePresets';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { useCurrentUser } from '../hooks/useCurrentUser';
+import { isAssignedOnly, useCurrentUser } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import { titleCaseAddress } from '@dispatch/utils';
 import { withBackContext } from '../lib/backContext';
@@ -225,6 +225,9 @@ export default function WorkOrdersPage() {
   // (shares the `assigned` param with the filter). "My team" is not built.
   const myId = currentUser?.id ?? '';
   const scopeMine = !!myId && assignedId === myId;
+  // Field roles without VIEW_ALL_WORK_ORDERS are pinned to "Assigned to me".
+  // UI-only: the backend doesn't enforce assigned-only visibility yet.
+  const assignedOnly = isAssignedOnly(currentUser);
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
   // Legacy bookmarked `?date=<preset>` (pre-DateRangeChip URL shape) — resolved
@@ -282,6 +285,16 @@ export default function WorkOrdersPage() {
     }
     setSearchParams(next, { replace: options.replace ?? false });
   }
+
+  // Re-pin the scope whenever something drops or changes `assigned` (clear
+  // filters, a shared link, back/forward). Replace so history stays clean.
+  useEffect(() => {
+    if (assignedOnly && myId && assignedId !== myId) {
+      const next = new URLSearchParams(searchParams);
+      next.set('assigned', myId);
+      setSearchParams(next, { replace: true });
+    }
+  }, [assignedOnly, myId, assignedId, searchParams, setSearchParams]);
 
   const handleSearchInputChange = (value: string) => {
     setSearchInput(value);
@@ -641,7 +654,7 @@ export default function WorkOrdersPage() {
 
         {/* Scope — "Assigned to me" is assignedUserId pinned to the current
             user; "All work" clears it. (My team is not built.) */}
-        {myId && (
+        {myId && !assignedOnly && (
           <div className="mb-3 flex items-center gap-2">
             <div className="inline-flex h-[30px] overflow-hidden rounded-md border border-border">
               <button
@@ -835,13 +848,15 @@ export default function WorkOrdersPage() {
                   active={onSiteOnly}
                   onToggle={() => updateParams({ onSite: onSiteOnly ? null : true, page: null })}
                 />
-                <FilterChip
-                  label={t('workOrders.filters.unassigned')}
-                  tone="warning"
-                  count={unassignedCount}
-                  active={unassignedOnly}
-                  onToggle={() => updateParams({ unassigned: unassignedOnly ? null : true, page: null })}
-                />
+                {!assignedOnly && (
+                  <FilterChip
+                    label={t('workOrders.filters.unassigned')}
+                    tone="warning"
+                    count={unassignedCount}
+                    active={unassignedOnly}
+                    onToggle={() => updateParams({ unassigned: unassignedOnly ? null : true, page: null })}
+                  />
+                )}
                 <FilterChip
                   label={t('workOrders.filters.urgentHigh')}
                   tone="danger"
