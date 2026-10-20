@@ -54,6 +54,8 @@ import {
   HomeIcon,
   BuildingOffice2Icon,
 } from '@heroicons/react/24/outline';
+import { CallbackPrompt } from '../features/callbacks/CallbackPrompt';
+import { isSeededCallbackType, UNSET, type CallbackValue } from '../features/callbacks/callbackModel';
 
 // New Work Order intake (mock: New Job.html / screen-wo-intake.jsx). A CSR
 // books this while on the phone, so it's one dense form — location-led (the
@@ -297,6 +299,14 @@ export default function WorkOrderIntakePage() {
   });
   const equipName = (id: string) => locEquip?.content.find((e) => e.id === id)?.name ?? null;
 
+  // Callback link — only for a real location (a new one has no history).
+  // Held against the location it was chosen for, so changing location drops
+  // it rather than carrying a link to another site's job.
+  const [callback, setCallback] = useState<{ locationId: string; value: CallbackValue } | null>(null);
+  const callbackValue: CallbackValue =
+    callback && callback.locationId === activeLocationId ? callback.value : UNSET;
+  const draftEquipmentIds = [...new Set(drafts.map((d) => d.equipmentId).filter((id): id is string => !!id))];
+
   // ── Validation ────────────────────────────────────────────────────────
   const newCustomerReady =
     newName.trim() !== '' &&
@@ -386,6 +396,8 @@ export default function WorkOrderIntakePage() {
         ...base,
         customerId: selectedLocation.customerId,
         serviceLocationId: selectedLocation.id,
+        // Unset or "not a callback" both mean no link; the prompt never blocks.
+        ...(callbackValue.state === 'linked' ? { callbackOfWorkOrderId: callbackValue.job.id } : {}),
       });
       return;
     }
@@ -594,7 +606,7 @@ export default function WorkOrderIntakePage() {
                 </Card>
 
                 {/* Job details — WO classification. */}
-                <Card title={<StepTitle n={2} complete={!!workOrderTypeId}>Job details</StepTitle>}>
+                <Card title={<StepTitle n={2} complete={!!workOrderTypeId}>{`${getName('work_order')} details`}</StepTitle>}>
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     <Field size="xs">
                       <Label size="xs" required>
@@ -615,12 +627,12 @@ export default function WorkOrderIntakePage() {
                       </Select>
                     </Field>
                     <Field size="xs">
-                      <Label size="xs">Division</Label>
+                      <Label size="xs">{getName('division')}</Label>
                       <Select
                         size="xs"
                         value={divisionId}
                         onChange={(e) => setDivisionId(e.target.value)}
-                        aria-label="Division"
+                        aria-label={getName('division')}
                       >
                         <option value="">— None —</option>
                         {activeDivisions.map((d) => (
@@ -645,6 +657,18 @@ export default function WorkOrderIntakePage() {
                       </ToggleGroup>
                     </div>
                   </div>
+                  {activeLocationId && selectedLocation && (
+                    <CallbackPrompt
+                      // Remount per location so the panel's open/closed state resets with it.
+                      key={activeLocationId}
+                      serviceLocationId={activeLocationId}
+                      customerId={selectedLocation.customerId}
+                      equipmentIds={draftEquipmentIds}
+                      isCallbackType={isSeededCallbackType(activeTypes.find((tx) => tx.id === workOrderTypeId))}
+                      value={callbackValue}
+                      onChange={(value) => setCallback({ locationId: activeLocationId, value })}
+                    />
+                  )}
                 </Card>
 
                 {/* Work items — repeatable drafts. */}
@@ -805,6 +829,7 @@ function CreatePanelFoot({
   disabled: boolean;
   onCreate: () => void;
 }) {
+  const { getName } = useGlossary();
   return (
     <div className="mt-1 flex items-center justify-between gap-3 border-t border-border-soft pt-2.5">
       {/* Says plainly that pressing this writes nothing — the values are held
@@ -812,7 +837,7 @@ function CreatePanelFoot({
           leaves no record behind. */}
       <span className="text-[11.5px] text-fg-muted">
         {readback}
-        <span className="text-fg-dim"> · saved when you create the job</span>
+        <span className="text-fg-dim">{` · saved when you create the ${getName('work_order').toLowerCase()}`}</span>
       </span>
       <Button type="button" size="xs" disabled={disabled} onClick={onCreate}>
         <CheckIcon className="size-3" />
@@ -931,8 +956,8 @@ function NewLocationFields({
   const residence = premise === 'RESIDENCE';
   const namePlaceholder = residence ? 'Avila' : 'Red Lobster #123';
   const nameHelper = residence
-    ? `The homeowner’s name. Invoices go to ${customerName}.`
-    : `The store or building — not the parent company. Invoices go to ${customerName}.`;
+    ? `The homeowner’s name. ${getName('invoice', true)} go to ${customerName}.`
+    : `The store or building — not the parent company. ${getName('invoice', true)} go to ${customerName}.`;
   return (
     <div className="space-y-2.5">
       {/* Just what this is. Which account is the card's job, right below, and
@@ -1021,9 +1046,9 @@ function NewLocationFields({
         {hasRegions && (
           <Field size="xs" className="col-span-4">
             <Label size="xs" required>
-              Region
+              {getName('dispatch_region')}
             </Label>
-            <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
+            <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label={getName('dispatch_region')}>
               <option value="">Select…</option>
               {regions.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -1180,9 +1205,9 @@ function NewCustomerFields({
         {hasRegions && (
           <Field size="xs" className="col-span-4">
             <Label size="xs" required>
-              Region
+              {getName('dispatch_region')}
             </Label>
-            <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
+            <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label={getName('dispatch_region')}>
               <option value="">Select…</option>
               {regions.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -1239,7 +1264,7 @@ function NewCustomerFields({
           <p className="mt-1 text-[11px] text-danger-500">{contactError}</p>
         ) : (
           <Text size="xs" tone="dim" className="mt-1">
-            At least one — we send confirmations and invoices through them.
+            {`At least one — we send confirmations and ${getName('invoice', true).toLowerCase()} through them.`}
           </Text>
         )}
       </div>
@@ -1262,7 +1287,7 @@ function NewCustomerFields({
           color="accent"
           // The visible text sits in a sibling span, so the control needs its
           // own name — a bare <label> around a non-input doesn't associate.
-          aria-label="Bill this customer directly"
+          aria-label={`Bill this ${getName('customer').toLowerCase()} directly`}
           checked={model.sameBilling}
           onChange={(v) =>
             setModel({
@@ -1274,7 +1299,7 @@ function NewCustomerFields({
           }
         />
         <span>
-          <span className="block text-[12.5px] font-medium text-fg-strong">Bill this customer directly</span>
+          <span className="block text-[12.5px] font-medium text-fg-strong">{`Bill this ${getName('customer').toLowerCase()} directly`}</span>
           <span className="mt-0.5 block text-[11px] text-fg-muted">
             Uncheck only if someone else is invoiced — a franchise owner, property manager, or corporate AP.
           </span>
@@ -1379,7 +1404,7 @@ function NewCustomerFields({
               <p className="mt-1 text-[11px] text-danger-500">{billingContactErr}</p>
             ) : (
               <Text size="xs" tone="dim" className="mt-1">
-                At least one — this is where we send the invoice.
+                {`At least one — this is where we send the ${getName('invoice').toLowerCase()}.`}
               </Text>
             )}
           </div>
@@ -1441,7 +1466,7 @@ function WorkItemDraftCard({
       queryClient.invalidateQueries({ queryKey: ['equipment', { serviceLocationId, forPicker: true }] });
       attach(created.id, created.name);
     } catch (err) {
-      showError('Couldn’t add equipment', extractApiError(err) ?? undefined);
+      showError(`Couldn’t add ${getName('equipment').toLowerCase()}`, extractApiError(err) ?? undefined);
     } finally {
       setQuickBusy(false);
     }
@@ -1520,7 +1545,7 @@ function WorkItemDraftCard({
                     }
                   }}
                   placeholder="e.g. Air conditioner"
-                  aria-label="New equipment name"
+                  aria-label={`New ${getName('equipment').toLowerCase()} name`}
                 />
                 <Button type="button" color="accent" size="xxs" disabled={!draft.quickName.trim() || quickBusy} onClick={() => void quickAdd()}>
                   <CheckIcon data-slot="icon" />
@@ -1619,7 +1644,7 @@ function IntakeRail({
     : null;
 
   return (
-    <Card title="Job summary">
+    <Card title={`${getName('work_order')} summary`}>
       {!hasLocation ? (
         <Text size="sm" tone="muted">
           Pick a {getName('service_location').toLowerCase()} to see who’s billed and how to get on
@@ -1678,7 +1703,7 @@ function IntakeRail({
 
       <dl className="space-y-1 text-[12px]">
         <RailRow label="Type" value={typeName} />
-        <RailRow label="Division" value={divisionName} />
+        <RailRow label={getName('division')} value={divisionName} />
         <RailRow
           label="Priority"
           value={

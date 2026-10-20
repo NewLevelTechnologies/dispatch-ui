@@ -111,6 +111,22 @@ export interface WorkItemResponse {
   // of the attach prompt. Moot once `equipmentId` is set (equipment wins).
   // Optional on the FE type for the pre-deploy window; treat undefined as true.
   equipmentNeeded?: boolean;
+  // Who logged the item. Items created with the WO carry its creator; null
+  // name = the system user (agreement-generated WOs).
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+  // Findings provenance: first author + when. Findings written before this
+  // was recorded have `diagnosis` but no author — show them without a byline.
+  // Clearing the findings clears all of these.
+  diagnosedByUserId?: string | null;
+  diagnosedByName?: string | null;
+  diagnosedAt?: string | null;
+  // Set by each later change to the text; null = never edited ("· edited").
+  diagnosisEditedAt?: string | null;
+  // The visit the findings were written on; null when written from the office.
+  diagnosisDispatchId?: string | null;
+  // Hours, quarter-hour steps; null = no estimate. Estimate only, never billed.
+  laborHoursEstimate?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -241,6 +257,67 @@ export interface WorkOrder extends WorkOrderSummary {
   // WorkItemResponse is a structural superset of WorkItemSummaryProjection,
   // so this narrows the inherited property type at the detail level.
   workItems: WorkItemResponse[];
+  /** The earlier job this is a confirmed callback of; null when it isn't one. */
+  callbackOf?: CallbackOf | null;
+  /** Work orders linked to this one as callbacks, newest first. */
+  callbacks?: CallbackBackRef[];
+}
+
+/** A minimal pointer to another work order. */
+export interface WorkOrderRef {
+  id: string;
+  workOrderNumber: string;
+}
+
+/** `name` is null only for a user deleted from the tenant. */
+export interface CallbackTechnician {
+  userId: string;
+  name: string | null;
+}
+
+/**
+ * The confirmed link on a callback work order. A link charges every tech who
+ * arrived on the original job, once each (the backend's one rule).
+ */
+export interface CallbackOf extends WorkOrderRef {
+  summary: string | null;
+  completedDate: string | null;
+  chargedTechnicians: CallbackTechnician[];
+  /** Null for links made before 2026-10-02. */
+  linkedByUserId: string | null;
+  linkedByName: string | null;
+  linkedAt: string | null;
+}
+
+/** A work order that links to this one as a callback. */
+export interface CallbackBackRef extends WorkOrderRef {
+  summary: string | null;
+  createdAt: string;
+  createdByUserId: string | null;
+  createdByName: string | null;
+  lifecycleState: string;
+  progressCategory: ProgressCategory;
+}
+
+/**
+ * A recently completed work order the one being raised might be a callback
+ * of. Only a suggestion — nothing is linked until a CSR confirms it.
+ * Equipment matches come first, then newest.
+ */
+export interface CallbackCandidate {
+  id: string;
+  workOrderNumber: string;
+  completedDate: string | null;
+  summary: string | null;
+  matchedOn: { location: boolean; equipment: boolean };
+  /** Same as matchedOn.location; kept for compatibility. */
+  sameLocation: boolean;
+  /** The shared equipment; empty for a location-only match. */
+  equipment: { id: string; name: string }[];
+  /** Generated from a service agreement. */
+  isAgreementVisit: boolean;
+  /** Who a link would charge. */
+  technicians: CallbackTechnician[];
 }
 
 // Spring Data Page<T> response wrapper
@@ -254,7 +331,9 @@ export interface Page<T> {
   last?: boolean;
 }
 
-export type WorkOrderSortField = 'scheduledDate' | 'createdAt' | 'workOrderNumber' | 'priority';
+// priority orders by severity (desc = URGENT → LOW); locationName by what the
+// location cell shows (location name, else customer name).
+export type WorkOrderSortField = 'scheduledDate' | 'completedDate' | 'createdAt' | 'workOrderNumber' | 'priority' | 'locationName';
 export type SortDirection = 'asc' | 'desc';
 
 export interface CreateWorkItemRequest {
@@ -265,6 +344,8 @@ export interface CreateWorkItemRequest {
   equipmentNeeded?: boolean;
   // Tech's on-site assessment (≤5000). Usually empty at create.
   diagnosis?: string;
+  // Visit the findings were written on (tech app). Must be a dispatch on this WO.
+  diagnosisDispatchId?: string;
 }
 
 // equipmentId + diagnosis use JsonNullable semantics: omit = no change,
@@ -279,6 +360,10 @@ export interface UpdateWorkItemRequest {
   // and mark not-needed in one PATCH).
   equipmentNeeded?: boolean;
   diagnosis?: string | null;
+  // Recorded only by the write that first sets the findings; the office omits it.
+  diagnosisDispatchId?: string;
+  // 0.25–999.75 in 0.25 steps; null clears, omit leaves unchanged.
+  laborHoursEstimate?: number | null;
 }
 
 export interface CreateWorkOrderRequest {
@@ -291,6 +376,8 @@ export interface CreateWorkOrderRequest {
   customerOrderNumber?: string;
   /** Required by the atomic-create contract — must contain at least one item. */
   workItems: CreateWorkItemRequest[];
+  /** A confirmed callback of this earlier work order (same customer, created before). */
+  callbackOfWorkOrderId?: string;
 }
 
 // `status` is no longer updatable. Use /cancel for cancellation; progress is derived.
@@ -307,6 +394,9 @@ export interface UpdateWorkOrderRequest {
   customerOrderNumber?: string;
   // JsonNullable on the backend: omit = no change, null = clear, value = set.
   notToExceed?: number | null;
+  // JsonNullable: an id links it as a callback, null unlinks, omit = no change.
+  // 400 unless the original is the same customer's and was created before this one.
+  callbackOfWorkOrderId?: string | null;
 }
 
 export interface CancelWorkOrderRequest {
@@ -373,11 +463,21 @@ export interface ListWorkOrdersParams {
   priority?: WorkOrderPriority | WorkOrderPriority[];
   unassigned?: boolean;
   onSite?: boolean;
+  // "Completed, not invoiced": completed, ACTIVE, hand-entered work orders
+  // with no live invoice (a draft counts as invoiced; void/cancelled don't).
+  // Agreement-generated orders never match. ANDs with everything else, so pair
+  // it with progressCategory=COMPLETED — an Open status filter empties it.
+  unbilled?: boolean;
 
   // Scheduled date range — ISO yyyy-mm-dd. From is inclusive at 00:00,
   // To is exclusive at 00:00 of the next day (handled server-side).
   scheduledDateFrom?: string;
   scheduledDateTo?: string;
+
+  // Completed date range — ISO dates, inclusive. The Jobs completed report's
+  // drill-in: with its group filter, totalElements is the group's jobs.
+  completedDateFrom?: string;
+  completedDateTo?: string;
 
   // Visibility
   includeArchived?: boolean;
@@ -387,7 +487,7 @@ export interface ListWorkOrdersParams {
   page?: number;
   size?: number;
 
-  // Sort — whitelist enforced server-side: scheduledDate, createdAt, workOrderNumber, priority
+  // Sort — whitelist enforced server-side: see WorkOrderSortField
   sort?: `${WorkOrderSortField},${SortDirection}`;
 }
 
@@ -461,6 +561,35 @@ export const workOrderApi = {
     await apiClient.delete(`/work-orders/${id}`);
   },
 
+  /** Who linking to this work order would charge, for a job found by search. 404 if unknown. */
+  getCallbackCharge: async (id: string): Promise<{ chargedTechnicians: CallbackTechnician[] }> => {
+    const response = await apiClient.get<{ chargedTechnicians: CallbackTechnician[] }>(
+      `/work-orders/${id}/callback-charge`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Up to 10 active work orders completed in the last 30 days at this location
+   * or on any of this equipment; equipment matches first, then newest. Pass
+   * `excludeWorkOrderId` when editing so a work order doesn't suggest itself.
+   */
+  getCallbackCandidates: async (params: {
+    serviceLocationId: string;
+    equipmentIds?: string[];
+    excludeWorkOrderId?: string;
+  }): Promise<CallbackCandidate[]> => {
+    const response = await apiClient.get<CallbackCandidate[]>('/work-orders/callback-candidates', {
+      params: {
+        serviceLocationId: params.serviceLocationId,
+        // Comma-separated; the backend caps it at 50.
+        ...(params.equipmentIds?.length ? { equipmentIds: params.equipmentIds.slice(0, 50).join(',') } : {}),
+        ...(params.excludeWorkOrderId ? { excludeWorkOrderId: params.excludeWorkOrderId } : {}),
+      },
+    });
+    return response.data;
+  },
+
   cancel: async (id: string, request: CancelWorkOrderRequest): Promise<WorkOrder> => {
     const response = await apiClient.post<WorkOrder>(`/work-orders/${id}/cancel`, request);
     return response.data;
@@ -502,6 +631,18 @@ export const workOrderApi = {
     return response.data;
   },
 
+  /** Return a done item to the status it held before Done (server reads its
+   *  status history; falls back to In progress). 409 WORK_ITEM_NOT_DONE when
+   *  the item isn't in the Completed category. */
+  reopenWorkItem: async (workOrderId: string, workItemId: string): Promise<WorkItemResponse> => {
+    const response = await apiClient.post<WorkItemResponse>(
+      `/work-orders/${workOrderId}/work-items/${workItemId}/reopen`
+    );
+    return response.data;
+  },
+
+  // 409 { message, code } refusals: LAST_WORK_ITEM,
+  // WORK_ITEM_HAS_COMPLETED_VISIT, WORK_ORDER_CANCELLED.
   deleteWorkItem: async (workOrderId: string, workItemId: string): Promise<void> => {
     await apiClient.delete(`/work-orders/${workOrderId}/work-items/${workItemId}`);
   },

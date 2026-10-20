@@ -18,12 +18,14 @@ import { useTranslation } from '@dispatch/i18n';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import {
   customerApi,
+  documentsApi,
   invoicesApi,
   type Customer,
   type CustomerStatus,
   type UpdateCustomerRequest,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { useDocumentBack } from '../../hooks/useDocumentBack';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { useUrlTab } from '../../hooks/useUrlTab';
 import { showSuccess, showError, extractApiError } from '../../lib/toast';
@@ -41,7 +43,7 @@ import ConfirmDialog from '../ConfirmDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import LocationActivityStream from '../LocationActivityStream';
 import NotesCard from '../NotesCard';
-import CustomerInvoicesTab from './CustomerInvoicesTab';
+import { DocumentsTab, DOCUMENTS_KEY } from '../document/DocumentsTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
 import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip, ContactCard } from './MultiOverviewTab';
@@ -57,6 +59,7 @@ const PAYER_TABS: readonly TabId[] = ['overview', 'invoices', 'contacts', 'activ
 export default function PayerDetail({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const docBack = useDocumentBack();
   const queryClient = useQueryClient();
 
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
@@ -73,9 +76,10 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
     queryFn: () => invoicesApi.getCustomerArSummary(customer.id),
     enabled: !!customer.id,
   });
-  const { data: invoicesCount } = useQuery({
-    queryKey: ['invoices', 'customer-count', customer.id],
-    queryFn: () => invoicesApi.getAll({ customerId: customer.id, size: 1 }),
+  // Tab badge; shares the Quotes & invoices tab's counts cache.
+  const { data: documentViews } = useQuery({
+    queryKey: [DOCUMENTS_KEY, { customerId: customer.id }, 'views'],
+    queryFn: () => documentsApi.getViews({ customerId: customer.id }),
     enabled: !!customer.id,
   });
 
@@ -105,17 +109,17 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
       queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setLifecycleConfirm(false);
-      showSuccess(customer.status === 'ACTIVE' ? 'Payer deactivated' : 'Payer reactivated');
+      showSuccess(`${getName('payer')} ${customer.status === 'ACTIVE' ? 'deactivated' : 'reactivated'}`);
     },
     onError: (err) => {
       if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
-      showError("Couldn't update payer", extractApiError(err) ?? undefined);
+      showError(`Couldn't update ${getName('payer').toLowerCase()}`, extractApiError(err) ?? undefined);
     },
   });
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: t('customers.tabs.overview') },
-    { id: 'invoices', label: getName('invoice', true), count: invoicesCount?.totalElements },
+    { id: 'invoices', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}`, count: documentViews?.counts.all },
     { id: 'contacts', label: 'Contacts', count: customer.additionalContacts.length },
     { id: 'activity', label: t('customers.tabs.activity') },
   ];
@@ -142,10 +146,10 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
       <div className="px-1 py-1">
         <div className="mx-auto max-w-[1240px]">
           <Link
-            to="/customers"
+            to={docBack?.href ?? '/customers'}
             className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"
           >
-            ← {t('common.actions.backTo', { entities: getName('customer', true) })}
+            ← {t('common.actions.backTo', { entities: docBack?.label ?? getName('customer', true) })}
           </Link>
 
           {/* Header — payer billing identity (gold "$" mark + "Payer" pill).
@@ -160,7 +164,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                 <Heading level={1} size="page-sm" className="m-0">
                   {customer.name}
                 </Heading>
-                <Pill tone="warning">Payer</Pill>
+                <Pill tone="warning">{getName('payer')}</Pill>
                 <Pill tone={customer.status === 'ACTIVE' ? 'success' : 'neutral'} dot live={customer.status === 'ACTIVE'}>
                   {customer.status === 'ACTIVE' ? t('common.active') : t('common.inactive')}
                 </Pill>
@@ -236,7 +240,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
             </div>
           )}
 
-          {activeTab === 'invoices' && <CustomerInvoicesTab customerId={customer.id} />}
+          {activeTab === 'invoices' && <DocumentsTab aging showLocation scope={{ customerId: customer.id }} />}
 
           {activeTab === 'contacts' && (
             <CustomerContactsTab
@@ -267,8 +271,8 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                 }
               >
                 {customer.status === 'ACTIVE'
-                  ? 'Removes this payer from new-invoice bill-to pickers. Open invoices and payment history are preserved.'
-                  : 'Restores the payer to bill-to pickers. New invoices can name it again.'}
+                  ? `Removes this ${getName('payer').toLowerCase()} from new-${getName('invoice').toLowerCase()} bill-to pickers. Open ${getName('invoice', true).toLowerCase()} and ${getName('payment').toLowerCase()} history are preserved.`
+                  : `Restores the ${getName('payer').toLowerCase()} to bill-to pickers. New ${getName('invoice', true).toLowerCase()} can name it again.`}
               </Callout>
             </div>
           )}
@@ -288,8 +292,8 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
         title={customer.status === 'ACTIVE' ? `Deactivate ${customer.name}?` : `Reactivate ${customer.name}?`}
         message={
           customer.status === 'ACTIVE'
-            ? 'Removes this payer from new-invoice bill-to pickers. Open invoices and payment history are preserved.'
-            : 'Restores the payer to bill-to pickers. New invoices can name it again.'
+            ? `Removes this ${getName('payer').toLowerCase()} from new-${getName('invoice').toLowerCase()} bill-to pickers. Open ${getName('invoice', true).toLowerCase()} and ${getName('payment').toLowerCase()} history are preserved.`
+            : `Restores the ${getName('payer').toLowerCase()} to bill-to pickers. New ${getName('invoice', true).toLowerCase()} can name it again.`
         }
         confirmLabel={customer.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
         isDestructive={customer.status === 'ACTIVE'}
@@ -304,6 +308,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
 // billed-for / performed-at denorm (the actual customer + service address per
 // row) that the invoice list doesn't carry yet — see BACKEND_ASKS PAYER-1.
 function LinkedWorkPendingCard({ onViewInvoices }: { onViewInvoices: () => void }) {
+  const { getName } = useGlossary();
   return (
     <Card title={<CardTitle>Linked work</CardTitle>} padding="none">
       <div className="px-3.5 py-6 text-center">
@@ -313,7 +318,7 @@ function LinkedWorkPendingCard({ onViewInvoices }: { onViewInvoices: () => void 
           per invoice needs a backend denorm (PAYER-1).
         </div>
         <Button outline size="xs" className="mt-2.5" onClick={onViewInvoices}>
-          View invoices
+          {`View ${getName('invoice', true).toLowerCase()}`}
         </Button>
       </div>
     </Card>

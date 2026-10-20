@@ -14,6 +14,7 @@ import PayerFormPage from './pages/PayerFormPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import CustomerFormPage from './pages/CustomerFormPage';
 import AgreementDetailPage from './pages/AgreementDetailPage';
+import AgreementsPage from './pages/AgreementsPage';
 import ServiceLocationsPage from './pages/ServiceLocationsPage';
 import ServiceLocationDetailPage from './pages/ServiceLocationDetailPage';
 import WorkOrdersPage from './pages/WorkOrdersPage';
@@ -33,12 +34,12 @@ import ReportDetailPage from './pages/ReportDetailPage';
 import PartsInventoryPage from './pages/PartsInventoryPage';
 import WarehousesPage from './pages/WarehousesPage';
 import InvoicesPage from './pages/InvoicesPage';
+import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import QuotesPage from './pages/QuotesPage';
+import QuoteDetailPage from './pages/QuoteDetailPage';
+import PresentProposalPage from './pages/PresentProposalPage';
 import PaymentsPage from './pages/PaymentsPage';
-import DispatchesPage from './pages/DispatchesPage';
-import AvailabilityPage from './pages/AvailabilityPage';
-import RecurringOrdersPage from './pages/RecurringOrdersPage';
-import SchedulingPage from './pages/SchedulingPage';
+import DispatchBoardPage from './pages/DispatchBoardPage';
 import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
 import { UserInvitePage, UserEditPage } from './pages/UserFormPage';
@@ -48,6 +49,16 @@ import RoleDetailPage from './pages/RoleDetailPage';
 import { RoleAddPage, RoleEditPage } from './pages/RoleFormPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import CompanyProfilePanel from './pages/settings/CompanyProfilePanel';
+import RevenueTargetsPanel from './pages/settings/RevenueTargetsPanel';
+import TaxPanel from './pages/settings/TaxPanel';
+import PromotionsPanel from './pages/settings/PromotionsPanel';
+import FinancingPanel from './pages/settings/FinancingPanel';
+import DocumentSettingsPanel from './pages/settings/DocumentSettingsPanel';
+import LaborRatesPanel from './pages/settings/LaborRatesPanel';
+import PricebookPage from './pages/settings/PricebookPage';
+import PricebookItemPage from './pages/settings/PricebookItemPage';
+import RatePlansPage from './pages/settings/RatePlansPage';
+import RatePlanPage from './pages/settings/RatePlanPage';
 import TerminologyPanel from './pages/settings/TerminologyPanel';
 import NotificationTemplatesPanel from './pages/settings/NotificationTemplatesPanel';
 import NotificationTemplateEditPage from './pages/settings/NotificationTemplateEditPage';
@@ -202,6 +213,7 @@ function App() {
       <Route path="/customers/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerFormPage />} />} />
       <Route path="/customers/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerDetailPage />} />} />
       <Route path="/customers/:customerId/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />
+      <Route path="/agreements" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AgreementsPage />} />} />
       <Route path="/agreements/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AgreementDetailPage />} />} />
       <Route path="/service-locations" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationsPage />} />} />
       <Route path="/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />
@@ -227,12 +239,19 @@ function App() {
       <Route path="/parts-inventory" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PartsInventoryPage />} />} />
       <Route path="/warehouses" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WarehousesPage />} />} />
       <Route path="/invoices" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<InvoicesPage />} />} />
+      <Route path="/invoices/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<InvoiceDetailPage />} />} />
       <Route path="/quotes" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<QuotesPage />} />} />
+      <Route path="/quotes/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<QuoteDetailPage />} />} />
+      <Route path="/quotes/:id/present" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PresentProposalPage />} />} />
       <Route path="/payments" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PaymentsPage />} />} />
-      <Route path="/dispatches" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DispatchesPage />} />} />
-      <Route path="/availability" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AvailabilityPage />} />} />
-      <Route path="/recurring-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RecurringOrdersPage />} />} />
-      <Route path="/scheduling" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SchedulingPage />} />} />
+      {/* The dispatch board. Supersedes /dispatches (a flat list of dispatch
+          records has no audience — a dispatch is a child of a work order),
+          /availability (implied a shift-scheduling product we declined; the
+          `availability` ENTITY stays and the board reads it), and /scheduling
+          (this board is that surface). Deleted outright rather than left as
+          <Navigate> stubs: nothing links to them and nobody has bookmarked
+          them, so redirects would be debt with no beneficiary. */}
+      <Route path="/dispatch" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DispatchBoardPage />} />} />
       <Route path="/approvals" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ApprovalsPage />} />} />
       {/* Legacy redirects: /roles moved under /settings/access */}
       <Route path="/roles" element={<Navigate to="/settings/access/roles" replace />} />
@@ -241,6 +260,18 @@ function App() {
         <Route index element={<Navigate to="/settings/company-profile" replace />} />
         <Route path="general" element={<Navigate to="/settings/company-profile" replace />} />
         <Route path="company-profile" element={<CompanyProfilePanel />} />
+        <Route path="revenue-targets" element={<RevenueTargetsPanel />} />
+        <Route path="rate-plans" element={<RatePlansPage />} />
+        <Route path="rate-plans/new" element={<RatePlanPage />} />
+        <Route path="rate-plans/:id" element={<RatePlanPage />} />
+        <Route path="tax" element={<TaxPanel />} />
+        <Route path="promotions" element={<PromotionsPanel />} />
+        <Route path="financing" element={<FinancingPanel />} />
+        <Route path="quotes-invoices" element={<DocumentSettingsPanel />} />
+        <Route path="pricebook" element={<PricebookPage />} />
+        <Route path="pricebook/new" element={<PricebookItemPage />} />
+        <Route path="pricebook/:id" element={<PricebookItemPage />} />
+        <Route path="labor-rates" element={<LaborRatesPanel />} />
         <Route path="terminology" element={<TerminologyPanel />} />
         <Route path="notifications" element={<NotificationTemplatesPanel />} />
         <Route path="notifications/:id" element={<NotificationTemplateEditPage />} />

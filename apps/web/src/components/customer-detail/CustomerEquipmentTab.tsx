@@ -108,7 +108,7 @@ export default function CustomerEquipmentTab({
 
   const hasFilters = !!deferredSearch || filter !== null;
   const chips: { id: Exclude<EquipFilter, null>; label: string; count: number }[] = [
-    { id: 'open-wo', label: 'Open work order', count: openWoCount ?? 0 },
+    { id: 'open-wo', label: `Open ${getName('work_order').toLowerCase()}`, count: openWoCount ?? 0 },
     { id: 'warranty', label: 'Warranty expired', count: warrantyCount ?? 0 },
   ];
 
@@ -127,10 +127,10 @@ export default function CustomerEquipmentTab({
               resetPage();
             }}
             placeholder="Search by ID, make, model, serial…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {q && (
-            <button onClick={() => { setQ(''); resetPage(); }} className="px-1 text-[11px] text-fg-dim hover:text-fg-strong">
+            <button onClick={() => { setQ(''); resetPage(); }} className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong">
               ×
             </button>
           )}
@@ -142,7 +142,7 @@ export default function CustomerEquipmentTab({
             <button
               key={c.id}
               onClick={() => { setFilter(active ? null : c.id); resetPage(); }}
-              className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium ${
+              className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 !text-[12px] !font-medium ${
                 active
                   ? 'border-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent-500)_9%,var(--bg-elev))] text-fg-accent'
                   : 'border-border bg-bg-elev text-fg'
@@ -185,10 +185,10 @@ export default function CustomerEquipmentTab({
         ) : rows.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
-              {hasFilters ? 'No equipment matches' : t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
+              {hasFilters ? `No ${getName('equipment').toLowerCase()} matches` : t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
             </div>
             <div className="mt-1 text-[12px] text-fg-muted">
-              {hasFilters ? 'Adjust your search or clear filters.' : 'Add equipment to get started.'}
+              {hasFilters ? 'Adjust your search or clear filters.' : `Add ${getName('equipment').toLowerCase()} to get started.`}
             </div>
           </div>
         ) : (

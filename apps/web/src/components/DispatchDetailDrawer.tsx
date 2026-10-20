@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   ArrowUpTrayIcon,
@@ -24,6 +25,8 @@ import {
   type Dispatch,
   type DispatchLifecycle,
   type DispatchStatus,
+  type DispatchReleaseState,
+  type ReleasedCopy,
   type ProgressCategory,
   type User,
   type WorkItemResponse,
@@ -33,23 +36,32 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Avatar } from './ui/Avatar';
 import { Pill, Tag } from './ui/Pill';
 import { Button } from './catalyst/button';
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownDescription,
+  DropdownHeading,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+  DropdownSection,
+} from './catalyst/dropdown';
+import { Input } from './catalyst/input';
+import { canMoveTo, defaultPick, formatMoveDay, moveTargets } from '../lib/boardMove';
+import { formatHour, formatWindow as boardWindow, zonedDate, zonedHour } from '../lib/boardTime';
+import { customerNotifiedAt as noticeForWindow } from '../lib/customerNotified';
 import { SlideOver } from './catalyst/slideover';
 import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
 import { FileLightbox } from './WorkOrderFilesTab';
+import DispatchJobSection from './dispatch/DispatchJobSection';
 import { formatPhone, workItemLabel } from '@dispatch/utils';
+import { DISPATCH_PRESENTATION, type PillTone } from '../lib/dispatchStatus';
 
-type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
-
-// Status → { tone, live, accent }. EN_ROUTE + IN_PROGRESS are both "live"
-// (violet); the drawer leads with self-reported status (no GPS/ETA bar).
-const PRESENTATION: Record<DispatchStatus, { tone: PillTone; live?: boolean; accent: string }> = {
-  SCHEDULED: { tone: 'info', accent: 'var(--info-500)' },
-  EN_ROUTE: { tone: 'violet', live: true, accent: 'var(--violet-500)' },
-  IN_PROGRESS: { tone: 'violet', live: true, accent: 'var(--violet-500)' },
-  COMPLETED: { tone: 'success', accent: 'var(--success-500)' },
-  NO_SHOW: { tone: 'warning', accent: 'var(--warning-500)' },
-  CANCELLED: { tone: 'neutral', accent: 'var(--border-strong)' },
-};
+// Status presentation now lives in lib/dispatchStatus so the dispatch board
+// renders blocks in the same tones this drawer shows. EN_ROUTE + IN_PROGRESS
+// are both "live" (violet); the drawer leads with self-reported status (no
+// GPS/ETA bar).
+const PRESENTATION = DISPATCH_PRESENTATION;
 
 const NOTIF_TONE: Record<NotificationStatus, PillTone> = {
   DELIVERED: 'success',
@@ -57,6 +69,8 @@ const NOTIF_TONE: Record<NotificationStatus, PillTone> = {
   PENDING: 'neutral',
   BOUNCED: 'danger',
   FAILED: 'danger',
+  // Nothing went out: the tenant has external notifications off.
+  SUPPRESSED: 'neutral',
 };
 
 // Work-item statusCategory → Pill tone (shared grammar with the overview peek).
@@ -75,12 +89,13 @@ const TIME_ONLY = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2
 const stamp = (iso: string): string => `${MONTH_DAY.format(new Date(iso))} · ${TIME_ONLY.format(new Date(iso))}`;
 const titleCase = (s: string): string => s.charAt(0) + s.slice(1).toLowerCase();
 
-// The Tech/Customer-notified timeline steps derive from the notification log
-// (the earliest actually-sent row for that audience), NOT trip.lifecycle —
-// only the four operational steps come from lifecycle.
-function earliestNotified(logs: NotificationLogDto[], audience: 'TECH' | 'CUSTOMER'): string | null {
+// The Tech-notified timeline step derives from the notification log (the
+// earliest actually-sent row), NOT trip.lifecycle — only the four operational
+// steps come from lifecycle. Customer-notified has its own rule: it has to be
+// about the CURRENT window (lib/customerNotified).
+function earliestTechNotified(logs: NotificationLogDto[]): string | null {
   const times = logs
-    .filter((n) => n.audience === audience && (n.status === 'SENT' || n.status === 'DELIVERED'))
+    .filter((n) => n.audience === 'TECH' && (n.status === 'SENT' || n.status === 'DELIVERED'))
     .map((n) => n.sentAt ?? n.createdAt)
     .filter((s): s is string => Boolean(s))
     .sort();
@@ -98,10 +113,20 @@ function formatWindow(startIso: string, endIso: string): string {
   return `${stamp(startIso)} – ${stamp(endIso)}`;
 }
 
+/**
+ * What a caller needs to open the drawer. The drawer re-fetches the
+ * authoritative record by id (`full = detail ?? dispatch`), so this object is
+ * only a first-paint seed — and the dispatch board's read legitimately does
+ * not carry `notes` / `createdAt` / `updatedAt`, so they are optional here
+ * rather than being invented at the callsite.
+ */
+export type DispatchSeed = Omit<Dispatch, 'notes' | 'createdAt' | 'updatedAt'> &
+  Partial<Pick<Dispatch, 'notes' | 'createdAt' | 'updatedAt'>>;
+
 interface Props {
   /** When non-null, the drawer is open and shows this dispatch. Null closes it
    *  (parent owns open state — same pattern as EquipmentQuickViewDrawer). */
-  dispatch: Dispatch | null;
+  dispatch: DispatchSeed | null;
   /** The work order's dispatches, used to derive this visit's sequence number
    *  (Trip 1 = earliest arrival). Optional; the badge degrades without it. */
   dispatches?: Dispatch[];
@@ -114,6 +139,46 @@ interface Props {
   onDelete: (dispatch: Dispatch) => void;
   /** Link out from an addressed work item (opens the Work items tab). */
   onViewWorkItems?: () => void;
+  /**
+   * The parent work order, as an href. A dispatch is a VISIT and the work
+   * order is the job, so a caller that reached this drawer from somewhere
+   * other than the job itself — the dispatch board — passes the way back to
+   * it. Omitted where the work order is already on screen, which is why
+   * nothing renders without it.
+   */
+  workOrder?: {
+    number: string | null;
+    href: string;
+    /** Lets the job section count this site's visit history without a
+     *  round-trip through the work order read. */
+    serviceLocationId?: string | null;
+  };
+  /**
+   * Move this visit to another day, keeping its window (dispatch board §3.6).
+   * Board-only: the board knows which day the visit is on (`moveFrom`) and
+   * owns the cost rules — undo vs. confirm — so the drawer just offers the
+   * targets. Omitted everywhere else, which hides the control.
+   */
+  moveFrom?: string;
+  /** Today in the tenant's zone — the earliest day the visit may move to. */
+  moveToday?: string;
+  onMoveTo?: (toDate: string) => void;
+  /**
+   * Board-only release state. Editing released work never contacts the tech,
+   * so the drawer says what they still have and offers the one verb that
+   * tells them: "Release to tech" when never sent, "Send update" when the
+   * copy has drifted. Omitted elsewhere, which hides both.
+   */
+  release?: DrawerRelease;
+}
+
+export interface DrawerRelease {
+  state: DispatchReleaseState;
+  copy: ReleasedCopy | null;
+  /** The tenant's zone, for "Released 7:02a" and the window the tech has. */
+  timeZone: string;
+  pending: boolean;
+  onRelease: () => void;
 }
 
 /**
@@ -136,6 +201,11 @@ export default function DispatchDetailDrawer({
   onEdit,
   onDelete,
   onViewWorkItems,
+  workOrder,
+  moveFrom,
+  moveToday,
+  onMoveTo,
+  release,
 }: Props) {
   return (
     <SlideOver open={dispatch !== null} onClose={onClose} className="!max-w-[480px]">
@@ -149,6 +219,11 @@ export default function DispatchDetailDrawer({
           onEdit={onEdit}
           onDelete={onDelete}
           onViewWorkItems={onViewWorkItems}
+          workOrder={workOrder}
+          moveFrom={moveFrom}
+          moveToday={moveToday}
+          onMoveTo={onMoveTo}
+          release={release}
         />
       )}
     </SlideOver>
@@ -156,7 +231,7 @@ export default function DispatchDetailDrawer({
 }
 
 interface ContentProps {
-  dispatch: Dispatch;
+  dispatch: DispatchSeed;
   dispatches?: Dispatch[];
   workItems?: WorkItemResponse[];
   readOnly: boolean;
@@ -164,6 +239,15 @@ interface ContentProps {
   onEdit: (dispatch: Dispatch) => void;
   onDelete: (dispatch: Dispatch) => void;
   onViewWorkItems?: () => void;
+  workOrder?: {
+    number: string | null;
+    href: string;
+    serviceLocationId?: string | null;
+  };
+  moveFrom?: string;
+  moveToday?: string;
+  onMoveTo?: (toDate: string) => void;
+  release?: DrawerRelease;
 }
 
 function DispatchDetailContent({
@@ -175,6 +259,11 @@ function DispatchDetailContent({
   onEdit,
   onDelete,
   onViewWorkItems,
+  workOrder,
+  moveFrom,
+  moveToday,
+  onMoveTo,
+  release,
 }: ContentProps) {
   const { t } = useTranslation();
   const { getName, getAbbrev } = useGlossary();
@@ -189,6 +278,14 @@ function DispatchDetailContent({
     queryFn: () => dispatchesApi.getById(dispatch.id),
   });
   const full = detail ?? dispatch;
+
+  // Display reads `full`, which may be a partial seed for one frame. The WRITE
+  // paths need the authoritative record: `detail` once fetched, or the seed
+  // when the caller already handed us a complete Dispatch (the work-order
+  // detail page does). Null while a partial seed is still resolving, which is
+  // the one case where editing genuinely isn't possible yet.
+  const editable: Dispatch | null =
+    detail ?? (dispatch.createdAt != null && dispatch.updatedAt != null ? (dispatch as Dispatch) : null);
   const p = PRESENTATION[full.status];
   const done = full.status === 'COMPLETED';
 
@@ -217,8 +314,13 @@ function DispatchDetailContent({
       }),
   });
   const notifications = useMemo<NotificationLogDto[]>(() => notifPage?.content ?? [], [notifPage]);
-  const techNotifiedAt = useMemo(() => earliestNotified(notifications, 'TECH'), [notifications]);
-  const customerNotifiedAt = useMemo(() => earliestNotified(notifications, 'CUSTOMER'), [notifications]);
+  const techNotifiedAt = useMemo(() => earliestTechNotified(notifications), [notifications]);
+  // From `full`, the by-id read, not the seed: a board row cached before a
+  // move would carry the old windowChangedAt and count the stale notice.
+  const customerNotifiedAt = useMemo(
+    () => noticeForWindow(notifications, full.windowChangedAt),
+    [notifications, full.windowChangedAt],
+  );
 
   // Captured this visit — media keyed by dispatchId (same source + key as the tab).
   const { data: filesPage } = useQuery({
@@ -236,7 +338,7 @@ function DispatchDetailContent({
   // Visit-timeline steps, read from lifecycle (falls back to the top-level /
   // notification data when the by-id lifecycle isn't loaded/populated yet).
   const lc: DispatchLifecycle = full.lifecycle ?? {
-    scheduled: full.createdAt,
+    scheduled: full.createdAt ?? null,
     notified: null,
     enroute: null,
     arrived: full.arrivedAt,
@@ -287,7 +389,7 @@ function DispatchDetailContent({
     mutationFn: ({ status }: { status: DispatchStatus; close?: boolean }) =>
       dispatchesApi.update(dispatch.id, { status }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({ queryKey: ['dispatch', dispatch.id] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', dispatch.workOrderId] });
       if (variables.close) onClose();
@@ -341,11 +443,17 @@ function DispatchDetailContent({
     },
     onSuccess: () => {
       // Board rows may surface notify state; the log reconciles on reopen.
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
     },
   });
   // Notify-able only while on deck (SCHEDULED); live/done/cancelled hide it.
   const canNotify = !readOnly && full.status === 'SCHEDULED';
+  // Board-only: the tech's copy is out of date and there is still something
+  // they could be told about.
+  const owesRelease =
+    release != null && release.state !== 'RELEASED' && full.status !== 'CANCELLED'
+      ? release
+      : null;
 
   // Complete is the terminal escape hatch — always reachable from a non-terminal
   // state via the footer, regardless of where the timeline got stuck (a tech
@@ -389,9 +497,31 @@ function DispatchDetailContent({
                 ? t('workOrders.dispatches.onSite')
                 : t(`workOrders.dispatches.status.${full.status}`)}
             </Pill>
+            {release?.state === 'UNRELEASED' && (
+              <Pill tone="neutral">{t('dispatchBoard.chips.unreleased')}</Pill>
+            )}
+            {release?.state === 'CHANGED' && (
+              <Pill tone="warning">{t('dispatchBoard.drawer.changedPill')}</Pill>
+            )}
           </div>
+          {release?.state === 'CHANGED' && release.copy && (
+            <StaleCopyLine
+              copy={release.copy}
+              assignedUserId={full.assignedUserId}
+              currentStart={full.arrivalWindowStart}
+              timeZone={release.timeZone}
+            />
+          )}
           <span className="mt-0.5 block text-[12px] text-fg-muted">
             {full.label ? `${full.label} · ${windowStr}` : windowStr}
+            {workOrder && (
+              <>
+                {' · '}
+                <a className="db-wolink font-mono" href={workOrder.href}>
+                  {workOrder.number ?? t('workOrders.detail.title')}
+                </a>
+              </>
+            )}
           </span>
         </div>
         <Button plain onClick={onClose} aria-label={t('common.close')}>
@@ -563,7 +693,7 @@ function DispatchDetailContent({
             isOpen={uploadOpen}
             onClose={() => setUploadOpen(false)}
             workOrderId={dispatch.workOrderId}
-            dispatches={dispatches ?? [dispatch]}
+            dispatches={dispatches ?? (editable ? [editable] : [])}
             defaultDispatchId={dispatch.id}
           />
         )}
@@ -577,7 +707,7 @@ function DispatchDetailContent({
         />
 
         {/* 6 · Customer notifications — the notification_logs trail */}
-        <Section title={t('workOrders.dispatches.drawer.notifications')} last>
+        <Section title={t('workOrders.dispatches.drawer.notifications')} last={!workOrder}>
           {notifLoading && (
             <div className="text-[12.5px] text-fg-muted">
               {t('workOrders.dispatches.drawer.notificationsLoading')}
@@ -599,10 +729,32 @@ function DispatchDetailContent({
             ))}
           </div>
         </Section>
+
+        {/* 6 · The JOB — the half a dispatch-only drawer cannot answer, and
+            the reason a dispatcher opened this with a customer on the phone.
+            Present only when the caller came from somewhere other than the
+            work order itself. */}
+        {workOrder && (
+          <DispatchJobSection
+            workOrderId={dispatch.workOrderId}
+            workOrderNumber={workOrder.number}
+            href={workOrder.href}
+            serviceLocationId={workOrder.serviceLocationId}
+            currentDispatchId={dispatch.id}
+            currentWindowStart={dispatch.arrivalWindowStart}
+          />
+        )}
       </div>
 
       {/* 7 · State-aware footer */}
       <div className="flex flex-wrap items-center gap-2 border-t border-border-soft bg-bg-elev-2 px-4 py-3">
+        {/* Ahead of the state-aware verbs, and in every state: the job outlives
+            the visit, so a completed or cancelled dispatch still links to it. */}
+        {workOrder && (
+          <a className="db-wolink text-[12px]" href={workOrder.href}>
+            {`${t('dispatchBoard.menu.openWorkOrder', { entity: getName('work_order') })} →`}
+          </a>
+        )}
         {done ? (
           <>
             <span className="text-[11.5px] text-fg-muted">
@@ -611,25 +763,44 @@ function DispatchDetailContent({
                 : t('workOrders.dispatches.status.COMPLETED')}
             </span>
             <span className="grow" />
-            {!readOnly && (
-              <Button plain size="xs" onClick={() => onDelete(dispatch)}>
+            {!readOnly && editable && (
+              <Button plain size="xs" onClick={() => onDelete(editable)}>
                 {t('common.delete')}
               </Button>
             )}
           </>
         ) : (
-          !readOnly && (
+          !readOnly && editable && (
             <>
               {/* One edit entry — the form covers tech, window, work items, and
                   release. Step-by-step transitions live on the timeline; the
                   footer carries only Complete, the always-reachable escape hatch. */}
-              <Button plain size="xs" onClick={() => onEdit(dispatch)}>
+              <Button plain size="xs" onClick={() => onEdit(editable)}>
                 {`${t('common.edit')} ${getName('dispatch').toLowerCase()}`}
               </Button>
+              {/* Only SCHEDULED work moves — anything started is happening
+                  now, and anything finished is history. */}
+              {onMoveTo && moveFrom && full.status === 'SCHEDULED' && (
+                <MoveToControl from={moveFrom} today={moveToday ?? moveFrom} onMove={onMoveTo} />
+              )}
               <span className="grow" />
-              {canComplete && (
+              {/* The one verb that tells the tech anything. Primary while their
+                  copy is out of date, which is exactly when it is shown. */}
+              {owesRelease && (
                 <Button
                   color="accent"
+                  size="xs"
+                  disabled={owesRelease.pending}
+                  onClick={owesRelease.onRelease}
+                >
+                  {owesRelease.state === 'CHANGED'
+                    ? t('dispatchBoard.release.sendUpdate')
+                    : t('dispatchBoard.menu.release', { tech: getName('technician') })}
+                </Button>
+              )}
+              {canComplete && (
+                <Button
+                  {...(owesRelease ? { outline: true as const } : { color: 'accent' as const })}
                   size="xs"
                   disabled={statusMutation.isPending}
                   onClick={() => statusMutation.mutate({ status: 'COMPLETED', close: true })}
@@ -642,6 +813,120 @@ function DispatchDetailContent({
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * "Released 7:02a · Maya still has 9–11a" — what the tech is working from,
+ * since editing never told them. On a different day it says so, and after a
+ * reassignment it warns that sending tells the previous tech it's off their
+ * schedule.
+ */
+function StaleCopyLine({
+  copy,
+  assignedUserId,
+  currentStart,
+  timeZone,
+}: {
+  copy: ReleasedCopy;
+  assignedUserId: string;
+  currentStart: string;
+  timeZone: string;
+}) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const sentHour = zonedHour(copy.sentAt, timeZone);
+  const start = zonedHour(copy.arrivalWindowStart, timeZone);
+  const end = zonedHour(copy.arrivalWindowEnd, timeZone);
+  const sentDay = zonedDate(copy.arrivalWindowStart, timeZone);
+  const line = t('dispatchBoard.drawer.stillHas', {
+    sent: sentHour != null ? formatHour(sentHour) : '',
+    name: copy.assignedUserName ?? getName('technician'),
+    window: start != null && end != null ? boardWindow(start, end) : '',
+  });
+  const otherDay =
+    sentDay && sentDay !== zonedDate(currentStart, timeZone)
+      ? ` ${t('dispatchBoard.drawer.onDay', { day: formatMoveDay(sentDay) })}`
+      : '';
+  const reassigned =
+    copy.assignedUserId !== assignedUserId ? t('dispatchBoard.drawer.reassignWarning') : '';
+  return <span className="db-drawer-stale">{`${line}${otherDay}${reassigned}`}</span>;
+}
+
+/**
+ * The drawer's copy of the block menu's Move to section. A menu of its own
+ * rather than the board's: the drawer is a modal surface, so the board's
+ * floating menu would sit behind it. Same targets, same order, from the same
+ * helper — only the container differs.
+ */
+function MoveToControl({
+  from,
+  today,
+  onMove,
+}: {
+  from: string;
+  today: string;
+  onMove: (toDate: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState(() => defaultPick(from, today));
+  const targets = moveTargets(from, today);
+  const pickable = canMoveTo(from, picked, today);
+
+  if (picking) {
+    return (
+      <form
+        className="flex items-center gap-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (pickable) onMove(picked);
+        }}
+      >
+        <Input
+          type="date"
+          autoFocus
+          min={today}
+          value={picked}
+          aria-label={t('dispatchBoard.move.pickDate')}
+          onChange={(e) => setPicked(e.target.value)}
+        />
+        <Button type="submit" size="xs" color="accent" disabled={!pickable}>
+          {t('dispatchBoard.move.go')}
+        </Button>
+        <Button plain size="xs" onClick={() => setPicking(false)}>
+          {t('common.cancel')}
+        </Button>
+      </form>
+    );
+  }
+
+  return (
+    <Dropdown>
+      <DropdownButton plain size="xs">
+        {t('dispatchBoard.move.drawerAction')}
+      </DropdownButton>
+      <DropdownMenu anchor="top start">
+        <DropdownSection>
+          <DropdownHeading>{t('dispatchBoard.move.drawerHeading')}</DropdownHeading>
+          {targets.nextBusiness && (
+            <DropdownItem onClick={() => onMove(targets.nextBusiness!)}>
+              <DropdownLabel>{t('dispatchBoard.move.nextBusinessDay')}</DropdownLabel>
+              <DropdownDescription>{formatMoveDay(targets.nextBusiness)}</DropdownDescription>
+            </DropdownItem>
+          )}
+          {targets.tomorrow && (
+            <DropdownItem onClick={() => onMove(targets.tomorrow!)}>
+              <DropdownLabel>{t('dispatchBoard.move.tomorrow')}</DropdownLabel>
+              <DropdownDescription>{formatMoveDay(targets.tomorrow)}</DropdownDescription>
+            </DropdownItem>
+          )}
+          <DropdownItem onClick={() => setPicking(true)}>
+            <DropdownLabel>{t('dispatchBoard.move.pickDate')}</DropdownLabel>
+          </DropdownItem>
+        </DropdownSection>
+      </DropdownMenu>
+    </Dropdown>
   );
 }
 
@@ -698,7 +983,7 @@ function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readO
               rows={2}
               placeholder={t('workOrders.dispatches.drawer.addNotePlaceholder')}
               aria-label={t('workOrders.dispatches.drawer.addNotePlaceholder')}
-              className="w-full resize-none border-0 bg-transparent text-[12.5px] leading-relaxed text-fg-strong outline-none"
+              className="w-full resize-none border-0 bg-transparent !text-[12.5px] leading-relaxed text-fg-strong outline-none"
             />
             <div className="mt-1 flex items-center gap-2">
               <span className="text-[10.5px] text-fg-dim">{t('workOrders.dispatches.drawer.officeNoteHint')}</span>

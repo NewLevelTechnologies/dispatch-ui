@@ -1,11 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import CompanyProfilePanel from './CompanyProfilePanel';
 import { apiClient } from '../../api/setup';
 import { showError, showSuccess } from '../../lib/toast';
 
 vi.mock('@dispatch/api/src/client');
+vi.mock('../../contexts/TenantContext', () => ({
+  useOptionalTenant: () => ({
+    activeMembership: {
+      tenantId: 't1',
+      tenantSlug: 'acme-hvac',
+      companyName: 'Acme Ops',
+      userId: 'u1',
+    },
+  }),
+}));
 // Keep extractApiError real (the load-error Callout depends on it); spy on the
 // toast lanes so we can assert success/error feedback.
 vi.mock('../../lib/toast', async (importOriginal) => {
@@ -50,11 +60,28 @@ const mockSettingsWithLogo = {
   logoThumbnailUrl: 'https://x/acme-logo-thumb.png',
 };
 
-// Editable cards (each has its own Edit button, so scope clicks by index):
-//   [0] Identity  [1] Operating  [2] Branding
-// The "Features & preferences" card is flip-in-place (no Edit button) and isn't
-// in this list — its toggles are targeted by switch aria-label.
-const editButtons = () => screen.getAllByRole('button', { name: /^(edit|complete identity)$/i });
+// Editable cards each have their own Edit button. Targeted by card title
+// rather than by index: the index mapping silently retargeted every one of
+// these tests when a card was added above Identity, and the failure surfaced
+// as "cannot find the company name field" rather than as "wrong card".
+//
+// The "Features & preferences" card is flip-in-place (no Edit button), so its
+// toggles are targeted by switch aria-label instead.
+const editButtonFor = (cardTitle: string) => {
+  // Walks up from the card's title to the nearest ancestor that contains an
+  // Edit button, which is that card's own. Card renders its title as a plain
+  // div rather than a heading, and its root has no test-friendly hook — so
+  // this avoids hard-coding either the markup depth or a class name.
+  let node: HTMLElement | null = screen.getByText(cardTitle);
+  while (node) {
+    const button = within(node).queryByRole('button', {
+      name: /^(edit|complete identity)$/i,
+    });
+    if (button) return button;
+    node = node.parentElement;
+  }
+  throw new Error(`No Edit button found for the "${cardTitle}" card`);
+};
 
 describe('CompanyProfilePanel', () => {
   beforeEach(() => {
@@ -71,6 +98,37 @@ describe('CompanyProfilePanel', () => {
     expect(screen.getByText(/123 Main/)).toBeInTheDocument();
     expect(screen.getByText(/Springfield, IL 62701/)).toBeInTheDocument();
     expect(screen.getByText('info@acme.com')).toBeInTheDocument();
+  });
+
+  it('shows the workspace name from the membership list, not from settings', async () => {
+    // The switcher renders the membership list's companyName, so this card has
+    // to edit that same string — tenant-settings.companyName is the separate
+    // customer-facing name below it.
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Workspace name')).toBeInTheDocument());
+    expect(screen.getByText('Workspace')).toBeInTheDocument();
+  });
+
+  it('renames the workspace through its own endpoint and refreshes the switcher', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { companyName: 'Atech' } });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtonFor('Workspace'));
+    const input = screen.getByDisplayValue('Acme Ops');
+    await user.clear(input);
+    await user.type(input, 'Atech');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      // Its own endpoint, and no status or tenant id in the body — neither is
+      // expressible on the self-service path.
+      expect(apiClient.put).toHaveBeenCalledWith('/tenant/tenants/me', {
+        companyName: 'Atech',
+      });
+    });
+    expect(showSuccess).toHaveBeenCalledWith('Workspace name updated');
   });
 
   it('renders the reporting timezone with human label and IANA zone', async () => {
@@ -100,7 +158,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[0]);
+    await user.click(editButtonFor('Identity'));
     expect(screen.getByDisplayValue('Acme HVAC')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
 
@@ -119,7 +177,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[0]);
+    await user.click(editButtonFor('Identity'));
     const nameInput = screen.getByDisplayValue('Acme HVAC');
     await user.clear(nameInput);
     await user.type(nameInput, 'New Name');
@@ -142,8 +200,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // Operating card is the second Edit button.
-    await user.click(editButtons()[1]);
+    await user.click(editButtonFor('Operating'));
     const tzSelect = screen.getByRole('combobox');
     await user.selectOptions(tzSelect, 'America/New_York');
     await user.click(screen.getByRole('button', { name: /save changes/i }));
@@ -164,8 +221,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // Operating card is the second Edit button.
-    await user.click(editButtons()[1]);
+    await user.click(editButtonFor('Operating'));
     await user.click(screen.getByRole('radio', { name: /residence/i }));
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
@@ -235,6 +291,24 @@ describe('CompanyProfilePanel', () => {
       expect(apiClient.put).toHaveBeenCalledWith(
         expect.stringContaining('/tenant'),
         expect.objectContaining({ revenueRecognitionBasis: 'PER_VISIT' }),
+      );
+    });
+  });
+
+  it('turns inventory on', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...mockSettings, enableInventory: true } });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    const toggle = screen.getByRole('switch', { name: /inventory/i });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ enableInventory: true }),
       );
     });
   });
@@ -344,8 +418,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // Branding is the third Edit button.
-    await user.click(editButtons()[2]);
+    await user.click(editButtonFor('Branding'));
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const goodFile = new File(['x'], 'logo.png', { type: 'image/png' });
     await user.upload(fileInput, goodFile);
@@ -354,14 +427,57 @@ describe('CompanyProfilePanel', () => {
     await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
   });
 
-  it('rejects a logo larger than 1MB without uploading', async () => {
+  it('accepts a JPEG, which the server has always taken', async () => {
+    // The client used to refuse JPEG while the server accepted it, so the most
+    // common logo format anyone has to hand was rejected by us alone.
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { message: 'ok', urls: { original: 'https://x/logo.png' } },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtonFor('Branding'));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, new File(['x'], 'logo.jpg', { type: 'image/jpeg' }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('rejects a type the server cannot process, rather than letting it 400 there', async () => {
+    // SVG in particular: the processing step rasterises to PNG renditions and
+    // has nothing to render vector with, so the server refuses it. This used to
+    // be offered in the picker and fail server-side.
+    //
+    // applyAccept: false on purpose — it is a setup option in user-event v14.
+    // The accept attribute already filters this out of the picker, so the JS
+    // check exists for what accept does not cover: drag-and-drop, or a picker
+    // filter the user overrides. Leaving accept applied would test the browser
+    // rather than our guard.
+    const user = userEvent.setup({ applyAccept: false });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtonFor('Branding'));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }));
+
+    expect(showError).toHaveBeenCalled();
+    expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('rejects a logo over the size the server accepts', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[2]);
+    await user.click(editButtonFor('Branding'));
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const bigFile = new File(['x'.repeat(2 * 1024 * 1024)], 'logo.png', { type: 'image/png' });
+    // Over 5MB, matching LogoProcessingService. At the old 1MB ceiling this
+    // fixture was 2MB — well within what the server would have accepted.
+    const bigFile = new File(['x'.repeat(6 * 1024 * 1024)], 'logo.png', { type: 'image/png' });
     await user.upload(fileInput, bigFile);
 
     expect(showError).toHaveBeenCalled();
@@ -373,7 +489,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[2]);
+    await user.click(editButtonFor('Branding'));
     expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument();
   });
 
@@ -386,7 +502,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[2]);
+    await user.click(editButtonFor('Branding'));
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
     expect(screen.getByText(/logo will be removed/i)).toBeInTheDocument();
 
@@ -404,7 +520,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[2]);
+    await user.click(editButtonFor('Branding'));
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
     expect(screen.getByText(/logo will be removed/i)).toBeInTheDocument();
 

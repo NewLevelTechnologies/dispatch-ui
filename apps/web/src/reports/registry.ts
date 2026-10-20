@@ -1,44 +1,138 @@
 import { type ComponentType, lazy } from 'react';
 
 /**
- * Single source of truth for the Reports section. The hub page iterates
- * this list to render its catalog; the /reports/:slug router looks up
- * a slug here to resolve the component to render.
+ * Single source of truth for the Reports section. The catalog lists these by
+ * group; the /reports/:slug route resolves a slug here. Only live reports go
+ * in: nothing "coming soon".
  *
  * Each report is lazy-loaded so the bundle doesn't grow as we add more
  * reports — only the report a user actually visits is downloaded.
  *
- * To add a new report:
- *   1. Add a component file under `src/reports/`
- *   2. Add an entry below
+ * To add a report: a component under `src/reports/`, an entry below, and its
+ * `reports.catalog.<slug>.*` strings.
  */
+export type ReportGroup = 'money' | 'work' | 'people' | 'sales';
+
+/** Catalog order. A group with no report the user can open isn't shown. */
+export const REPORT_GROUPS: ReportGroup[] = ['money', 'work', 'people', 'sales'];
+
 export interface ReportDefinition {
-  /** URL slug — appears as /reports/:slug. */
+  /** URL slug — appears as /reports/:slug; also keys `reports.catalog.<slug>.{name,description,fromHome}`. */
   slug: string;
-  /** Title shown on the hub card and in the report header. */
-  title: string;
-  /** One-line summary shown on the hub card. */
-  description: string;
-  /** Optional grouping ("Equipment", "Operational", "Financial", …). */
-  category?: string;
+  group: ReportGroup;
+  /** `list` = print-first (tagged "Print list" in the catalog); default analysis. */
+  kind?: 'analysis' | 'list';
+  /** It also opens from a Home card (the catalog says which). */
+  fromHome?: boolean;
   /** Lazy-loaded report component (no props — gets data from URL/state). */
   Component: ComponentType;
   /**
-   * Optional capability the user must have to see this report. Hub filters
-   * by this; the router enforces it on direct access. Omit for public.
+   * The capability needed to see the report. The catalog hides it without
+   * one and the route answers as if it didn't exist. Omit for everyone.
    */
   requiresCapability?: string;
 }
 
+const AgreementsReport = lazy(() => import('./AgreementsReport'));
+const ArrivalsReport = lazy(() => import('./ArrivalsReport'));
+const CallbacksReport = lazy(() => import('./CallbacksReport'));
+const DiscountsReport = lazy(() => import('./DiscountsReport'));
 const FilterPullListReport = lazy(() => import('./FilterPullListReport'));
+const JobsCompletedReport = lazy(() => import('./JobsCompletedReport'));
+const ReceivablesReport = lazy(() => import('./ReceivablesReport'));
+const PaymentsReport = lazy(() => import('./PaymentsReport'));
+const QuotesReport = lazy(() => import('./QuotesReport'));
+const RevenueReport = lazy(() => import('./RevenueReport'));
+const SalesTaxReport = lazy(() => import('./SalesTaxReport'));
+const TechProductivityReport = lazy(() => import('./TechProductivityReport'));
+const UnbilledReport = lazy(() => import('./UnbilledReport'));
 
 export const reports: ReportDefinition[] = [
   {
+    slug: 'revenue',
+    group: 'money',
+    fromHome: true,
+    Component: RevenueReport,
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'receivables',
+    group: 'money',
+    fromHome: true,
+    Component: ReceivablesReport,
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'payments',
+    group: 'money',
+    Component: PaymentsReport,
+    // Revenue's collected, split: the same money capability.
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'discounts',
+    group: 'money',
+    Component: DiscountsReport,
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'sales-tax',
+    group: 'money',
+    Component: SalesTaxReport,
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'unbilled',
+    group: 'money',
+    Component: UnbilledReport,
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'tech-productivity',
+    group: 'people',
+    fromHome: true,
+    Component: TechProductivityReport,
+    // Home's Revenue tab and this card follow the invoice capability.
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'jobs-completed',
+    group: 'work',
+    Component: JobsCompletedReport,
+    // Every job; money columns also need VIEW_ALL_INVOICES.
+    requiresCapability: 'VIEW_ALL_WORK_ORDERS',
+  },
+  {
+    slug: 'callbacks',
+    group: 'work',
+    Component: CallbacksReport,
+    requiresCapability: 'VIEW_ALL_WORK_ORDERS',
+  },
+  {
+    slug: 'arrivals',
+    group: 'work',
+    Component: ArrivalsReport,
+    // Every tech's visits, so the company-wide dispatch view.
+    requiresCapability: 'VIEW_ALL_DISPATCHES',
+  },
+  {
+    slug: 'quotes',
+    group: 'sales',
+    fromHome: true,
+    Component: QuotesReport,
+    requiresCapability: 'VIEW_ALL_QUOTES',
+  },
+  {
+    slug: 'agreements',
+    group: 'sales',
+    Component: AgreementsReport,
+    // Recurring revenue: the money capability, as on Home.
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
     slug: 'filter-pull-list',
-    title: 'Filter Pull List',
-    description:
-      'Filter sizes and quantities needed for scheduled work orders. Print and tape to the truck before heading out.',
-    category: 'Equipment',
+    group: 'work',
+    kind: 'list',
     Component: FilterPullListReport,
   },
 ];

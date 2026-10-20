@@ -105,6 +105,24 @@ describe('workOrderApi lifecycle', () => {
     expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/wo-1');
   });
 
+  it('getCallbackCharge asks who a link to this work order would charge', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { chargedTechnicians: [] } });
+    await workOrderApi.getCallbackCharge('wo-9');
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/wo-9/callback-charge');
+  });
+
+  it('getCallbackCandidates sends the location, comma-joined equipment and the exclusion', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    await workOrderApi.getCallbackCandidates({ serviceLocationId: 'sl-1', equipmentIds: ['e1', 'e2'], excludeWorkOrderId: 'wo-1' });
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/callback-candidates', {
+      params: { serviceLocationId: 'sl-1', equipmentIds: 'e1,e2', excludeWorkOrderId: 'wo-1' },
+    });
+    await workOrderApi.getCallbackCandidates({ serviceLocationId: 'sl-1', equipmentIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/callback-candidates', {
+      params: { serviceLocationId: 'sl-1' },
+    });
+  });
+
   it('cancel carries a reason body; archive and unarchive send none', async () => {
     await workOrderApi.cancel('wo-1', { reason: 'Duplicate' } as never);
     await workOrderApi.archive('wo-1');

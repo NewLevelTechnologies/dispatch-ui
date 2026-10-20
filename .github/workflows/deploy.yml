@@ -57,6 +57,7 @@ jobs:
           echo "VITE_COGNITO_CLIENT_ID=${{ vars.VITE_COGNITO_CLIENT_ID }}"
           echo "VITE_COGNITO_DOMAIN=${{ vars.VITE_COGNITO_DOMAIN }}"
           echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}"
+          echo "VITE_MAP_STYLE_URL=${{ vars.VITE_MAP_STYLE_URL }}"
           echo "VITE_ENV=production"
 
       # VITE_API_BASE_URL is required, not optional: the shared @dispatch/api
@@ -68,6 +69,14 @@ jobs:
             echo "::error::VITE_API_BASE_URL is not set — the bundle would fall back to the dev API."
             exit 1
           fi
+          # VITE_MAP_STYLE_URL is deliberately optional: unset renders the
+          # dispatch board's explicit "map isn't configured" panel, which is a
+          # designed state, not a failure. Warn rather than fail, because the
+          # silent version of this is someone shipping a board with no basemap
+          # and no indication why.
+          if [ -z "${{ vars.VITE_MAP_STYLE_URL }}" ]; then
+            echo "::warning::VITE_MAP_STYLE_URL is not set — the dispatch board map will render the 'not configured' panel."
+          fi
 
       - name: Build React app with Vite
         run: pnpm turbo run build --filter=web
@@ -77,6 +86,11 @@ jobs:
           VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
           VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          # Self-hosted Protomaps basemap for the dispatch board map view.
+          # Must be listed here, not only set as a repo variable: Vite inlines
+          # only the VITE_* vars named in this block, so a variable that is set
+          # but not passed through produces a board with no basemap and no error.
+          VITE_MAP_STYLE_URL: ${{ vars.VITE_MAP_STYLE_URL }}
           VITE_ENV: production
 
       - name: Configure AWS credentials (OIDC)

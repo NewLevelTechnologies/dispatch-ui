@@ -1,0 +1,97 @@
+/* ───────────────────────────────────────────────────────────────────
+   Callback link — the "Is this a callback of an earlier job?" prompt
+   (new work order → Job details, and the work order's Callback card),
+   the header chip, and the back-reference card. Ported from
+   claude_designs/callback-link.css. Tints mix into `transparent` except
+   the linked row, which sits on its own elevated surface.
+   ─────────────────────────────────────────────────────────────────── */
+
+.cb-block { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+.cb-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.cb-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-elev-2);
+}
+.cb-bar-ico {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+}
+.cb-panel { overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev); }
+.cb-panel-head { padding: 11px 12px 10px; border-bottom: 1px solid var(--border-soft); background: var(--bg-elev-2); }
+.cb-title { font-size: 13px; font-weight: 600; color: var(--fg-strong); }
+.cb-sub { margin-top: 2px; font-size: 11.5px; line-height: 1.45; color: var(--fg-muted); text-wrap: pretty; }
+.cb-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.cb-row:last-child { border-bottom: none; }
+.cb-row:hover { background: var(--bg-hover); }
+.cb-row-top { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.cb-wo { font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; color: var(--fg-accent); text-decoration: none; }
+.cb-wo:hover { text-decoration: underline; }
+.cb-row-title { font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+.cb-meta { margin-top: 2px; font-size: 11.5px; color: var(--fg-muted); }
+.cb-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-elev-2);
+}
+.cb-foot .grow, .cb-bar .grow { flex: 1; }
+.cb-search { margin: 10px 12px; }
+.cb-empty { padding: 0 12px 12px; font-size: 12px; color: var(--fg-muted); }
+.cb-linked {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklch, var(--accent-500) 35%, var(--border));
+  border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--accent-500) 6%, var(--bg-elev));
+}
+.cb-linked .cb-bar-ico { background: color-mix(in oklch, var(--accent-500) 16%, transparent); color: var(--fg-accent); }
+.cb-charge { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px; color: var(--fg); }
+.cb-quiet { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-muted); }
+.cb-btn-row { display: flex; flex-shrink: 0; gap: 6px; }
+
+/* Header chip on a callback work order, beside the type pill. */
+.cb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: color-mix(in oklch, var(--accent-500) 12%, transparent);
+  color: var(--fg-accent);
+  text-decoration: none;
+}
+.cb-chip:hover { text-decoration: underline; }

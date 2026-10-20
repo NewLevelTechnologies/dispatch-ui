@@ -19,3 +19,23 @@ export function withBackContext(path: string, from: string, listQuery: string): 
 export function resolveBack(listPath: string, back: string | null): string {
   return back ? `${listPath}?${back}` : listPath;
 }
+
+export type DocumentBackKind = 'quote' | 'invoice';
+
+/**
+ * A link out of a quote or invoice (to its customer, location or work order)
+ * that the target page's back-link returns from: `from=quote|invoice`, the
+ * document's id and its number for the label.
+ */
+export function withDocumentBack(path: string, kind: DocumentBackKind, id: string, number: string | null | undefined): string {
+  const qs = new URLSearchParams({ from: kind, docId: id, ...(number ? { docNo: number } : {}) });
+  return `${path}${path.includes('?') ? '&' : '?'}${qs.toString()}`;
+}
+
+/** The quote or invoice a page was opened from, or null. Only ever an in-app document path. */
+export function documentBack(params: URLSearchParams): { kind: DocumentBackKind; href: string; number: string | null } | null {
+  const from = params.get('from');
+  const id = params.get('docId');
+  if ((from !== 'quote' && from !== 'invoice') || !id) return null;
+  return { kind: from, href: `/${from}s/${encodeURIComponent(id)}`, number: params.get('docNo') };
+}

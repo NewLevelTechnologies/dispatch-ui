@@ -6,96 +6,111 @@ import { apiClient } from '../api/setup';
 
 vi.mock('@dispatch/api/src/client');
 
-const invoiceRow = {
-  id: 'inv-1',
-  invoiceNumber: 'INV-1001',
-  status: 'SENT',
-  customerId: 'c-1',
-  customerName: 'Acme Co',
-  serviceLocationId: null,
-  workOrderId: 'wo-1',
-  invoiceDate: '2026-01-10T00:00:00Z',
-  dueDate: '2026-02-10T00:00:00Z',
-  totalAmount: 500,
-  amountPaid: 0,
-  balanceDue: 500,
-  overdue: false,
-  lastSentAt: null,
-  createdAt: '2026-01-10T00:00:00Z',
-  updatedAt: '2026-01-10T00:00:00Z',
+const row = (over: Record<string, unknown> = {}) => ({
+  id: 'inv-1', invoiceNumber: 'INV-3307', status: 'SENT', customerId: 'c-1', customerName: 'Desert Ridge Property Mgmt',
+  billToIsPayer: true, paymentTermsDays: 30, serviceLocationId: 'loc-1', serviceLocationName: 'Camelback Plaza · Suite 210',
+  serviceLocationAddress: '2390 E Camelback Rd, Phoenix', workOrderId: 'wo-1', workOrderNumber: 'WO-4107', customerPoNumber: 'DR-55821',
+  quoteId: 'q-1', quoteNumber: 'Q-2051', invoiceDate: '2026-10-11', dueDate: '2026-11-10', totalAmount: 1742.18,
+  amountPaid: 500, balanceDue: 1242.18, overdue: false, lastSentAt: '2026-10-11T16:00:00Z',
+  createdAt: '2026-10-11T00:00:00Z', updatedAt: '2026-10-11T00:00:00Z', ...over,
+});
+const page = (content: unknown[]) => ({ content, totalElements: content.length, totalPages: 1, page: 0, size: 25, first: true, last: true });
+const views = {
+  counts: { unpaid: 6, overdue: 2, draft: 2, paid: 3, all: 13, void: 2 },
+  outstanding: 13570,
+  overdueAmount: 8260,
 };
 
-const invoicePage = (content: unknown[]) => ({
-  content,
-  totalElements: content.length,
-  totalPages: 1,
-  number: 0,
-  size: 25,
-  first: true,
-  last: true,
-});
+const listParams = () =>
+  vi
+    .mocked(apiClient.get)
+    .mock.calls.filter(([u]) => u === '/financial/invoices')
+    .map(([, cfg]) => (cfg as { params: Record<string, unknown> }).params);
 
 describe('InvoicesPage', () => {
+  let rows: unknown[];
   beforeEach(() => {
     vi.clearAllMocks();
+    rows = [row()];
     vi.mocked(apiClient.get).mockImplementation((url: string) => {
-      if (url === '/financial/invoices' || url.startsWith('/financial/invoices?')) {
-        return Promise.resolve({ data: invoicePage([invoiceRow]) });
-      }
-      if (url.includes('/customers')) {
-        return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 200 } });
-      }
-      if (url.includes('/work-orders')) {
-        return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 200 } });
-      }
-      return Promise.reject(new Error(`unexpected GET ${url}`));
+      if (url === '/financial/invoices') return Promise.resolve({ data: page(rows) });
+      if (url === '/financial/invoices/views') return Promise.resolve({ data: views });
+      if (url.includes('/config/') || url.startsWith('/tenant/dispatch-regions')) return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: [] });
     });
   });
 
-  it('renders rows from the paged list envelope', async () => {
-    renderWithProviders(<InvoicesPage />);
-    await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
-    // Customer name comes off the lean row (no client-side customer join).
-    expect(screen.getByText('Acme Co')).toBeInTheDocument();
+  it('opens on Unpaid, with counts on the tabs and the outstanding totals', async () => {
+    renderWithProviders(<InvoicesPage />, { initialPath: '/invoices' });
+
+    expect(await screen.findByText('INV-3307')).toBeInTheDocument();
+    expect(listParams()[0]).toMatchObject({ status: 'SENT,OVERDUE', page: 0, size: 25 });
+    expect(await screen.findByText('$13,570.00')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Unpaid/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Overdue/ })).toHaveTextContent('2');
   });
 
-  it('drives the status chip server-side — Overdue sends overdue=true, not status=OVERDUE', async () => {
+  it('shows where each invoice came from, who pays, the site and the PO', async () => {
+    rows = [row(), row({ id: 'inv-2', invoiceNumber: 'INV-2204', status: 'VOID', quoteNumber: null, reissuedAsInvoiceNumber: 'INV-2219', voidedAt: '2026-10-10T12:00:00Z' })];
+    renderWithProviders(<InvoicesPage />, { initialPath: '/invoices' });
+
+    const sent = (await screen.findByText('INV-3307')).closest('tr')!;
+    expect(sent).toHaveTextContent('from Q-2051');
+    expect(sent).toHaveTextContent('Payer');
+    expect(sent).toHaveTextContent('Net 30');
+    expect(sent).toHaveTextContent('Camelback Plaza · Suite 210');
+    expect(sent).toHaveTextContent('WO-4107');
+    expect(sent).toHaveTextContent('DR-55821');
+    // Some paid, some still owed.
+    expect(sent).toHaveTextContent('Partial');
+    expect(sent).toHaveTextContent('$1,242.18');
+    const voided = screen.getByText('INV-2204').closest('tr')!;
+    expect(voided).toHaveTextContent('Reissued as INV-2219');
+    expect(voided).toHaveTextContent('Voided Oct 10');
+  });
+
+  it('switches tab to the matching server filter', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<InvoicesPage />);
-    await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
+    renderWithProviders(<InvoicesPage />, { initialPath: '/invoices' });
 
-    await user.click(screen.getByRole('button', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: /overdue/i }));
+    await user.click(await screen.findByRole('tab', { name: /Overdue/ }));
+    await waitFor(() => expect(listParams()).toContainEqual(expect.objectContaining({ overdue: true })));
+    await user.click(screen.getByRole('tab', { name: /Void/ }));
+    await waitFor(() => expect(listParams()).toContainEqual(expect.objectContaining({ status: 'VOID,CANCELLED' })));
+  });
 
-    await waitFor(() => {
-      const sent = vi
-        .mocked(apiClient.get)
-        .mock.calls.some(
-          ([u, cfg]) =>
-            u === '/financial/invoices' &&
-            (cfg as { params?: { overdue?: boolean; status?: string } } | undefined)?.params?.overdue === true &&
-            (cfg as { params?: { status?: string } } | undefined)?.params?.status === undefined,
-        );
-      expect(sent).toBe(true);
+  it('keeps a Revenue report drill-down exact: billed invoices in a group', async () => {
+    renderWithProviders(<InvoicesPage />, {
+      initialPath: '/invoices?status=billed&from=2026-09-01&to=2026-09-30&division=none&region=r1',
+    });
+    await screen.findByText('INV-3307');
+    expect(listParams()).toContainEqual(
+      expect.objectContaining({ billed: true, from: '2026-09-01', to: '2026-09-30', noDivision: true, regionIds: ['r1'] }),
+    );
+    expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Division' })).toBeInTheDocument();
+    // The counts cover the same dates and region.
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/invoices/views', {
+      params: { from: '2026-09-01', to: '2026-09-30', regionIds: ['r1'] },
     });
   });
 
-  it('drives search server-side via the q param', async () => {
+  it('sorts on the server: issued newest first by default, biggest balance first on Balance', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<InvoicesPage />);
-    await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
+    renderWithProviders(<InvoicesPage />, { initialPath: '/invoices' });
 
-    await user.type(screen.getByRole('textbox'), 'acme');
+    await screen.findByText('INV-3307');
+    expect(listParams()[0]).toMatchObject({ sort: 'invoiceDate,desc' });
 
-    await waitFor(() => {
-      const sentQ = vi
-        .mocked(apiClient.get)
-        .mock.calls.some(
-          ([u, cfg]) =>
-            u === '/financial/invoices' &&
-            (cfg as { params?: { q?: string } } | undefined)?.params?.q === 'acme',
-        );
-      expect(sentQ).toBe(true);
-    });
+    await user.click(screen.getByRole('button', { name: /sort by balance/i }));
+    await waitFor(() => expect(listParams()).toContainEqual(expect.objectContaining({ sort: 'balanceDue,desc' })));
+  });
+
+  it('searches the server', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<InvoicesPage />, { initialPath: '/invoices' });
+
+    await user.type(await screen.findByRole('textbox', { name: /PO #/ }), 'DR-558');
+    await waitFor(() => expect(listParams()).toContainEqual(expect.objectContaining({ q: 'DR-558' })));
   });
 });

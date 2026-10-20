@@ -13,7 +13,6 @@ import {
   EquipmentStatus,
   type EquipmentSummary,
   type EquipmentSortField,
-  type EquipmentSortDirection,
 } from '../api/setup';
 import AppLayout from '../components/AppLayout';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
@@ -27,6 +26,8 @@ import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -34,6 +35,8 @@ import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 
 const PAGE_SIZE = 50;
+const DEFAULT_SORT: SortState = { key: 'name', dir: 'asc' };
+const SORT_KEYS = ['name'] as const;
 
 export default function EquipmentPage() {
   const queryClient = useQueryClient();
@@ -64,8 +67,11 @@ export default function EquipmentPage() {
     else params.set('page', String(next + 1));
     setSearchParams(params);
   };
-  const [sortBy] = useState<EquipmentSortField>('name');
-  const [sortDir] = useState<EquipmentSortDirection>('asc');
+  // BE sort whitelist (EquipmentController): name, createdAt, updatedAt,
+  // lastServicedAt, installDate. Name is the only one with a column here.
+  const { current: currentSort, onSort } = useUrlSort({ defaultSort: DEFAULT_SORT, allowed: SORT_KEYS });
+  const sortBy = currentSort.key as EquipmentSortField;
+  const sortDir = currentSort.dir;
 
   // Defer the search input so we don't fire a request on every keystroke
   const deferredSearch = useDeferredValue(searchQuery.trim());
@@ -317,7 +323,7 @@ export default function EquipmentPage() {
               <DenseTable>
                 <DenseTHead>
                   <tr>
-                    <th>{t('common.form.name')}</th>
+                    <SortHeader sortKey="name" label={t('common.form.name')} current={currentSort} onSort={onSort} />
                     <th>{getName('service_location')}</th>
                     <th>{t('equipment.table.type')}</th>
                     <th>{t('equipment.table.makeModel')}</th>

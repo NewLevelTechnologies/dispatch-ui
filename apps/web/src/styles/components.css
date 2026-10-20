@@ -57,6 +57,9 @@
   color: var(--fg-accent);
 }
 .card-action:hover { text-decoration: underline; }
+/* Secondary header action (Cancel, "No equipment needed") — same link, muted. */
+.card-action.is-muted { color: var(--fg-muted); }
+.card-action.is-muted:hover { color: var(--fg-strong); }
 .card-action svg { width: 14px; height: 14px; }
 .card-body { padding: 14px; }
 .card-body.flush { padding: 0; }
@@ -97,6 +100,23 @@
 .kpi-delta.up   { color: var(--success-500); }
 .kpi-delta.down { color: var(--danger-500); }
 .kpi-meta { font-size: 11px; color: var(--fg-muted); }
+.kpi-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  letter-spacing: 0;
+  margin-left: 4px;
+}
+.kpi-foot { display: flex; align-items: center; gap: 8px; }
+/* Reserve the sparkline's corner so delta/meta never run under it. */
+.kpi-foot.has-spark { padding-right: 76px; }
+.kpi-spark {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  opacity: 0.85;
+  pointer-events: none;
+}
 
 /* ── Pills / status badges ──────────────────────────────────────── */
 .pill {
@@ -375,11 +395,23 @@
 }
 
 /* `sm` — inline placements (e.g. beside a field label). */
-.toggle-group--sm { padding: 2px; gap: 2px; border-radius: 7px; }
+/* The dense variant sits in operational chrome beside 26px fields, so its
+   height is DECLARED rather than derived from its own text — a content-sized
+   track lands a couple of pixels taller than everything next to it, which is
+   how one band ends up with three heights. */
+.toggle-group--sm {
+  box-sizing: border-box;
+  height: 26px;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 7px;
+}
 .toggle-group--sm .toggle-group-option {
-  padding: 2px 8px;
+  display: grid;
+  place-items: center;
+  padding: 0 10px;
   gap: 4px;
-  font-size: 11px;
+  font-size: 11.5px;
   border-radius: 5px;
 }
 
@@ -835,6 +867,21 @@
   letter-spacing: 0.08em;
   color: var(--fg-muted);
 }
+/* Inline qualifier beside a label or card title ("As of today"). */
+.tag-tiny {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  vertical-align: 1px;
+}
 .bar {
   height: 5px;
   background: var(--bg-active);
@@ -1015,4 +1062,44 @@
   padding: 2px 6px;
   color: var(--fg);
   font-size: 11.5px;
+}
+
+/* ── Workspace switcher ──────────────────────────────────────────────
+   Catalyst's menu-item focus style is a hardcoded `bg-blue-500` with white
+   text (dropdown.tsx), which ignores the accent token entirely. Beside the
+   accent-tinted tiles and the accent check, that blue reads as a different
+   system — and a fully filled row out-shouts the current workspace, so hover
+   looks like the selection and the selection looks inactive.
+
+   Scoped to this menu rather than fixed app-wide: the same hardcoded blue is
+   in combobox.tsx and listbox.tsx too, and correcting all three is a
+   deliberate, app-wide visual change rather than a switcher fix.
+
+   Unlayered and imported after Tailwind, so it wins on source order at equal
+   specificity — no `!important` needed. */
+.workspace-menu [data-focus] {
+  background: color-mix(in oklch, var(--accent-500) 12%, transparent);
+  color: var(--fg-strong);
+}
+
+/* ── Account menu: destructive row ───────────────────────────────────
+   Catalyst's menu items assume a saturated focus fill, so they set
+   `data-focus:text-white` on the item and `group-data-focus:text-white` on the
+   description and icon. A destructive row wants a pale red wash instead of a
+   solid one, and white text on a 10% tint is unreadable — which is exactly
+   what it rendered as.
+
+   Selectors here carry a class + attribute, so they outrank Tailwind's
+   single-class utilities on specificity and do not depend on source order. */
+.account-menu .menu-danger[data-focus] {
+  background: color-mix(in oklch, var(--danger-500) 10%, transparent);
+  color: var(--danger-500);
+}
+.account-menu .menu-danger[data-focus] [data-slot='icon'] {
+  color: var(--danger-500);
+}
+/* Kept a step down from the label so the row reads as one thing with a
+   sub-line, not two equal red strings. */
+.account-menu .menu-danger[data-focus] [data-slot='description'] {
+  color: color-mix(in oklch, var(--danger-500) 78%, transparent);
 }

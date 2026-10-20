@@ -2,12 +2,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { PatternFormat } from 'react-number-format';
-import { userApi, dispatchRegionApi, type Role } from '../api/setup';
+import {
+  type Dispatchable,
+  type Role,
+  dispatchRegionApi,
+  divisionsApi,
+  tenantSettingsApi,
+  userApi,
+} from '../api/setup';
+import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
+import { summarizeAssignment } from '../lib/dispatchable';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { roleAccentFromRole } from '@dispatch/utils';
-import { showError, showSuccess, extractApiError, errorStatus } from '../lib/toast';
+import { showError, showSuccess, extractApiError, errorStatus, errorCode, isConflict } from '../lib/toast';
+import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
@@ -28,6 +40,7 @@ interface UserFormPageProps {
 }
 
 export default function UserFormPage({ mode }: UserFormPageProps) {
+  const { getName } = useGlossary();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -50,15 +63,36 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     queryFn: () => dispatchRegionApi.getAll(false),
   });
 
+  // Same query key the dispatch board uses, so this usually costs nothing.
+  const { data: divisions = [] } = useQuery({
+    queryKey: ['work-order-config', 'divisions'],
+    queryFn: () => divisionsApi.getAll(),
+  });
+
+  // Names the workspace in the invite result and the lockout dialog. Shared
+  // cache key with App.tsx, so this costs no extra request.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const workspaceName = tenantSettings?.companyName || 'this workspace';
+
+  // Set when a role save would leave the workspace with nobody able to manage
+  // users. Not predicted client-side — that needs a capability-aware count
+  // across every role, and getting it subtly wrong is worse than asking.
+  const [guard, setGuard] = useState<RemovalGuard | null>(null);
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     phoneNumber: '',
+    jobTitle: '',
     roleIds: [] as string[],
     dispatchRegionIds: [] as string[],
+    divisionIds: [] as string[],
+    dispatchable: 'INHERIT' as Dispatchable,
   });
-  const [sendInvite, setSendInvite] = useState(true);
 
   useEffect(() => {
     if (isInvite) return;
@@ -73,8 +107,11 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       lastName: existingUser.lastName,
       email: existingUser.email,
       phoneNumber: existingUser.phoneNumber ?? '',
+      jobTitle: existingUser.jobTitle ?? '',
       roleIds: existingUser.roles?.map((r) => r.id) ?? [],
       dispatchRegionIds: existingUser.dispatchRegionIds ?? [],
+      divisionIds: existingUser.divisionIds ?? [],
+      dispatchable: existingUser.dispatchable ?? 'INHERIT',
     });
   }, [existingUser, isInvite]);
 
@@ -110,33 +147,49 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         roleIds: formData.roleIds,
         dispatchRegionIds: formData.dispatchRegionIds,
         phoneNumber: formData.phoneNumber.trim() || null,
-        sendInvite,
+        jobTitle: formData.jobTitle.trim() || null,
       }),
-    onSuccess: (created) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      // Branch on the status the backend derived from the person's real Cognito
-      // state, NOT on whether we just created them. Inviting an email that
-      // already has a login links that identity into this workspace and sends
-      // no email at all — promising one is a support ticket.
-      //
-      // `sendInvite: false` is a third case the invite-status split doesn't
-      // cover: the row exists, nothing was sent, whatever status comes back.
-      if (!sendInvite) {
-        showSuccess('User created', `No invitation was sent to ${created.email}.`);
-      } else if (created.invitationStatus === 'ACTIVE') {
-        showSuccess(
-          `${created.firstName} ${created.lastName} was added to this workspace`,
-          'No email was sent — they already have a login. This workspace appears in their workspace switcher the next time they sign in.'
-        );
-      } else {
-        // INVITED covers a brand-new person *and* someone another workspace
-        // invited who never finished their first sign-in. The pending invite is
-        // real in both cases, so resend stays available on their row.
-        showSuccess(
-          `Invitation sent to ${created.email}`,
-          "They'll get an email with a temporary password. You can resend it from their row until they sign in."
-        );
+    onSuccess: async (created) => {
+      // Divisions are not accepted on create — the contract exposes them only
+      // through their own endpoint — so an invite that selected some needs a
+      // follow-up. Skipped entirely when none were chosen, which is the common
+      // case and keeps the invite a single request.
+      if (formData.divisionIds.length > 0) {
+        try {
+          await userApi.updateDivisions(created.id, { divisionIds: formData.divisionIds });
+        } catch (err) {
+          // The user exists and the invite went out; only the divisions are
+          // missing, so this must not read as a failed invite.
+          showError(`Invited, but couldn't save ${getName('division', true).toLowerCase()}`, extractApiError(err));
+        }
       }
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      invalidateDispatchBoard(queryClient);
+      // Branch on `notificationRequested`, never on `invitationStatus` — the
+      // backend keys this on who created the Cognito identity, and someone
+      // another tenant invited who never signed in comes back INVITED here yet
+      // still gets the workspace-added mail. Branching on status is the
+      // original bug.
+      //
+      // Neither branch claims delivery. INVITATION is safe to describe as an
+      // email because Cognito mails it directly, outside the tenant's
+      // notification kill-switch; WORKSPACE_ADDED goes through
+      // notification-service, which may suppress it — so that branch leads
+      // with the fact that holds either way. Falls back to the neutral line if
+      // the field is absent (an older backend, or a response shape we don't
+      // recognise).
+      const detail =
+        created.notificationRequested === 'INVITATION'
+          ? t('users.form.memberAddedInvitation', { email: created.email })
+          : created.notificationRequested === 'WORKSPACE_ADDED'
+            ? t('users.form.memberAddedLinked', { company: workspaceName })
+            : t('users.form.memberAddedDetail', { email: created.email });
+      showSuccess(
+        t('users.form.memberAdded', {
+          name: `${created.firstName} ${created.lastName}`,
+        }),
+        detail
+      );
       navigate(`/settings/access/users/${created.id}`);
     },
     onError: (error: unknown) => {
@@ -164,6 +217,12 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phoneNumber: formData.phoneNumber.trim() || null,
+        // Blank clears it on this endpoint; null would leave it as it was.
+        jobTitle: formData.jobTitle.trim(),
+        // Always sent. On this sparse PUT, omitting means "leave alone" while
+        // INHERIT means "reset to follow the roles" — sending it every time
+        // keeps that distinction out of the callsite.
+        dispatchable: formData.dispatchable,
       }),
     onError: (error: unknown) => {
       showError(
@@ -173,22 +232,40 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     },
   });
 
+  // Expect the lockout refusal HERE far more than on removal: self-removal is
+  // already blocked, so a remover is always left standing — but an admin can
+  // strip their own user-management role with no accomplice at all.
+  // `PUT /users/{id}/roles` can only ever return LAST_USER_MANAGER.
   const updateRolesMutation = useMutation({
     mutationFn: () => userApi.updateRoles(id!, { roleIds: formData.roleIds }),
-    onError: (err) => showError("Couldn't update roles", extractApiError(err)),
+    onError: (err) => {
+      if (isConflict(err) && errorCode(err) === 'LAST_USER_MANAGER') {
+        setGuard('LAST_USER_MANAGER');
+        return;
+      }
+      showError(t('users.form.rolesFailed'), extractApiError(err));
+    },
   });
 
   const updateRegionsMutation = useMutation({
     mutationFn: () =>
       userApi.updateRegions(id!, { dispatchRegionIds: formData.dispatchRegionIds }),
-    onError: (err) => showError("Couldn't update regions", extractApiError(err)),
+    onError: (err) => showError(`Couldn't update ${getName('dispatch_region', true).toLowerCase()}`, extractApiError(err)),
+  });
+
+  // Its own endpoint rather than a field on the profile PUT, matching how
+  // roles and regions already save from this form.
+  const updateDivisionsMutation = useMutation({
+    mutationFn: () => userApi.updateDivisions(id!, { divisionIds: formData.divisionIds }),
+    onError: (err) => showError(`Couldn't update ${getName('division', true).toLowerCase()}`, extractApiError(err)),
   });
 
   const submitting =
     createMutation.isPending ||
     updateProfileMutation.isPending ||
     updateRolesMutation.isPending ||
-    updateRegionsMutation.isPending;
+    updateRegionsMutation.isPending ||
+    updateDivisionsMutation.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,8 +287,12 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       await updateProfileMutation.mutateAsync();
       await updateRolesMutation.mutateAsync();
       await updateRegionsMutation.mutateAsync();
+      await updateDivisionsMutation.mutateAsync();
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['users', id] });
+      // Roles, `dispatchable`, regions and divisions all move who is on the
+      // board — divisions because the filter narrows ROWS, not just work.
+      invalidateDispatchBoard(queryClient);
       // Role / region changes emit ROLE_ADDED / ROLE_REMOVED audit events
       // that should appear in the detail page's activity feed without a
       // hard refresh.
@@ -229,6 +310,15 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       roleIds: prev.roleIds.includes(roleId)
         ? prev.roleIds.filter((r) => r !== roleId)
         : [...prev.roleIds, roleId],
+    }));
+  };
+
+  const toggleDivision = (divisionId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      divisionIds: prev.divisionIds.includes(divisionId)
+        ? prev.divisionIds.filter((d) => d !== divisionId)
+        : [...prev.divisionIds, divisionId],
     }));
   };
 
@@ -330,7 +420,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   />
                 </Field>
               </div>
-              <div className="mt-2.5">
+              <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <Field size="xs">
                   <Label size="xs">Phone</Label>
                   <PatternFormat
@@ -344,6 +434,16 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                       setFormData((p) => ({ ...p, phoneNumber: values.value }))
                     }
                     placeholder="(555) 123-4567"
+                  />
+                </Field>
+                <Field size="xs">
+                  <Label size="xs">Job title</Label>
+                  <Input
+                    size="xs"
+                    value={formData.jobTitle}
+                    maxLength={100}
+                    onChange={(e) => setFormData((p) => ({ ...p, jobTitle: e.target.value }))}
+                    placeholder="e.g. Comfort Advisor"
                   />
                 </Field>
               </div>
@@ -372,6 +472,14 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   setFormData((p) => ({ ...p, roleIds: [] }))
                 }
               />
+              {!isInvite && (
+                <DispatchableField
+                  value={formData.dispatchable}
+                  onChange={(v) => setFormData((p) => ({ ...p, dispatchable: v }))}
+                  roles={roles}
+                  selectedRoleIds={formData.roleIds}
+                />
+              )}
               <CapabilityPreview
                 effective={effective}
                 selectedCount={formData.roleIds.length}
@@ -379,32 +487,71 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
             </Card>
 
             <Card
-              title="Regions"
+              title={getName('dispatch_region', true)}
               subtitle="Where in the world this user works. Limits which records they see."
               className="mb-3"
             >
-              <RegionMultiSelect
-                regions={activeRegions}
+              <MultiSelectGrid
+                items={activeRegions}
                 selected={formData.dispatchRegionIds}
                 onToggle={toggleRegion}
+                empty={
+                  <>
+                    {`No active ${getName('dispatch_region', true).toLowerCase()} configured. `}
+                    <Link
+                      to="/settings/dispatch-regions"
+                      className="font-medium text-fg-accent hover:underline"
+                    >
+                      {`Manage ${getName('dispatch_region', true).toLowerCase()} →`}
+                    </Link>
+                  </>
+                }
               />
             </Card>
 
+            {/* A separate card from Regions on purpose: one is a PERMISSION and
+                the other is a STRENGTH, and stating them as two questions makes
+                that difference visible rather than implied.
+
+                Deliberately not "qualified for" or "certified in" — divisions
+                here are not a gate, and any tech can be given any job.
+                Certifications are a separate model with real blocking
+                semantics; borrowing their language would turn a preference into
+                something that looks like a compliance control. */}
+            <Card
+              title={getName('division', true)}
+              subtitle="The kinds of work they're good at taking on. Leave empty and they're offered for everything."
+              className="mb-3"
+            >
+              <MultiSelectGrid
+                items={divisions}
+                selected={formData.divisionIds}
+                onToggle={toggleDivision}
+                empty={
+                  <>
+                    {`No ${getName('division', true).toLowerCase()} configured. `}
+                    <Link
+                      to="/settings/work-orders"
+                      className="font-medium text-fg-accent hover:underline"
+                    >
+                      {`Manage ${getName('division', true).toLowerCase()} →`}
+                    </Link>
+                  </>
+                }
+              />
+            </Card>
+
+            {/* Not a choice: the backend sends mail on every invite, so this
+                states what will happen instead of offering a toggle that had
+                no effect on the request. */}
             {isInvite && (
-              <label className="mt-2 flex items-center gap-2 px-1 text-[11.5px] text-fg-muted">
-                <Checkbox
-                  color="accent"
-                  checked={sendInvite}
-                  onChange={setSendInvite}
-                />
-                <span>
-                  Send invitation email to{' '}
-                  <strong className="text-fg-strong">
-                    {formData.email || 'their address'}
-                  </strong>{' '}
-                  on save
-                </span>
-              </label>
+              <p className="mt-2 px-1 text-[11.5px] text-fg-muted">
+                On save we email{' '}
+                <strong className="text-fg-strong">
+                  {formData.email || 'their address'}
+                </strong>{' '}
+                how to sign in.
+              </p>
             )}
           </div>
         </div>
@@ -446,11 +593,109 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
           </Button>
         </div>
       </form>
+
+      {/* Close only: the resolution is to change the selection right here, so
+          there is nowhere else to send them. */}
+      <RemovalGuardDialog
+        guard={guard}
+        onClose={() => setGuard(null)}
+        company={workspaceName}
+      />
     </div>
   );
 }
 
 // ──────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+// DispatchableField — the per-user override on "is this person on the
+// dispatch board".
+//
+// THREE states, so a segmented group rather than a checkbox: "follow the
+// roles" is a real, distinct answer from both yes and no, and it is the
+// default for nearly everyone.
+//
+// The trailing hint is the point of the control. On its own, INHERIT tells an
+// admin nothing — they would have to go read the Roles page to work out what
+// following the roles produces for this person. So the hint states the
+// OUTCOME and its CAUSE, computed live from the roles currently ticked in
+// this form rather than from the saved value, so it updates the moment
+// someone adds Technician.
+// ──────────────────────────────────────────────────────────────────
+function DispatchableField({
+  value,
+  onChange,
+  roles,
+  selectedRoleIds,
+}: {
+  value: Dispatchable;
+  onChange: (value: Dispatchable) => void;
+  roles: Role[];
+  selectedRoleIds: string[];
+}) {
+  const { getName } = useGlossary();
+  const selected = useMemo(
+    () => roles.filter((r) => selectedRoleIds.includes(r.id)),
+    [roles, selectedRoleIds],
+  );
+  const inherited = selected.some((r) => r.performsFieldWork);
+
+  // Tenant's own word for the entity — "Can be assigned trips" for a tenant
+  // that renamed it.
+  const assignLabel = `Can be assigned ${getName('dispatch', true).toLowerCase()}`;
+
+  // The same helper the detail page reads, so the two can't drift — but fed
+  // the FORM's current selections rather than the saved user, so it answers
+  // while someone is still deciding.
+  const summary = useMemo(
+    () =>
+      summarizeAssignment({
+        dispatchable: value,
+        performsFieldWork:
+          value === 'ALWAYS' ? true : value === 'NEVER' ? false : inherited,
+        roles: selected,
+      }),
+    [value, inherited, selected],
+  );
+
+  return (
+    <div className="mt-3 border-t border-border-soft pt-3">
+      <div className="mb-1.5 text-[10px] font-semibold tracking-[0.06em] text-fg-muted uppercase">
+        {assignLabel}
+      </div>
+      <ToggleGroup
+        value={value}
+        onChange={onChange}
+        size="sm"
+        aria-label={assignLabel}
+      >
+        {/* The inherited result is echoed INSIDE the label, not beside it:
+            whoever is choosing can see what they would be overriding without
+            reading elsewhere, and it updates as roles are ticked on this same
+            page. */}
+        <ToggleGroupOption value="INHERIT">
+          {`Follow roles \u2014 ${inherited ? 'assignable' : 'not assignable'}`}
+        </ToggleGroupOption>
+        <ToggleGroupOption value="ALWAYS">Always</ToggleGroupOption>
+        <ToggleGroupOption value="NEVER">Never</ToggleGroupOption>
+      </ToggleGroup>
+
+      {/* The label carries the outcome, so this carries the cause. */}
+      <p className="mt-1.5 text-[11.5px] text-fg-muted" data-testid="dispatchable-hint">
+        {summary.reason.map((part, i) =>
+          part.strong ? (
+            <b key={i} className="font-semibold text-fg-strong">
+              {part.text}
+            </b>
+          ) : (
+            <span key={i}>{part.text}</span>
+          )
+        )}
+      </p>
+
+    </div>
+  );
+}
+
 // RoleMultiSelect — 3-col grid of role rows. Search appears only when
 // roles.length > 10; below that, the grid is the summary. The per-row
 // `<label>` wraps a Catalyst Checkbox; native label semantics forward
@@ -467,6 +712,7 @@ function RoleMultiSelect({
   onToggle: (id: string) => void;
   onClear: () => void;
 }) {
+  const { getName } = useGlossary();
   const needsSearch = roles.length > SEARCH_THRESHOLD;
   const [query, setQuery] = useState('');
 
@@ -495,7 +741,7 @@ function RoleMultiSelect({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={`Search ${roles.length} roles…`}
-            className="block h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-2.5 text-[12px] text-fg-strong outline-none focus:border-accent-500"
+            className="block h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-2.5 !text-[12px] text-fg-strong outline-none focus:border-accent-500"
           />
         </div>
       )}
@@ -551,6 +797,19 @@ function RoleMultiSelect({
                   >
                     {role.name}
                   </span>
+                  {/* Ticking this role is what puts someone on the dispatch
+                      board, so say so HERE — at the moment of the decision —
+                      rather than leaving an inviter to wonder later why a new
+                      tech has no row. Present on the invite form too, where
+                      the Dispatchable override deliberately is not. */}
+                  {role.performsFieldWork && (
+                    <span
+                      title={`Users in this role appear on the ${getName('dispatch').toLowerCase()} board`}
+                      className="flex-shrink-0 rounded-sm bg-bg-active px-1 py-px font-mono text-[9.5px] font-bold tracking-wide text-fg-muted uppercase"
+                    >
+                      Field
+                    </span>
+                  )}
                 </span>
                 <span className="font-mono text-[10px] tabular-nums text-fg-dim">
                   {capCount}
@@ -566,7 +825,7 @@ function RoleMultiSelect({
           <button
             type="button"
             onClick={onClear}
-            className="bg-transparent p-0 text-[11px] text-fg-muted hover:text-fg-strong"
+            className="bg-transparent p-0 !text-[11px] text-fg-muted hover:text-fg-strong"
           >
             Clear all {selected.length}
           </button>
@@ -629,7 +888,7 @@ function CapabilityPreview({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-[11.5px]"
+        className="flex w-full items-center gap-2 px-2.5 py-2 text-left !text-[11.5px]"
       >
         <ChevronRightIcon
           className={`size-3.5 text-fg-dim transition-transform ${open ? 'rotate-90' : ''}`}
@@ -674,30 +933,27 @@ function CapabilityPreview({
 }
 
 // ──────────────────────────────────────────────────────────────────
-// RegionMultiSelect — chip-style toggles. Selected chips fill with
-// accent; unselected sit on the nested-card surface.
+// MultiSelectGrid — the selectable multi-select for this page, used for
+// both regions and divisions. One pattern rather than two: the questions
+// differ (permission vs strength) but the gesture is identical, and a
+// second visual language for the card below would read as a different
+// KIND of answer.
 // ──────────────────────────────────────────────────────────────────
-function RegionMultiSelect({
-  regions,
+function MultiSelectGrid({
+  items,
   selected,
   onToggle,
+  empty,
 }: {
-  regions: { id: string; name: string }[];
+  items: { id: string; name: string }[];
   selected: string[];
   onToggle: (id: string) => void;
+  /** Says where to go and configure them — an empty grid with no way out is
+   *  a dead end on a form someone is trying to finish. */
+  empty: React.ReactNode;
 }) {
-  if (regions.length === 0) {
-    return (
-      <div className="text-[11.5px] text-fg-muted">
-        No active dispatch regions configured.{' '}
-        <Link
-          to="/settings/dispatch-regions"
-          className="font-medium text-fg-accent hover:underline"
-        >
-          Manage regions →
-        </Link>
-      </div>
-    );
+  if (items.length === 0) {
+    return <div className="text-[11.5px] text-fg-muted">{empty}</div>;
   }
 
   // 3-col checkbox grid — same shape as RoleMultiSelect. The selectable
@@ -707,7 +963,7 @@ function RegionMultiSelect({
   // when we have one to surface; today it stays empty.
   return (
     <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-      {regions.map((r) => {
+      {items.map((r) => {
         const on = selected.includes(r.id);
         return (
           <label

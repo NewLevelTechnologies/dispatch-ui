@@ -3,7 +3,7 @@
 // tenant is active and every request it fires carries one.
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useTranslation } from '@dispatch/i18n';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTenant } from '../../contexts/TenantContext';
 import { LoadingState } from '../ui/LoadingState';
 import {
@@ -13,6 +13,17 @@ import {
   WorkspaceLoadError,
   WorkspacePicker,
 } from './WorkspaceStates';
+
+/**
+ * Phase 3 flips this to false.
+ *
+ * Until the backend deletes its `custom:tenant_id` fallback, a request with no
+ * `X-Tenant-Id` still resolves the way it did before this rollout — so a failed
+ * bootstrap is survivable and blocking the app would be a self-inflicted
+ * outage. Once that fallback is gone, a request without a tenant is a 400 and
+ * WorkspaceLoadError becomes the honest surface.
+ */
+const CLAIM_FALLBACK_ACTIVE = true;
 
 export default function TenantGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -32,6 +43,18 @@ export default function TenantGate({ children }: { children: ReactNode }) {
   // so it cannot be called before a workspace exists.
   const email = user?.signInDetails?.loginId ?? undefined;
 
+  // Loud in the console even though the app carries on, so a persistent failure
+  // gets found rather than silently costing everyone their switcher.
+  useEffect(() => {
+    if (error && CLAIM_FALLBACK_ACTIVE) {
+      console.warn(
+        'Workspace bootstrap failed; continuing on the legacy tenant claim. ' +
+          'The workspace switcher is unavailable until this recovers.',
+        error
+      );
+    }
+  }, [error]);
+
   // Revocation outranks everything below — the workspace this tab was using is
   // gone, so nothing built on it can render.
   if (revokedFrom) {
@@ -48,9 +71,18 @@ export default function TenantGate({ children }: { children: ReactNode }) {
   if (isLoading) return <LoadingState label={t('workspace.loading')} />;
 
   // A failed bootstrap is NOT "you have no workspaces" — we don't know what
-  // this person has. Saying so would be a confident lie about their access.
+  // this person has, and saying so would be a confident lie about their access.
+  //
+  // While the backend still honours the legacy claim, it is not a reason to
+  // block either: a request with no X-Tenant-Id resolves exactly as it did
+  // before this rollout, so the app works and only the switcher is missing.
+  // Blocking would turn a transient blip into a lockout of every page.
   if (error) {
-    return <WorkspaceLoadError onRetry={refresh} onSignOut={signOut} />;
+    return CLAIM_FALLBACK_ACTIVE ? (
+      <>{children}</>
+    ) : (
+      <WorkspaceLoadError onRetry={refresh} onSignOut={signOut} />
+    );
   }
 
   if (activeMembership) return <>{children}</>;

@@ -6,6 +6,7 @@ import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { findReport } from '../reports/registry';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 /**
  * Resolves /reports/:slug → the matching report component from the registry.
@@ -17,7 +18,22 @@ export default function ReportDetailPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  const report = findReport(slug);
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+  const found = findReport(slug);
+  // A report the user can't open answers exactly like one that doesn't exist.
+  const allowed =
+    !found?.requiresCapability || (user?.capabilities?.includes(found.requiresCapability) ?? false);
+  const report = allowed ? found : undefined;
+
+  if (found?.requiresCapability && userLoading) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center">
+          <Text>{t('reports.loading')}</Text>
+        </div>
+      </AppLayout>
+    );
+  }
 
   if (!report) {
     return (

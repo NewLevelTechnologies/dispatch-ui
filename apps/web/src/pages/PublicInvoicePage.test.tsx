@@ -83,6 +83,15 @@ describe('PublicInvoicePage', () => {
     expect(screen.getAllByText(/\$500\.00/).length).toBeGreaterThan(0);
   });
 
+  it('shows the preview banner on an office preview link', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: { ...buildResponse({ status: 'DRAFT' }), preview: true },
+    });
+    renderAt('tok-preview');
+    expect(await screen.findByText('Preview')).toBeInTheDocument();
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument();
+  });
+
   it('renders the voided banner when the invoice status is VOID', async () => {
     vi.mocked(publicApiClient.get).mockResolvedValueOnce({
       data: buildResponse({ status: 'VOID' }),

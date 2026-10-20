@@ -41,6 +41,16 @@ export const dense = {
     '[&_input]:border-border! ' +
     'before:rounded-md!',
 
+  /** 26px — the operational-chrome height, for a search that sits in a band
+   *  beside selects, a toggle track and buttons rather than above a list. Same
+   *  number as Button `xxs` and Select `xxs`; declared, not derived from
+   *  padding, because a content-sized control is how one band ends up with
+   *  three heights. */
+  inputChrome:
+    '[&_input]:h-[26px]! [&_input]:py-0! [&_input]:text-[11.5px]! [&_input]:rounded-md! ' +
+    '[&_input]:border-border! ' +
+    'before:rounded-md!',
+
   /** Select dropdowns — same height/text as input. Same wrapper trick. */
   select:
     '[&_select]:h-8! [&_select]:py-0! [&_select]:text-[12.5px]! [&_select]:rounded-md! ' +

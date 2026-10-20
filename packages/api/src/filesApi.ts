@@ -80,6 +80,10 @@ export interface ListFilesParams {
   page?: number;
   /** Default 50, max 100. */
   limit?: number;
+  /** Work order files only: one work item's files (counts follow it). */
+  workItemId?: string;
+  /** Equipment files only: leave out this work order's files (counts follow it). */
+  excludeWorkOrderId?: string;
 }
 
 /** Direct upload categories (location/customer files only; validated server-side). */
@@ -184,6 +188,8 @@ export interface WorkOrderFile {
   agreementId: string | null;
   // Equipment profile image flag (equipment-anchored images only).
   isProfile: boolean;
+  // The equipment's data-plate photo (at most one per equipment; the OCR source).
+  isNameplate?: boolean;
   uploadedBy: string | null;
   uploadedByName: string | null;
   createdAt: string;
@@ -345,6 +351,11 @@ export interface RequestWorkOrderFileUploadUrlRequest {
   dispatchId?: string | null;
   // Before/After tag for the captured photo/video. Optional.
   captureTag?: WorkOrderFileCaptureTag | null;
+  // The work item the capture belongs to. When equipmentId is absent the
+  // server tags the file with the item's equipment. Optional.
+  workItemId?: string | null;
+  // Explicit subject tag. Optional.
+  equipmentId?: string | null;
 }
 
 // PATCH semantics: omitted key = unchanged; explicit null clears.
@@ -394,6 +405,8 @@ export const workOrderFilesApi = {
       caption?: string | null;
       dispatchId?: string | null;
       captureTag?: WorkOrderFileCaptureTag | null;
+      workItemId?: string | null;
+      equipmentId?: string | null;
       onProgress?: (stage: 'requesting' | 'uploading' | 'confirming') => void;
     } = {}
   ): Promise<WorkOrderFile> => {
@@ -405,6 +418,9 @@ export const workOrderFilesApi = {
       caption: options.caption ?? null,
       dispatchId: options.dispatchId ?? null,
       captureTag: options.captureTag ?? null,
+      // Only sent when set, so existing callers' request bodies don't change.
+      ...(options.workItemId ? { workItemId: options.workItemId } : {}),
+      ...(options.equipmentId ? { equipmentId: options.equipmentId } : {}),
     });
     options.onProgress?.('uploading');
     await putToS3(uploadUrl, file.type, file);

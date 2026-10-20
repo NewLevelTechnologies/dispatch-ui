@@ -1,0 +1,309 @@
+/* ───────────────────────────────────────────────────────────────────
+   Work Items tab (WO detail ?tab=items) — list | detail.
+
+   Only the rules Tailwind can't express cleanly live here: the two-level
+   grid with its viewport + container breakpoints, the list row's selected
+   rail, the 2-line clamp, the derived step strip, and the photo-tile grids.
+   Text sizes/colors stay on the elements (Text / tokens). Unlayered like
+   components.css so bare <button> rows keep their sizing.
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Layout: 280px list | detail. One item → detail only. Stacks < 980px. */
+.wit {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.wit.single { grid-template-columns: minmax(0, 1fr); }
+.wit-rail { position: sticky; top: 12px; }
+@media (max-width: 980px) {
+  .wit { grid-template-columns: minmax(0, 1fr); }
+  .wit-rail { position: static; }
+}
+
+/* List rows — 3px left rail turns accent when selected. */
+.wit-row {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px 10px 11px;
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.wit-row:hover { background: var(--bg-hover); }
+.wit-row:focus-visible { outline: 2px solid var(--accent-500); outline-offset: -2px; }
+.wit-row.on {
+  background: color-mix(in oklch, var(--accent-500) 7%, var(--bg-elev));
+  border-left-color: var(--accent-500);
+}
+.wit-group {
+  padding: 7px 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+.wit-dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
+.wit-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+}
+
+/* Detail — a size container so the body stacks on its own width, not the
+   viewport's (the list eats 294px of it on desktop). */
+.wit-detail { container-type: inline-size; min-width: 0; }
+.wit-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 14px;
+  align-items: start;
+}
+
+/* Step strip — derived, never stored. */
+.wit-steps {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  gap: 4px;
+  padding: 0 16px 14px;
+}
+.wit-step { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.wit-bar { height: 4px; border-radius: 2px; background: var(--bg-active); margin-bottom: 3px; }
+.wit-step.s-done .wit-bar { background: var(--success-500); }
+.wit-step.s-current .wit-bar { background: var(--accent-500); }
+.wit-step.s-blocked .wit-bar { background: var(--warning-500); }
+.wit-step.s-skip .wit-bar {
+  background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 7px);
+}
+.wit-steplabel { font-size: 11.5px; font-weight: 600; color: var(--fg-muted); }
+.wit-step.s-done .wit-steplabel,
+.wit-step.s-current .wit-steplabel { color: var(--fg-strong); }
+.wit-step.s-blocked .wit-steplabel { color: var(--warning-fg); }
+.wit-stepsub {
+  font-size: 11px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (max-width: 760px) {
+  .wit-body { grid-template-columns: minmax(0, 1fr); }
+  .wit-steps { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); row-gap: 10px; }
+}
+
+/* Main-column sections. */
+.wit-sec { padding: 14px 16px; border-top: 1px solid var(--border-soft); }
+.wit-sec:first-child { border-top: 0; }
+.wit-empty {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.wit-empty.stack { flex-direction: column; align-items: flex-start; }
+
+/* Photo tiles — 56px item tiles; equipment-history tiles flex 76–96px. */
+.wit-tile {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  cursor: pointer;
+}
+.wit-tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.wit-tile:hover,
+.wit-ph:hover { box-shadow: 0 0 0 2px var(--accent-500); }
+.wit-tile:focus-visible,
+.wit-ph:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 1px; }
+.wit-tileadd {
+  all: unset;
+  box-sizing: border-box;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-sm);
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border-strong);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.wit-tileadd:hover { color: var(--fg-strong); background: var(--bg-hover); }
+.wit-phgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 96px));
+  gap: 6px;
+}
+.wit-ph {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  cursor: pointer;
+}
+.wit-ph img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.wit-ph .wit-phtag {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent-700);
+  background: color-mix(in oklch, var(--accent-500) 18%, var(--bg-elev));
+}
+.wit-ph.more {
+  display: grid;
+  place-items: center;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Parts & POs list. */
+.wit-parts { display: flex; flex-direction: column; border: 1px solid var(--border-soft); border-radius: var(--r-sm); }
+.wit-part {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.wit-part:last-child { border-bottom: 0; }
+
+/* Equipment-history card. */
+.wit-eqsec { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
+.wit-eqsec:last-child { border-bottom: 0; }
+.wit-eqh {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.wit-eqcols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  border-top: 1px solid var(--border-soft);
+}
+.wit-eqcols > .wit-eqsec { border-bottom: 0; }
+.wit-eqcols > .wit-eqsec + .wit-eqsec { border-left: 1px solid var(--border-soft); }
+.wit-li { padding: 7px 0; border-top: 1px solid var(--border-soft); }
+.wit-li:first-of-type { border-top: 0; padding-top: 0; }
+
+/* Equipment facts (label | value). */
+.wit-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 12px;
+  margin: 12px 0 0;
+  font-size: 12px;
+}
+.wit-facts dt { color: var(--fg-muted); }
+.wit-facts dd { margin: 0; color: var(--fg-strong); overflow-wrap: anywhere; }
+.wit-facts dd.mono { font-size: 11.5px; }
+
+/* Narrow equipment picker (290px column). */
+.wit-pksearch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--fg-muted);
+}
+.wit-pksearch:focus-within {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent-500) 14%, transparent);
+}
+.wit-pksearch input { all: unset; flex: 1; min-width: 0; font-size: 12.5px; color: var(--fg-strong); }
+.wit-pksearch input::placeholder { color: var(--fg-muted); }
+.wit-pklist { max-height: 320px; overflow-y: auto; }
+.wit-pkrow {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.wit-pkrow:hover { background: var(--bg-hover); }
+.wit-pkrow:focus-visible { outline: 2px solid var(--accent-500); outline-offset: -2px; }
+.wit-pkrow.on { background: color-mix(in oklch, var(--accent-500) 7%, var(--bg-elev)); }
+.wit-ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Dispatch rows. */
+.wit-trip {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.wit-trip:last-child { border-bottom: 0; }
+.wit-trip:hover { background: var(--bg-hover); }
+.wit-trip:focus-visible { outline: 2px solid var(--accent-500); outline-offset: -2px; }
+.wit-seq {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in oklch, var(--info-500) 14%, var(--bg-elev));
+  color: var(--info-500);
+}
+.wit-seq.t-success {
+  background: color-mix(in oklch, var(--success-500) 14%, var(--bg-elev));
+  color: var(--success-500);
+}
+.wit-seq.t-violet {
+  background: color-mix(in oklch, var(--violet-500) 16%, var(--bg-elev));
+  color: var(--violet-500);
+}

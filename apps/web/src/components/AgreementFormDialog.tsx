@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
@@ -10,6 +10,7 @@ import {
   type AgreementClassification,
   type UpdateAgreementRequest,
 } from '../api/setup';
+import LocationCustomerPicker, { type PickedCustomer } from './LocationCustomerPicker';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
@@ -30,9 +31,12 @@ function addMonths(isoDate: string, months: number): string {
 interface AgreementFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  // Edit mode — pass the agreement. Create mode — pass customerId instead.
+  // Edit mode — pass the agreement. Create mode — pass customerId instead, or
+  // neither to pick the customer in the form (the company-wide list).
   agreement?: AgreementResponse;
   customerId?: string;
+  /** Create mode: start from this plan (a membership signed on a proposal). */
+  planId?: string;
   // Edit-where-you-see-it: scope the edit to the card that opened it. 'identity'
   // (header) edits the name; 'term' (Term card) edits term dates + renewal.
   // Omitted on create → the full form. Ignored in create mode.
@@ -43,7 +47,7 @@ interface AgreementFormDialogProps {
 // the only v1 values) and routes to its detail page so the user can configure
 // visit templates + coverage and then activate. Edits are scoped to the card
 // they open from (see `section`) so no two Edit buttons open the same fields.
-export default function AgreementFormDialog({ isOpen, onClose, agreement, customerId, section }: AgreementFormDialogProps) {
+export default function AgreementFormDialog({ isOpen, onClose, agreement, customerId, planId: startPlanId, section }: AgreementFormDialogProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -52,6 +56,9 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   // Create shows the whole form; edit shows only the opening card's fields.
   const showIdentity = !isEdit || section === 'identity';
   const showTerm = !isEdit || section === 'term';
+  const pickCustomer = !isEdit && !customerId;
+  const [customer, setCustomer] = useState<PickedCustomer | null>(null);
+  const forCustomerId = customerId ?? customer?.id;
 
   const [name, setName] = useState('');
   const [termStart, setTermStart] = useState('');
@@ -88,6 +95,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
     setPlanId(agreement?.planId ?? '');
     setClassification(agreement?.classification ?? 'CONTRACT');
     setPlanTermMonths(null);
+    setCustomer(null);
   }, [isOpen, agreement]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -110,6 +118,29 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
     if (termStart && plan.defaultTermMonths != null) setTermEnd(addMonths(termStart, plan.defaultTermMonths));
   };
 
+  // Opened from a membership sign-up: start from its plan, once per opening,
+  // as if it were picked (its term and renewal defaults fill in).
+  const startedFrom = useRef<string | null>(null);
+  /* eslint-disable react-hooks/set-state-in-effect -- applies the starting plan once its list loads */
+  useEffect(() => {
+    if (!isOpen) {
+      startedFrom.current = null;
+      return;
+    }
+    if (isEdit || !startPlanId || !activePlans || startedFrom.current === startPlanId) return;
+    startedFrom.current = startPlanId;
+    // The plan's defaults, as picking it would set them (no start date yet, so no end).
+    const plan = activePlans.find((p) => p.id === startPlanId);
+    if (!plan) return;
+    setPlanId(plan.id);
+    setClassification(plan.classification);
+    setAutoRenew(plan.defaultAutoRenew);
+    setRenewalTermMonths(plan.defaultRenewalTermMonths != null ? String(plan.defaultRenewalTermMonths) : '');
+    setRenewalAlertDays(plan.defaultRenewalAlertDays != null ? String(plan.defaultRenewalAlertDays) : '');
+    setPlanTermMonths(plan.defaultTermMonths ?? null);
+  }, [isOpen, isEdit, startPlanId, activePlans]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   // Picking a start date re-derives the end from the plan's term length.
   const handleTermStartChange = (value: string) => {
     setTermStart(value);
@@ -119,7 +150,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   const createMutation = useMutation({
     mutationFn: () =>
       agreementApi.create({
-        customerId: customerId!,
+        customerId: forCustomerId!,
         name: name.trim(),
         kind: 'VISIT',
         classification,
@@ -135,8 +166,9 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
       queryClient.invalidateQueries({ queryKey: ['agreements'] });
       showSuccess(t('common.form.successCreate', { entity: getName('agreement'), defaultValue: `${getName('agreement')} created` }));
       onClose();
-      // Land on the new DRAFT so the user can configure + activate it.
-      navigate(`/agreements/${created.id}?from=customer`);
+      // Land on the new DRAFT so the user can configure + activate it; back
+      // goes where it was sold from.
+      navigate(`/agreements/${created.id}?from=${pickCustomer ? 'agreements' : 'customer'}`);
     },
     onError: (err) =>
       setErrorMessage(extractApiError(err) ?? t('common.form.errorCreate', { entity: getName('agreement') })),
@@ -158,12 +190,14 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   const trimmedName = name.trim();
   // Name is required wherever it's shown (create + identity edit), not on the
   // term-only edit.
-  const canSubmit = (!showIdentity || trimmedName.length > 0) && !isSaving;
+  const canSubmit =
+    (!showIdentity || trimmedName.length > 0) && (!pickCustomer || Boolean(customer)) && !isSaving;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     if (showIdentity && !trimmedName) return;
+    if (pickCustomer && !customer) return;
     if (!isEdit) {
       createMutation.mutate();
       return;
@@ -212,6 +246,13 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
           )}
           <Fieldset>
             <FieldGroup className="!space-y-3">
+              {pickCustomer && (
+                <Field size="xs">
+                  <Label size="xs" required>{getName('customer')}</Label>
+                  <LocationCustomerPicker value={customer} onChange={setCustomer} />
+                </Field>
+              )}
+
               {!isEdit && (activePlans?.length ?? 0) > 0 && (
                 <Field size="xs">
                   <Label size="xs">{t('agreements.plan', { defaultValue: 'Plan' })}</Label>
@@ -239,7 +280,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
                     onChange={(e) => setName(e.target.value)}
                     maxLength={255}
                     required
-                    autoFocus
+                    autoFocus={!pickCustomer}
                   />
                 </Field>
               )}

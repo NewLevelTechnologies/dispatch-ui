@@ -139,6 +139,7 @@ export default function PaymentDialog({
       // query carries payments now — invalidate both that and the summary.
       queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
       queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ['invoice'] });
       invalidateLocationInvoiceCaches(queryClient);
       onClose();
     },
@@ -210,13 +211,15 @@ export default function PaymentDialog({
       <DialogBody>
         {/* Locked context strip (§4.1 layout principle). Read-only context
             for the CSR, not a field. */}
-        <div className="mb-3 rounded-md bg-zinc-50 px-2.5 py-1.5 text-sm text-zinc-700 dark:bg-white/5 dark:text-zinc-300">
-          {t('workOrders.financialDrawer.paymentDialog.contextStrip', {
-            workOrder: workOrderLabel,
-            number: workOrderNumber,
-            customer: customerName,
-          })}
-        </div>
+        {workOrderNumber && (
+          <div className="mb-3 rounded-md bg-zinc-50 px-2.5 py-1.5 text-sm text-zinc-700 dark:bg-white/5 dark:text-zinc-300">
+            {t('workOrders.financialDrawer.paymentDialog.contextStrip', {
+              workOrder: workOrderLabel,
+              number: workOrderNumber,
+              customer: customerName,
+            })}
+          </div>
+        )}
 
         {!hasOpenInvoices ? (
           <Text className="!text-sm !text-zinc-500">

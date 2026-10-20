@@ -21,7 +21,7 @@ function inv(over: Partial<InvoiceListItemRow>): InvoiceListItemRow {
   return {
     id: 'i', invoiceNumber: 'INV', status: 'SENT', customerId: 'c1', customerName: null,
     serviceLocationId: null, workOrderId: null, agreementId: 'a-1', billingPeriodKey: null,
-    invoiceDate: '2026-01-01', dueDate: '2026-01-31', totalAmount: 300, amountPaid: 0,
+    invoiceDate: '2026-01-01', dueDate: '2026-01-31', totalAmount: 300, subtotal: 300, taxAmount: 0, workOrderNumber: null, divisionId: null, workOrderTypeId: null, regionId: null, amountPaid: 0,
     balanceDue: 300, overdue: false, lastSentAt: null, createdAt: '', updatedAt: '', ...over,
   };
 }

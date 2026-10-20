@@ -17,6 +17,7 @@ import {
 } from '../components/catalyst/dropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { Pill } from '../components/ui/Pill';
+import { SummaryCell } from '../components/ui/SummaryCell';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { PageHead } from '../components/ui/PageHead';
@@ -26,6 +27,8 @@ import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChi
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { sortRows, useUrlSort } from '../hooks/useUrlSort';
 import { roleAccentFromRole } from '@dispatch/utils';
 import { invalidateRoleConsumers } from '../utils/invalidateRoleConsumers';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
@@ -41,6 +44,10 @@ function formatDate(value?: string): string {
     day: 'numeric',
   });
 }
+
+// Roles come back whole, so sort is client-side. Default: most-used first.
+const DEFAULT_SORT: SortState = { key: 'userCount', dir: 'desc' };
+const SORT_KEYS = ['name', 'userCount', 'capabilityCount', 'updatedAt'] as const;
 
 export default function RolesPage() {
   const navigate = useNavigate();
@@ -163,11 +170,18 @@ export default function RolesPage() {
       ),
   });
 
-  // Filter + sort. Roles come back small, all client-side.
+  const { current: currentSort, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['userCount', 'capabilityCount', 'updatedAt'],
+    allowed: SORT_KEYS,
+  });
+
+  // Filter + sort. Roles come back small, all client-side. Name pre-sort makes
+  // it the tiebreak for the count columns (Array.sort is stable).
   const filteredRoles = useMemo(() => {
     if (!roles) return [];
     const q = searchQuery.trim().toLowerCase();
-    return roles
+    const matched = roles
       .filter((role) => {
         if (q) {
           const hay = `${role.name} ${role.description ?? ''}`.toLowerCase();
@@ -184,13 +198,14 @@ export default function RolesPage() {
         if (hasUsersFilter === 'no' && userCount > 0) return false;
         return true;
       })
-      .sort((a, b) => {
-        const ua = a.userCount ?? 0;
-        const ub = b.userCount ?? 0;
-        if (ub !== ua) return ub - ua;
-        return a.name.localeCompare(b.name);
-      });
-  }, [roles, searchQuery, typeFilter, hasUsersFilter]);
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return sortRows(matched, currentSort, {
+      name: (r) => r.name,
+      userCount: (r) => r.userCount ?? 0,
+      capabilityCount: (r) => r.capabilityCount ?? 0,
+      updatedAt: (r) => r.updatedAt,
+    });
+  }, [roles, searchQuery, typeFilter, hasUsersFilter, currentSort]);
 
   // Summary totals (5-cell strip). usersAssigned comes from the envelope
   // — it's the distinct user count from the BE, not a sum of per-row
@@ -323,10 +338,6 @@ export default function RolesPage() {
           <ChipListboxOption value="no">{t('roles.filter.no')}</ChipListboxOption>
         </FilterChipListbox>
 
-        <div className="ml-auto flex items-center text-[11px] text-fg-muted">
-          {t('roles.sort.label')}{' '}
-          <span className="ml-1 font-medium text-fg-strong">{t('roles.sort.users')}</span>
-        </div>
       </ListToolbar>
 
       <Card>
@@ -375,16 +386,12 @@ export default function RolesPage() {
               <DenseTable>
                 <DenseTHead>
                   <tr>
-                    <th>{t('roles.table.role')}</th>
+                    <SortHeader sortKey="name" label={t('roles.table.role')} current={currentSort} onSort={onSort} />
                     <th>{t('roles.table.description')}</th>
-                    <th className="right" style={{ width: 90 }}>
-                      {t('entities.users')}
-                    </th>
-                    <th className="right" style={{ width: 130 }}>
-                      {t('roles.table.capabilities')}
-                    </th>
+                    <SortHeader sortKey="userCount" label={t('entities.users')} align="right" style={{ width: 90 }} current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="capabilityCount" label={t('roles.table.capabilities')} align="right" style={{ width: 130 }} current={currentSort} onSort={onSort} />
                     <th style={{ width: 110 }}>{t('roles.table.type')}</th>
-                    <th style={{ width: 110 }}>{t('roles.table.lastModified')}</th>
+                    <SortHeader sortKey="updatedAt" label={t('roles.table.lastModified')} style={{ width: 110 }} current={currentSort} onSort={onSort} />
                     <th style={{ width: 40 }}></th>
                   </tr>
                 </DenseTHead>
@@ -573,35 +580,6 @@ export default function RolesPage() {
         isDestructive
         isPending={restoreAllMutation.isPending}
       />
-    </div>
-  );
-}
-
-function SummaryCell({
-  label,
-  value,
-  last,
-}: {
-  label: string;
-  value: number;
-  last?: boolean;
-}) {
-  // The vertical dividers only line up in the desktop 5-col layout. In
-  // the 2-col mobile layout they'd land between odd/even cells where
-  // they don't belong — hide below sm, restore at sm:.
-  return (
-    <div
-      className={
-        'px-4 py-[11px]' +
-        (last ? '' : ' sm:border-r sm:border-border-soft')
-      }
-    >
-      <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-fg-muted">
-        {label}
-      </div>
-      <div className="mt-0.5 text-[20px] font-bold leading-none tracking-[-0.02em] text-fg-strong tabular-nums">
-        {value}
-      </div>
     </div>
   );
 }

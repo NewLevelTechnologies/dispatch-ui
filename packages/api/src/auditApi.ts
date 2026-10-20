@@ -128,6 +128,31 @@ export const auditApi = {
   },
 
   /**
+   * Field-level change history for a work order's own fields (priority, type,
+   * division…), newest-first, same row shape as the location's. Work item and
+   * dispatch edits aren't included. Requires VIEW_AUDIT_LOGS.
+   */
+  getWorkOrderChanges: async (workOrderId: string, limit?: number): Promise<ServiceLocationAuditEntry[]> => {
+    const response = await apiClient.get<ServiceLocationAuditEntry[]>(`/audit/WorkOrder/${workOrderId}`, {
+      params: { limit },
+    });
+    return response.data;
+  },
+
+  /**
+   * Field-level change history for one work item (description, findings,
+   * equipment, equipmentNeeded, estimate…), newest-first, same row shape as
+   * the work order's. Field edits live here, not in the WO activity feed.
+   * Requires VIEW_AUDIT_LOGS.
+   */
+  getWorkItemChanges: async (workItemId: string, limit?: number): Promise<ServiceLocationAuditEntry[]> => {
+    const response = await apiClient.get<ServiceLocationAuditEntry[]>(`/audit/WorkItem/${workItemId}`, {
+      params: { limit },
+    });
+    return response.data;
+  },
+
+  /**
    * Get audit history for a specific user
    * @param userId - User UUID
    * @returns Array of audit logs ordered by timestamp DESC

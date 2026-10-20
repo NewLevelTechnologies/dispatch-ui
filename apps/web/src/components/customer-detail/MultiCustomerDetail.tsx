@@ -14,7 +14,7 @@ import {
   customerApi,
   equipmentApi,
   agreementApi,
-  invoicesApi,
+  documentsApi,
   EquipmentStatus,
   type Customer,
   type CustomerStatus,
@@ -23,6 +23,7 @@ import {
 } from '../../api/setup';
 import { workOrdersListQueryOptions } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { useDocumentBack } from '../../hooks/useDocumentBack';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { showSuccess, showError, extractApiError } from '../../lib/toast';
 import { handleConcurrentEdit } from '../../lib/conflict';
@@ -42,7 +43,7 @@ import CustomerHeaderTags from './CustomerHeaderTags';
 import MultiOverviewTab, { CustomerHeaderEdit } from './MultiOverviewTab';
 import MultiLocationsTab from './MultiLocationsTab';
 import CustomerEquipmentTab from './CustomerEquipmentTab';
-import CustomerInvoicesTab from './CustomerInvoicesTab';
+import { DocumentsTab, DOCUMENTS_KEY } from '../document/DocumentsTab';
 import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import { OrgMark } from './shared';
@@ -75,6 +76,7 @@ const VALID_TABS: TabId[] = [
 export default function MultiCustomerDetail({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const docBack = useDocumentBack();
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const queryClient = useQueryClient();
@@ -101,12 +103,10 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
     queryFn: () => equipmentApi.list({ customerId: customer.id, status: EquipmentStatus.ACTIVE, size: 100 }),
     enabled: !!customer.id,
   });
-  // Invoice tab-count badge. Stable (customerId-only, unfiltered) so it shows the
-  // customer's total — distinct from the tab body's filtered/paged query. size:1
-  // keeps the payload minimal; we only read totalElements.
-  const { data: invoicesCount } = useQuery({
-    queryKey: ['invoices', 'customer-count', customer.id],
-    queryFn: () => invoicesApi.getAll({ customerId: customer.id, size: 1 }),
+  // Tab badge; shares the Quotes & invoices tab's counts cache.
+  const { data: documentViews } = useQuery({
+    queryKey: [DOCUMENTS_KEY, { customerId: customer.id }, 'views'],
+    queryFn: () => documentsApi.getViews({ customerId: customer.id }),
     enabled: !!customer.id,
   });
 
@@ -145,11 +145,11 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
       queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setLifecycleConfirm(false);
-      showSuccess(customer.status === 'ACTIVE' ? 'Customer deactivated' : 'Customer reactivated');
+      showSuccess(`${getName('customer')} ${customer.status === 'ACTIVE' ? 'deactivated' : 'reactivated'}`);
     },
     onError: (err) => {
       if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
-      showError("Couldn't update customer", extractApiError(err) ?? undefined);
+      showError(`Couldn't update ${getName('customer').toLowerCase()}`, extractApiError(err) ?? undefined);
     },
   });
 
@@ -168,7 +168,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
     { id: 'agreements', label: getName('agreement', true), count: agreementsData?.length },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements },
-    { id: 'invoices', label: getName('invoice', true), count: invoicesCount?.totalElements },
+    { id: 'invoices', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}`, count: documentViews?.counts.all },
     { id: 'contacts', label: 'Contacts', count: customer.additionalContacts.length },
     { id: 'activity', label: t('customers.tabs.activity') },
   ];
@@ -200,10 +200,10 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
       <div className="px-1 py-1">
         <div className="mx-auto max-w-[1240px]">
           <Link
-            to="/customers"
+            to={docBack?.href ?? '/customers'}
             className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"
           >
-            ← {t('common.actions.backTo', { entities: getName('customer', true) })}
+            ← {t('common.actions.backTo', { entities: docBack?.label ?? getName('customer', true) })}
           </Link>
 
           {/* Header — identity (name/phone/email) edits inline here; attributes in cards */}
@@ -335,7 +335,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
             />
           )}
 
-          {activeTab === 'invoices' && <CustomerInvoicesTab customerId={customer.id} />}
+          {activeTab === 'invoices' && <DocumentsTab aging canStart showLocation scope={{ customerId: customer.id }} />}
 
           {activeTab === 'contacts' && (
             <CustomerContactsTab
@@ -367,8 +367,8 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
                 }
               >
                 {customer.status === 'ACTIVE'
-                  ? 'Stops new work, estimates and invoices. AR history, locations, equipment and agreements are preserved.'
-                  : 'Restores the account. New work, estimates and invoices can be created again.'}
+                  ? `Stops new work, ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()}. AR history, ${getName('service_location', true).toLowerCase()}, ${getName('equipment').toLowerCase()} and ${getName('agreement', true).toLowerCase()} are preserved.`
+                  : `Restores the account. New work, ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()} can be created again.`}
               </Callout>
             </div>
           )}
@@ -402,8 +402,8 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
         }
         message={
           customer.status === 'ACTIVE'
-            ? 'Stops new work, estimates and invoices. AR history, locations, equipment and agreements are preserved.'
-            : 'Restores the account. New work, estimates and invoices can be created again.'
+            ? `Stops new work, ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()}. AR history, ${getName('service_location', true).toLowerCase()}, ${getName('equipment').toLowerCase()} and ${getName('agreement', true).toLowerCase()} are preserved.`
+            : `Restores the account. New work, ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()} can be created again.`
         }
         confirmLabel={customer.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
         isDestructive={customer.status === 'ACTIVE'}

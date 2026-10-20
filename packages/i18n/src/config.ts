@@ -17,4 +17,13 @@ i18n
     },
   });
 
+// `{{entity, lowercase}}` puts a glossary name mid-sentence ("Loading work
+// orders…"). i18next has no built-in `lowercase` formatter; unregistered
+// formats pass the value through untouched, so without this every such string
+// rendered the name capitalized. (The web test mock lowercases on its own,
+// which is why tests never caught it.)
+i18n.services.formatter?.add('lowercase', (value: unknown) =>
+  typeof value === 'string' ? value.toLowerCase() : String(value),
+);
+
 export default i18n;

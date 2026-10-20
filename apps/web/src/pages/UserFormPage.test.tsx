@@ -3,6 +3,12 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import { UserInvitePage, UserEditPage } from './UserFormPage';
 import { apiClient } from '../api/setup';
+import { showSuccess } from '../lib/toast';
+
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return { ...actual, showSuccess: vi.fn(actual.showSuccess) };
+});
 
 vi.mock('@dispatch/api/src/client');
 
@@ -71,6 +77,14 @@ function defaultGetMock(url: string) {
   if (url === '/users/roles') return Promise.resolve({ data: { roles: mockRoles } });
   if (url.startsWith('/tenant/dispatch-regions')) {
     return Promise.resolve({ data: mockRegions });
+  }
+  if (url.endsWith('/divisions')) {
+    return Promise.resolve({
+      data: [
+        { id: 'div-1', name: 'HVAC' },
+        { id: 'div-2', name: 'Plumbing' },
+      ],
+    });
   }
   if (url === '/users/capabilities/grouped') {
     return Promise.resolve({ data: mockGroupedCapabilities });
@@ -171,12 +185,18 @@ describe('UserFormPage', () => {
       });
     });
 
-    it('renders the send-invite checkbox', async () => {
+    it('states that an email will be sent, rather than offering a toggle', async () => {
       renderWithProviders(<UserInvitePage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Send invitation email to/i)).toBeInTheDocument();
+        expect(screen.getByText(/how to sign in/i)).toBeInTheDocument();
       });
+
+      // The old "Send invitation email" checkbox is gone: `sendInvite` was
+      // never read by the backend, so the control suppressed nothing.
+      expect(
+        screen.queryByRole('checkbox', { name: /send invitation email/i })
+      ).not.toBeInTheDocument();
     });
 
     it('navigates back via the Cancel link', async () => {
@@ -404,6 +424,19 @@ describe('UserFormPage', () => {
       });
     });
 
+    it('saves a job title, shown on proposals beside the advisor’s name', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UserEditPage />);
+
+      await screen.findByDisplayValue('Jane');
+      await user.type(screen.getByPlaceholderText('e.g. Comfort Advisor'), 'Comfort Advisor');
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() =>
+        expect(apiClient.put).toHaveBeenCalledWith('/users/user-1', expect.objectContaining({ jobTitle: 'Comfort Advisor' })),
+      );
+    });
+
     it('edit submit with zero roles surfaces an error and does not call API', async () => {
       const user = userEvent.setup();
       renderWithProviders(<UserEditPage />);
@@ -426,6 +459,156 @@ describe('UserFormPage', () => {
         '/users/user-1',
         expect.anything(),
       );
+    });
+  });
+
+  describe('Invite result copy', () => {
+    // Branches on notificationRequested, never on invitationStatus — the two
+    // don't partition the same way, which was the original bug.
+    function respondWith(notificationRequested: string | null, invitationStatus: string) {
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: {
+          ...mockUser,
+          id: 'new-user',
+          email: 'dana@example.com',
+          firstName: 'Dana',
+          lastName: 'Ruiz',
+          notificationRequested,
+          invitationStatus,
+        },
+      });
+    }
+
+    async function submitInvite() {
+      const user = userEvent.setup();
+      renderWithProviders(<UserInvitePage />);
+      await waitFor(() => {
+        expect(screen.getByText('Admin')).toBeInTheDocument();
+      });
+      const adminCheckbox = screen
+        .getByText('Admin')
+        .closest('label')!
+        .querySelector('[role="checkbox"]') as HTMLElement;
+      await user.click(adminCheckbox);
+
+      // Required fields, or native validation blocks the submit.
+      await user.type(screen.getByPlaceholderText('Maria'), 'Dana');
+      await user.type(screen.getByPlaceholderText('Chen'), 'Ruiz');
+      await user.type(
+        screen.getByPlaceholderText('maria@yourcompany.com'),
+        'dana@example.com'
+      );
+
+      await user.click(screen.getByRole('button', { name: /send invitation/i }));
+    }
+
+    it('names the temporary password only when Cognito mailed one', async () => {
+      respondWith('INVITATION', 'INVITED');
+      await submitInvite();
+
+      await waitFor(() => {
+        expect(vi.mocked(showSuccess)).toHaveBeenCalled();
+      });
+      const [, detail] = vi.mocked(showSuccess).mock.calls[0];
+      expect(detail).toMatch(/temporary password/i);
+    });
+
+    it('claims no email for a linked identity, whose mail the tenant can suppress', async () => {
+      // INVITED here too — this is the case invitationStatus gets wrong.
+      respondWith('WORKSPACE_ADDED', 'INVITED');
+      await submitInvite();
+
+      await waitFor(() => {
+        expect(vi.mocked(showSuccess)).toHaveBeenCalled();
+      });
+      const [, detail] = vi.mocked(showSuccess).mock.calls[0];
+      expect(detail).toMatch(/existing password/i);
+      // notification-service may suppress the mail, so we must not assert it.
+      expect(detail).not.toMatch(/emailed/i);
+    });
+
+    it('falls back to the neutral line when the field is absent', async () => {
+      respondWith(null, 'ACTIVE');
+      await submitInvite();
+
+      await waitFor(() => {
+        expect(vi.mocked(showSuccess)).toHaveBeenCalled();
+      });
+      const [, detail] = vi.mocked(showSuccess).mock.calls[0];
+      expect(detail).toMatch(/what they need to sign in/i);
+    });
+  });
+
+});
+
+// Divisions are a STRENGTH — what someone is good at taking on — not a
+// qualification. The board never blocks on them; the filter is a lens.
+describe('UserFormPage divisions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockNavigate.mockClear();
+    vi.mocked(apiClient.get).mockImplementation(defaultGetMock);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: mockUser });
+    vi.mocked(apiClient.put).mockResolvedValue({ data: mockUser });
+  });
+
+  it('offers the tenant’s divisions as its own question, separate from regions', async () => {
+    renderWithProviders(<UserEditPage />);
+    // Two cards, because one is a permission and the other is a strength —
+    // stating them separately makes that difference visible.
+    expect(await screen.findByText('Divisions')).toBeInTheDocument();
+    expect(screen.getByText('Regions')).toBeInTheDocument();
+    expect(screen.getByText('HVAC')).toBeInTheDocument();
+  });
+
+  it('says empty means offered for everything, never "good at nothing"', async () => {
+    renderWithProviders(<UserEditPage />);
+    expect(
+      await screen.findByText(/Leave empty and they're offered for everything/i),
+    ).toBeInTheDocument();
+  });
+
+  it('never borrows the language of certification', async () => {
+    // Certifications are a separate model WITH blocking semantics. Using their
+    // words here would make a preference look like a compliance control, and
+    // that misreading is expensive to undo once dispatchers believe it.
+    renderWithProviders(<UserEditPage />);
+    await screen.findByText('Divisions');
+    const page = document.body.textContent ?? '';
+    expect(page).not.toMatch(/qualified|certified|not allowed|ineligible/i);
+  });
+
+  it('saves the selection to its own endpoint', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<UserEditPage />);
+
+    // Catalyst's Checkbox is button-role-with-aria-checked, not a native
+    // input, so a label-forwarded click doesn't fire in jsdom.
+    const hvac = (await screen.findByText('HVAC'))
+      .closest('label')!
+      .querySelector('[role="checkbox"]') as HTMLElement;
+    await user.click(hvac);
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        '/users/user-1/divisions',
+        { divisionIds: ['div-1'] },
+      );
+    });
+  });
+
+  it('saves an empty list, so a selection can be cleared', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<UserEditPage />);
+
+    await screen.findByText('Divisions');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith('/users/user-1/divisions', {
+        divisionIds: [],
+      });
     });
   });
 });

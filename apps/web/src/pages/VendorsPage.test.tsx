@@ -81,6 +81,21 @@ describe('VendorsPage', () => {
     expect(screen.queryByText('Ferguson HVAC')).not.toBeInTheDocument();
   });
 
+  it('sorts client-side when a column header is clicked', async () => {
+    const user = userEvent.setup();
+    mockSearch.mockResolvedValue([
+      vendor({ id: 'v-1', name: 'Ferguson HVAC', ytdSpend: 12500 }),
+      vendor({ id: 'v-2', name: 'Trane Supply', ytdSpend: 90000 }),
+    ]);
+    render();
+    await screen.findByText('Ferguson HVAC');
+    const names = () => screen.getAllByText(/Ferguson HVAC|Trane Supply/).map((el) => el.textContent);
+    expect(names()).toEqual(['Ferguson HVAC', 'Trane Supply']); // name,asc default
+
+    await user.click(screen.getByRole('button', { name: /sort by ytd spend/i }));
+    expect(names()).toEqual(['Trane Supply', 'Ferguson HVAC']); // biggest spend first
+  });
+
   it('navigates to the vendor detail on row click', async () => {
     const user = userEvent.setup();
     mockSearch.mockResolvedValue([vendor()]);

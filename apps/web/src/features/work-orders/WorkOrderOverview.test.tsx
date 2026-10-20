@@ -100,7 +100,9 @@ const liveDispatch: DispatchBoardRow = {
 };
 
 const summary: WorkOrderFinancialSummary = {
-  quoted: '742.67',
+  quotedAccepted: '742.67',
+  quotedAwaiting: '0.00',
+  inDraft: '0.00',
   invoiced: '742.67',
   paid: '0.00',
   balance: '150.00',
@@ -245,7 +247,7 @@ describe('WorkOrderOverview', () => {
     await user.click(screen.getByText('Thermostat unresponsive').closest('button')!);
     expect(onOpenWorkItem).toHaveBeenCalledWith('wi-2');
 
-    // The Quoted rollup (quoted > 0) routes to the quotes tab.
+    // The accepted-quotes rollup (when above zero) opens the quotes and invoices tab.
     await user.click(screen.getByText('$742.67').closest('button')!);
     expect(onOpenFinancial).toHaveBeenCalledWith('quotes');
   });

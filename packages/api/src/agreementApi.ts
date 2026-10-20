@@ -14,6 +14,7 @@
 import apiClient from './client';
 import type { CreateNoteRequest, NoteDto, UpdateNoteRequest } from './noteApi';
 import type { RecognitionBasis } from './tenantSettingsApi';
+import type { Page } from './workOrderApi';
 
 // ---- Enums (string unions matching the BE) ----------------------------------
 
@@ -118,6 +119,10 @@ export interface AgreementResponse {
   autoRenew: boolean;
   renewalTermMonths?: number | null;
   renewalAlertDays?: number | null;
+  // A renewal booked to start at termEnd: the next term ends nextTermEnd,
+  // billed at nextTermBillingAmount when set. Both null when none is booked.
+  nextTermEnd?: string | null;
+  nextTermBillingAmount?: number | null;
   notes?: string | null;
   // Plan provenance (null = bespoke, not sold from a plan) + the member-benefits
   // snapshot the agreement was sold under. BE always sends `benefits`; kept
@@ -152,6 +157,111 @@ export interface AgreementSummaryResponse {
   updatedAt: string;
 }
 
+// Company-wide list row (GET /work-orders/agreements with no customerId or
+// serviceLocationId — paged). Same rules and region scope as the overview, so
+// Home's counts equal the list's totalElements.
+export interface AgreementListRow extends AgreementSummaryResponse {
+  /** Annualized billing ÷ 12, to the cent; null unless ACTIVE with an active billing schedule. */
+  monthlyValue: number | null;
+  coverageLocationCount: number;
+  /** Start of the next open visit window not yet closed; null when none generated (~6 months ahead). */
+  nextVisitDue: string | null;
+  /** Visits whose window closed unfulfilled and unwaived, all time. */
+  overdueVisitCount: number;
+  /** The plan it was sold from; null for a custom agreement. */
+  plan: { id: string; name: string } | null;
+  /** The active billing schedule: `amount` every `cadenceInterval` × `cadenceUnit`; null when none. */
+  billing: AgreementListBilling | null;
+  /** The covered location when coverageLocationCount is exactly 1; fields null until it syncs. */
+  primaryLocation: { streetAddress: string | null; city: string | null } | null;
+  /** Visits in [termStart, termEnd), waived excluded; null with no templates or an open term. */
+  visitsThisTerm: { planned: number; completed: number } | null;
+  /** The visit nextVisitDue names. workOrderId null = not generated yet; dispatch null = unscheduled. */
+  nextVisit: AgreementNextVisit | null;
+  /** termEnd when EXPIRED; the tenant-local cancel day when CANCELLED; else null. */
+  endedOn: string | null;
+  /** Who created it; null when unknown (older agreements). */
+  createdByName: string | null;
+  /** The booked renewal, as on the agreement; null when none is booked. */
+  nextTermEnd?: string | null;
+  nextTermBillingAmount?: number | null;
+}
+
+export interface AgreementListBilling {
+  mode: BillingMode;
+  /** Never null: PER_VISIT is invoiced like a fixed schedule today. */
+  amount: number;
+  cadenceUnit: CadenceUnit;
+  cadenceInterval: number;
+}
+
+export interface AgreementNextVisit {
+  windowStart: string;
+  windowEnd: string;
+  workOrderId: string | null;
+  workOrderNumber: string | null;
+  /** The earliest dispatch not yet completed (else the latest); scheduledStart = arrival window start. */
+  dispatch: { scheduledStart: string; technicianName: string | null } | null;
+}
+
+/** GET /work-orders/agreements/facets — counts for the list's chips. */
+export interface AgreementListFacets {
+  /** Every status, under all the current filters except status. */
+  statusCounts: Record<AgreementStatus, number>;
+  /** Each flag on its own, under status/q/classification/plan/region. */
+  renewing: number;
+  renewingWithinDays: number;
+  visitsBehind: number;
+  noBilling: number;
+}
+
+export type AgreementListSort = 'customerName' | 'termEnd' | 'monthlyValue' | 'agreementNumber';
+
+export interface ListAgreementsParams {
+  q?: string;
+  status?: AgreementStatus[];
+  classification?: AgreementClassification;
+  regionIds?: string[];
+  /** The overview's renewing-soon rule: ACTIVE, term ending today … today + N. */
+  renewingWithinDays?: number;
+  /** Matched plans; OR-ed with noPlan. */
+  planId?: string[];
+  /** Custom agreements (no plan). */
+  noPlan?: boolean;
+  /** overdueVisitCount > 0. */
+  visitsBehind?: boolean;
+  /** ACTIVE or DRAFT with no active billing schedule. */
+  noBilling?: boolean;
+  /** Nulls last either way; ties by agreement number. */
+  sort?: `${AgreementListSort},${'asc' | 'desc'}`;
+  page?: number;
+  size?: number;
+}
+
+// The visits-to-schedule queue: the overview's visitsDueSoonUnscheduled set —
+// open visits on ACTIVE agreements with no live dispatch, window starting by
+// today + withinDays (overdue included), oldest window first.
+export interface UnscheduledVisit {
+  obligationId: string;
+  agreementId: string;
+  agreementNumber: string;
+  agreementName: string;
+  customer: AgreementCustomerRef;
+  /** Fields null until the location syncs; `name` null for an unnamed location. */
+  serviceLocation: { id: string; name: string | null; streetAddress: string | null; city: string | null };
+  visitTemplateLabel: string | null;
+  windowStart: string;
+  windowEnd: string;
+  /**
+   * MATERIALIZED with a work order to schedule; PENDING (workOrderId null)
+   * means the nightly job failed to create it and will retry. Never create
+   * one from the frontend.
+   */
+  status: 'MATERIALIZED' | 'PENDING' | string;
+  workOrderId: string | null;
+  workOrderNumber: string | null;
+}
+
 // Per-location PM visit status (LOC-1 Phase 3) — GET /work-orders/agreements/visit-status?customerId={id}.
 // A separate work-order-service call (NOT on the customer detail payload —
 // customer-service has no obligation data); the FE merges it into the locations
@@ -178,6 +288,25 @@ export interface CustomerAgreementSummaryResponse {
   currency: string;
 }
 
+// Tenant-wide agreement overview (home dashboard) — GET /work-orders/agreements/overview.
+// Revenue, plan and renewal numbers cover ACTIVE CONTRACT agreements; visit
+// numbers cover every ACTIVE agreement (internal included). Money is decimal dollars.
+export interface AgreementOverviewResponse {
+  asOf: string; // ISO date yyyy-MM-dd, tenant zone
+  activeAgreementCount: number;
+  recurringMonthly: number; // annualized active billing ÷ 12
+  renewingSoon: { withinDays: number; count: number; monthlyValue: number };
+  // Visits whose window starts this month (waived excluded). Remaining =
+  // planned − completed − missed. Unscheduled = open with no live dispatch.
+  visitsThisMonth: { planned: number; completed: number; missed: number; unscheduled: number };
+  // Open visits with no live dispatch starting within `withinDays`, overdue included.
+  visitsDueSoonUnscheduled: { withinDays: number; count: number };
+  currency: string;
+  // The regions these figures cover; null = the whole company. An agreement
+  // counts only under a scope that includes every location it covers.
+  regionIds: string[] | null;
+}
+
 // Create body. New agreements are created status DRAFT — generation + billing
 // only run once PATCHed to ACTIVE (after coverage + visit templates are set).
 // v1 only creates kind VISIT / classification CONTRACT.
@@ -196,6 +325,12 @@ export interface CreateAgreementRequest {
   // snapshot the plan's benefits; send it to override the benefits per-sale.
   planId?: string | null;
   benefits?: MemberBenefits | null;
+}
+
+export interface RenewAgreementRequest {
+  termEnd: string;
+  /** Reprices the billing schedule from the new term's first period; omit to keep it. */
+  billingAmount?: number;
 }
 
 // PATCH body. Tri-state nullable fields (termStart, termEnd, renewalTermMonths,
@@ -427,6 +562,16 @@ export interface ListAgreementPlansParams {
   size?: number;
 }
 
+// Lists go comma-joined; false flags and empty values are left off.
+function listWireParams({ status, regionIds, planId, ...params }: ListAgreementsParams) {
+  return {
+    ...Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== false)),
+    ...(status?.length ? { status: status.join(',') } : {}),
+    ...(planId?.length ? { planId: planId.join(',') } : {}),
+    ...(regionIds?.length ? { regionIds } : {}),
+  };
+}
+
 export const agreementApi = {
   // List — `classification` defaults to CONTRACT (the commercial-agreements
   // list). `customerId` scopes to one customer's Agreements tab.
@@ -451,6 +596,35 @@ export const agreementApi = {
     return response.data;
   },
 
+  // Company-wide, paged. See {@link AgreementListRow}.
+  listPage: async (params: ListAgreementsParams = {}): Promise<Page<AgreementListRow>> => {
+    const response = await apiClient.get<Page<AgreementListRow>>('/work-orders/agreements', {
+      params: listWireParams(params),
+    });
+    return response.data;
+  },
+
+  // The list's chip counts, for the same filters (paging and sort ignored).
+  facets: async (params: ListAgreementsParams = {}): Promise<AgreementListFacets> => {
+    const response = await apiClient.get<AgreementListFacets>('/work-orders/agreements/facets', {
+      params: listWireParams({ ...params, sort: undefined, page: undefined, size: undefined }),
+    });
+    return response.data;
+  },
+
+  // See {@link UnscheduledVisit}. withinDays defaults to 7 (Home's window).
+  unscheduledVisits: async ({
+    regionIds,
+    ...params
+  }: { withinDays?: number; regionIds?: string[]; page?: number; size?: number } = {}): Promise<
+    Page<UnscheduledVisit>
+  > => {
+    const response = await apiClient.get<Page<UnscheduledVisit>>('/work-orders/agreements/visits/unscheduled', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+
   getById: async (id: string): Promise<AgreementResponse> => {
     const response = await apiClient.get<AgreementResponse>(`/work-orders/agreements/${id}`);
     return response.data;
@@ -462,6 +636,16 @@ export const agreementApi = {
       '/work-orders/agreements/summary',
       { params: { customerId } },
     );
+    return response.data;
+  },
+
+  // Tenant-wide overview (home dashboard). See {@link AgreementOverviewResponse}.
+  getOverview: async (params: { regionIds?: string[] } = {}): Promise<AgreementOverviewResponse> => {
+    const response = params.regionIds?.length
+      ? await apiClient.get<AgreementOverviewResponse>('/work-orders/agreements/overview', {
+          params: { regionIds: params.regionIds },
+        })
+      : await apiClient.get<AgreementOverviewResponse>('/work-orders/agreements/overview');
     return response.data;
   },
 
@@ -493,6 +677,22 @@ export const agreementApi = {
     const response = await apiClient.post<AgreementResponse>(
       `/work-orders/agreements/${id}/cancel`,
     );
+    return response.data;
+  },
+
+  // Renews into [termEnd, request.termEnd). Booked while the current term runs
+  // (it starts at termEnd); applied now once the term has ended or from EXPIRED.
+  renew: async (id: string, request: RenewAgreementRequest): Promise<AgreementResponse> => {
+    const response = await apiClient.post<AgreementResponse>(
+      `/work-orders/agreements/${id}/renew`,
+      request,
+    );
+    return response.data;
+  },
+
+  // Cancels a booked renewal; the term then ends at termEnd. 409 when none is booked.
+  cancelRenewal: async (id: string): Promise<AgreementResponse> => {
+    const response = await apiClient.delete<AgreementResponse>(`/work-orders/agreements/${id}/renewal`);
     return response.data;
   },
 
@@ -631,7 +831,10 @@ export const agreementPlanApi = {
   // (management table); active:true for the sell-from-plan picker. Axios drops
   // undefined params, so omitting active really omits it.
   getAll: async (params?: ListAgreementPlansParams): Promise<AgreementPlanPage> => {
-    const response = await apiClient.get<AgreementPlanPage>('/work-orders/agreement-plans', { params });
+    // The BE takes Spring's native `sort=field,dir`; sortBy/sortDir alone are ignored.
+    const { sortBy, sortDir, ...rest } = params ?? {};
+    const wire = sortBy ? { ...rest, sort: `${sortBy},${sortDir ?? 'asc'}` } : rest;
+    const response = await apiClient.get<AgreementPlanPage>('/work-orders/agreement-plans', { params: wire });
     return response.data;
   },
   getById: async (id: string): Promise<AgreementPlanResponse> => {

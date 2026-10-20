@@ -1,69 +1,100 @@
-import { useState, useDeferredValue } from 'react';
+/* eslint-disable i18next/no-literal-string -- dense billing list; short operational labels stay literal (same convention as the document pages). Entity names route through getName(). */
+import { useDeferredValue, useState, type ReactNode } from 'react';
 import clsx from 'clsx';
-import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from '@dispatch/i18n';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { DocumentTextIcon, PlusIcon } from '@heroicons/react/16/solid';
+import { formatCurrency } from '@dispatch/utils';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { invalidateLocationInvoiceCaches } from '../lib/invalidateFinancialCaches';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
-import { Input } from '../components/catalyst/input';
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
-import { Field, Label } from '../components/catalyst/fieldset';
-import { Select } from '../components/catalyst/select';
-import { Textarea } from '../components/catalyst/textarea';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { LoadingState } from '../components/ui/LoadingState';
-import { Pill } from '../components/ui/Pill';
-import {
-  DenseTable, DenseTHead, DenseRow,
-} from '../components/ui/DenseTable';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Pill, Tag } from '../components/ui/Pill';
+import { ViewTabs } from '../components/ui/Tabs';
+import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
-import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { ChipListboxOption, FilterChipListbox } from '../components/ui/FilterChipListbox';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { EMPTY_DATE_RANGE, rangeForPreset, type DatePreset, type DateRange } from '../lib/dateRangePresets';
-import { InvoiceStatus, invoicesApi } from '../api/setup';
-import type { InvoiceListItemRow, CreateInvoiceRequest, CreateInvoiceLineItemRequest, ListInvoicesParams } from '../api/setup';
-import { customerApi } from '../api/setup';
-import { workOrderApi } from '../api/setup';
+import { AssignmentChip, UNASSIGNED } from '../components/billing/AssignmentChip';
+import { StartDocumentDialog } from '../components/document/StartDocumentDialog';
+import { formatDocDate } from '../components/document/documentModel';
+import {
+  INVOICE_STATUS_FILTERS,
+  INVOICE_STATUS_TONE,
+  INVOICE_VIEWS,
+  INVOICE_VIEW_PARAMS,
+  daysSince,
+  invoiceListStatus,
+  termsLabel,
+  type InvoiceView,
+} from '../components/billing/billingListModel';
+import { dispatchRegionApi, divisionsApi, invoicesApi, workOrderTypesApi } from '../api/setup';
+import type { InvoiceListItemRow, ListInvoicesParams } from '../api/setup';
 
 const PAGE_SIZE = 25;
 
-// Status chip — single-select (the backend has no multi-status param). "Overdue"
-// rides the server-derived `overdue=true` (open + strictly past due) rather than
-// `status=OVERDUE`, so a SENT invoice past its due date matches even before the
-// stored status flips. Same filter set as the location detail Invoices tab.
-const INVOICE_STATUS_FILTERS: { id: string; labelKey: string; params: Partial<ListInvoicesParams> }[] = [
-  { id: 'overdue', labelKey: 'invoices.status.overdue', params: { overdue: true } },
-  { id: 'draft', labelKey: 'invoices.status.draft', params: { status: InvoiceStatus.DRAFT } },
-  { id: 'sent', labelKey: 'invoices.status.sent', params: { status: InvoiceStatus.SENT } },
-  { id: 'paid', labelKey: 'invoices.status.paid', params: { status: InvoiceStatus.PAID } },
-  { id: 'cancelled', labelKey: 'invoices.status.cancelled', params: { status: InvoiceStatus.CANCELLED } },
-  { id: 'void', labelKey: 'invoices.status.void', params: { status: InvoiceStatus.VOID } },
-];
+function assignmentParams(
+  value: string,
+  ids: 'divisionIds' | 'workOrderTypeIds' | 'regionIds',
+  none: 'noDivision' | 'noWorkOrderType' | 'noRegion',
+): Partial<ListInvoicesParams> {
+  if (!value) return {};
+  return value === UNASSIGNED ? { [none]: true } : { [ids]: [value] };
+}
 
+const VIEW_LABEL: Record<InvoiceView, string> = {
+  unpaid: 'Unpaid',
+  overdue: 'Overdue',
+  draft: 'Drafts',
+  paid: 'Paid',
+  all: 'All',
+  void: 'Void',
+};
+
+// BE sort whitelist (InvoiceController): invoiceDate, dueDate, totalAmount,
+// status, createdAt, updatedAt, invoiceNumber, customerName, balanceDue. Status
+// is an enum sorted by name (meaningless order), so it's not offered.
+const DEFAULT_SORT: SortState = { key: 'invoiceDate', dir: 'desc' };
+const SORT_KEYS = ['invoiceDate', 'invoiceNumber', 'customerName', 'totalAmount', 'balanceDue'] as const;
+
+const day = (v: string | null | undefined) => formatDocDate(v, false) ?? '—';
+
+/**
+ * Every invoice, by what needs doing: unpaid first, then overdue, drafts,
+ * paid, all, and void (kept apart so the rest add up). Counts and the
+ * outstanding totals come from the server, over the same filters as the
+ * list. A row opens the invoice.
+ */
 export default function InvoicesPage() {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
   const { getName } = useGlossary();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceListItemRow | null>(null);
+  const navigate = useNavigate();
+  const entities = getName('invoice', true);
+  const entity = getName('invoice');
+  const [creating, setCreating] = useState(false);
 
-  // Server-side search + filters + pagination (the list endpoint is paged +
-  // lean now, so client-side filtering would only search the loaded page).
-  // Page lives in the URL (1-based; API is 0-based); search and filters are
-  // mirrored to the URL so the footer's page links preserve them.
+  // Tab, filters and page live in the URL, so links and the footer's page links keep them.
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') ?? '');
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const deferredSearch = useDeferredValue(searchQuery.trim());
-  const statusId = searchParams.get('status') ?? '';
-  // Date range — the `from`/`to` day params are the source of truth; a legacy
-  // bookmarked `?date=<preset>` (pre-chip URL shape) resolves to its concrete
-  // range until any new selection overwrites it.
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const { current: currentSort, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['invoiceDate', 'totalAmount', 'balanceDue'],
+    allowed: SORT_KEYS,
+  });
+  const sort = `${currentSort.key},${currentSort.dir}` as ListInvoicesParams['sort'];
+  // An exact status from an older link (the revenue report's `billed`) shows as a chip on All.
+  const legacyStatusId = searchParams.get('status') ?? '';
+  const legacyStatus = INVOICE_STATUS_FILTERS[legacyStatusId] ?? null;
+  const viewParam = searchParams.get('view') as InvoiceView | null;
+  const view: InvoiceView = legacyStatus ? 'all' : viewParam && INVOICE_VIEWS.includes(viewParam) ? viewParam : 'unpaid';
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
   const legacyPreset = (searchParams.get('date') as DatePreset | null) ?? '';
@@ -73,18 +104,11 @@ export default function InvoicesPage() {
       : legacyPreset && legacyPreset !== 'custom'
         ? rangeForPreset(legacyPreset)
         : EMPTY_DATE_RANGE;
+  const divisionId = searchParams.get('division') ?? '';
+  const typeId = searchParams.get('type') ?? '';
+  const regionId = searchParams.get('region') ?? '';
 
-  const onSearchChange = (value: string) => {
-    setSearchQuery(value);
-    const next = new URLSearchParams(searchParams);
-    if (value) next.set('search', value);
-    else next.delete('search');
-    next.delete('page'); // new query → back to page 1
-    setSearchParams(next, { replace: true });
-  };
-
-  // Status / issued-date chips write through here. New filter → back to page 1.
-  const setFilterParams = (updates: Record<string, string | null>) => {
+  const setParams = (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(updates)) {
       if (value) next.set(key, value);
@@ -93,8 +117,10 @@ export default function InvoicesPage() {
     next.delete('page');
     setSearchParams(next, { replace: true });
   };
-  const setFilterParam = (key: string, value: string | null) => setFilterParams({ [key]: value });
-
+  const onSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setParams({ search: value || null });
+  };
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
     if (target <= 1) next.delete('page');
@@ -103,520 +129,295 @@ export default function InvoicesPage() {
     return qs ? `?${qs}` : '?';
   };
 
-  // Form state
-  const [formData, setFormData] = useState<{
-    customerId: string;
-    workOrderId: string;
-    invoiceDate: string;
-    dueDate: string;
-    taxRate: string;
-    notes: string;
-    lineItems: CreateInvoiceLineItemRequest[];
-  }>({
-    customerId: '',
-    workOrderId: '',
-    invoiceDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    taxRate: '0',
-    notes: '',
-    lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
+  const { data: divisions = [] } = useQuery({ queryKey: ['divisions'], queryFn: () => divisionsApi.getAll() });
+  const { data: types = [] } = useQuery({ queryKey: ['work-order-types'], queryFn: () => workOrderTypesApi.getAll() });
+  const { data: regions = [] } = useQuery({ queryKey: ['dispatch-regions', 'active'], queryFn: () => dispatchRegionApi.getAll(false) });
+
+  const scope = {
+    from: dateRange.from || undefined,
+    to: dateRange.to || undefined, // inclusive on the backend
+    ...(regionId && regionId !== UNASSIGNED ? { regionIds: [regionId] } : {}),
+  };
+  const { data: views } = useQuery({
+    queryKey: ['invoices', 'views', scope],
+    queryFn: () => invoicesApi.getViews(scope),
   });
-
-  const [newStatus, setNewStatus] = useState<InvoiceStatus>(InvoiceStatus.DRAFT);
-  const [submitting, setSubmitting] = useState(false);
-
-  const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-
-  const { data: invoicePage, isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices', page, deferredSearch, statusId, dateRange.from, dateRange.to],
+  const { data: invoicePage, isLoading } = useQuery({
+    queryKey: ['invoices', view, legacyStatusId, page, deferredSearch, dateRange.from, dateRange.to, divisionId, typeId, regionId, sort],
     queryFn: () =>
       invoicesApi.getAll({
         q: deferredSearch || undefined,
-        ...statusParams,
-        // The chip's inclusive day strings pass through as-is.
-        from: dateRange.from || undefined,
-        to: dateRange.to || undefined, // inclusive on the backend — no +1-day trick
+        ...(legacyStatus ? legacyStatus.params : INVOICE_VIEW_PARAMS[view]),
+        ...assignmentParams(divisionId, 'divisionIds', 'noDivision'),
+        ...assignmentParams(typeId, 'workOrderTypeIds', 'noWorkOrderType'),
+        ...assignmentParams(regionId, 'regionIds', 'noRegion'),
+        from: scope.from,
+        to: scope.to,
         page: page - 1,
         size: PAGE_SIZE,
-        sort: 'invoiceDate,desc',
+        sort,
       }),
+    placeholderData: keepPreviousData,
   });
   const invoices = invoicePage?.content ?? [];
   const total = invoicePage?.totalElements ?? 0;
-  const totalPages = invoicePage?.totalPages ?? 0;
+  const narrowed = !!(deferredSearch || dateRange.from || dateRange.to || divisionId || typeId || regionId || legacyStatus);
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['invoice-form-customers'],
-    queryFn: async () => {
-      const page = await customerApi.getAllPaginated({ size: 200, status: ['ACTIVE'] });
-      return page.content;
-    },
-  });
-
-  const { data: workOrders = [] } = useQuery({
-    queryKey: ['invoice-form-work-orders'],
-    queryFn: async () => {
-      const page = await workOrderApi.getAll({ size: 200 });
-      return page.content;
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (request: CreateInvoiceRequest) => invoicesApi.create(request),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      invalidateLocationInvoiceCaches(queryClient);
-      setIsCreateOpen(false);
-      resetForm();
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: InvoiceStatus }) =>
-      invoicesApi.updateStatus(id, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      invalidateLocationInvoiceCaches(queryClient);
-      setIsStatusOpen(false);
-      setSelectedInvoice(null);
-    },
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.customerId) {
-      alert(t('invoices.form.customer') + ' is required');
-      return;
-    }
-
-    if (formData.lineItems.length === 0 || !formData.lineItems.every(item => item.description && item.quantity > 0)) {
-      alert('Please add at least one complete line item');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      const request: CreateInvoiceRequest = {
-        customerId: formData.customerId,
-        workOrderId: formData.workOrderId || undefined,
-        // Business dates are LocalDate (yyyy-MM-dd) on the wire — pass
-        // the date-input value through raw, not as an ISO Instant.
-        invoiceDate: formData.invoiceDate,
-        dueDate: formData.dueDate,
-        taxRate: parseFloat(formData.taxRate),
-        notes: formData.notes || undefined,
-        lineItems: formData.lineItems,
-      };
-      await createMutation.mutateAsync(request);
-    } catch (error: unknown) {
-      console.error('Error creating invoice:', error);
-      const message = error && typeof error === 'object' && 'response' in error &&
-        error.response && typeof error.response === 'object' && 'data' in error.response &&
-        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
-        ? String(error.response.data.message)
-        : t('common.form.errorCreate', { entity: getName('invoice') });
-      alert(message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleStatusUpdate = async () => {
-    if (!selectedInvoice) return;
-
-    try {
-      setSubmitting(true);
-      await updateStatusMutation.mutateAsync({ id: selectedInvoice.id, status: newStatus });
-    } catch (error: unknown) {
-      console.error('Error updating status:', error);
-      const message = error && typeof error === 'object' && 'response' in error &&
-        error.response && typeof error.response === 'object' && 'data' in error.response &&
-        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
-        ? String(error.response.data.message)
-        : 'Failed to update invoice status';
-      alert(message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      customerId: '',
-      workOrderId: '',
-      invoiceDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      taxRate: '0',
-      notes: '',
-      lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
-    });
-  };
-
-  const addLineItem = () => {
-    setFormData({
-      ...formData,
-      lineItems: [...formData.lineItems, { description: '', quantity: 1, unitPrice: 0 }],
-    });
-  };
-
-  const removeLineItem = (index: number) => {
-    setFormData({
-      ...formData,
-      lineItems: formData.lineItems.filter((_, i) => i !== index),
-    });
-  };
-
-  const updateLineItem = (index: number, field: keyof CreateInvoiceLineItemRequest, value: string | number) => {
-    const updated = [...formData.lineItems];
-    updated[index] = { ...updated[index], [field]: value };
-    setFormData({ ...formData, lineItems: updated });
-  };
-
-  const getStatusBadge = (invoice: InvoiceListItemRow) => {
-    const tones: Record<InvoiceStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
-      [InvoiceStatus.DRAFT]: 'neutral',
-      [InvoiceStatus.SENT]: 'info',
-      [InvoiceStatus.PAID]: 'success',
-      [InvoiceStatus.OVERDUE]: 'danger',
-      [InvoiceStatus.CANCELLED]: 'neutral',
-      [InvoiceStatus.VOID]: 'neutral',
-    };
-    // Server-derived `overdue` is canonical — same rule as the overdue filter
-    // (open + strictly past due), so badge and filter always agree. It covers
-    // SENT rows whose stored status hasn't flipped to OVERDUE yet. Never
-    // recompute from dueDate client-side (timezone drift).
-    if (invoice.overdue) {
-      return <Pill tone="danger" dot>{t('invoices.status.overdue')}</Pill>;
-    }
-    return <Pill tone={tones[invoice.status]} dot>{t(`invoices.status.${invoice.status.toLowerCase()}`)}</Pill>;
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
-  const showingStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const showingEnd = Math.min(page * PAGE_SIZE, total);
-  const invoiceSubtitle = total > 0
-    ? t('common.pagination.showing', {
-        start: showingStart,
-        end: showingEnd,
-        total: total.toLocaleString(),
-      })
-    : t('invoices.description');
+  const summary = views && (
+    <>
+      <Strong>{views.counts.unpaid}</Strong> unpaid · <Strong>{formatCurrency(views.outstanding)}</Strong> outstanding ·{' '}
+      <span className={clsx('font-semibold tabular-nums', views.overdueAmount > 0 ? 'text-danger-500' : 'text-fg-strong')}>
+        {formatCurrency(views.overdueAmount)}
+      </span>{' '}
+      overdue
+    </>
+  );
 
   return (
     <AppLayout>
-      <div>
-        <PageHead
-          title={getName('invoice', true)}
-          sub={invoiceSubtitle}
-          actions={
-            <Button color="accent" onClick={() => setIsCreateOpen(true)}>
-              {t('common.actions.create', { entity: getName('invoice') })}
-            </Button>
-          }
-        />
+      <PageHead
+        title={entities}
+        sub={summary}
+        actions={
+          <Button color="accent" size="xs" onClick={() => setCreating(true)}>
+            <PlusIcon />
+            {`New ${entity.toLowerCase()}`}
+          </Button>
+        }
+      />
 
-        <ListToolbar
-          search={
-            <ListSearch
-              placeholder={t('invoices.search.placeholder', {
-                entity: getName('invoice'),
-                customer: getName('customer'),
-              })}
-              value={searchQuery}
-              onChange={onSearchChange}
-            />
-          }
-        >
+      <ViewTabs
+        className="mb-3"
+        value={legacyStatus ? '' : view}
+        onChange={(id) => setParams({ view: id === 'unpaid' ? null : id, status: null })}
+        tabs={INVOICE_VIEWS.map((v) => ({
+          id: v,
+          label: VIEW_LABEL[v],
+          count: views?.counts[v],
+          ...(v === 'overdue' ? { tone: 'danger' as const } : {}),
+        }))}
+      />
+
+      <ListToolbar
+        search={
+          <ListSearch
+            placeholder={`${entity} #, ${getName('customer').toLowerCase()}, PO #, address, ${getName('work_order').toLowerCase()}…`}
+            value={searchQuery}
+            onChange={onSearchChange}
+          />
+        }
+      >
+        {legacyStatus && (
           <FilterChipListbox
-            label={t('common.form.status')}
-            ariaLabel={t('common.form.status')}
-            value={statusId || null}
-            displayValue={
-              statusId ? t(INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.labelKey ?? '') : null
-            }
-            onChange={(id) => setFilterParam('status', id)}
-            onClear={() => setFilterParam('status', null)}
-            resetLabel={t('invoices.filters.anyStatus')}
+            label="Status"
+            ariaLabel="Status"
+            value={legacyStatusId}
+            displayValue={legacyStatus.label}
+            onChange={(id) => setParams({ status: id })}
+            onClear={() => setParams({ status: null })}
+            resetLabel="Any status"
           >
-            {INVOICE_STATUS_FILTERS.map((s) => (
-              <ChipListboxOption key={s.id} value={s.id}>
-                {t(s.labelKey)}
+            {Object.entries(INVOICE_STATUS_FILTERS).map(([id, f]) => (
+              <ChipListboxOption key={id} value={id}>
+                {f.label}
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
-
-          <DateRangeChip
-            label={t('invoices.filters.issued')}
-            ariaLabel={t('invoices.filters.issued')}
-            value={dateRange}
-            onChange={(r) => setFilterParams({ from: r.from || null, to: r.to || null, date: null })}
+        )}
+        <DateRangeChip
+          label="Issued"
+          ariaLabel="Issued"
+          value={dateRange}
+          onChange={(r) => setParams({ from: r.from || null, to: r.to || null, date: null })}
+        />
+        {(divisions.length > 1 || divisionId) && (
+          <AssignmentChip
+            label={getName('division')}
+            value={divisionId}
+            options={divisions}
+            unassignedLabel={`No ${getName('division').toLowerCase()}`}
+            anyLabel="Any"
+            onChange={(v) => setParams({ division: v })}
           />
-        </ListToolbar>
+        )}
+        {(types.length > 1 || typeId) && (
+          <AssignmentChip
+            label={`${getName('work_order')} type`}
+            value={typeId}
+            options={types}
+            unassignedLabel="No type"
+            anyLabel="Any"
+            onChange={(v) => setParams({ type: v })}
+          />
+        )}
+        {(regions.length > 1 || regionId) && (
+          <AssignmentChip
+            label={getName('dispatch_region')}
+            value={regionId}
+            options={regions}
+            unassignedLabel={`No ${getName('dispatch_region').toLowerCase()}`}
+            anyLabel="Any"
+            onChange={(v) => setParams({ region: v })}
+          />
+        )}
+      </ListToolbar>
 
-        {invoicesLoading ? (
-          <Card>
-            <CardBody flush>
-              <LoadingState label={t('common.actions.loading', { entities: getName('invoice', true) })} />
-            </CardBody>
-          </Card>
-        ) : invoices.length === 0 ? (
-          <Card>
-            <CardBody>
-              <p className="text-[12.5px] text-fg-muted">
-                {deferredSearch || statusId || dateRange.from || dateRange.to
-                  ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) })
-                  : t('common.actions.notFound', { entities: getName('invoice', true) })}
-              </p>
-            </CardBody>
-          </Card>
-        ) : (
-          <Card>
-            <CardBody flush>
-              <DenseTable>
+      <Card>
+        <CardBody flush>
+          {isLoading ? (
+            <LoadingState label={`Loading ${entities.toLowerCase()}…`} />
+          ) : invoices.length === 0 ? (
+            <EmptyState
+              icon={<DocumentTextIcon className="size-10 text-fg-dim" />}
+              title={deferredSearch ? `No ${entities.toLowerCase()} match “${deferredSearch}”` : narrowed ? `No ${entities.toLowerCase()} match these filters` : 'Nothing here'}
+              description={
+                deferredSearch
+                  ? `Try ${entity.toLowerCase()} #, ${getName('customer').toLowerCase()}, PO # or address.`
+                  : `${entities} in this view show up here.`
+              }
+            />
+          ) : (
+            <>
+              <DenseTable className="min-w-[1180px]">
                 <DenseTHead>
                   <tr>
-                    <th>{t('invoices.table.invoiceNumber')}</th>
-                    <th>{t('invoices.table.customer')}</th>
-                    <th>{t('invoices.table.invoiceDate')}</th>
-                    <th>{t('invoices.table.dueDate')}</th>
-                    <th className="right">{t('invoices.table.totalAmount')}</th>
-                    <th className="right">{t('invoices.table.balanceDue')}</th>
-                    <th>{t('invoices.table.status')}</th>
-                    <th></th>
+                    <SortHeader sortKey="invoiceNumber" label={entity} current={currentSort} onSort={onSort} style={{ minWidth: 150 }} />
+                    <SortHeader sortKey="customerName" label="Bill to" current={currentSort} onSort={onSort} />
+                    <th>{getName('service_location')}</th>
+                    <th>{`${getName('customer')} PO`}</th>
+                    <SortHeader sortKey="invoiceDate" label="Issued" current={currentSort} onSort={onSort} />
+                    <th>Status</th>
+                    <SortHeader sortKey="totalAmount" label="Total" align="right" current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="balanceDue" label="Balance" align="right" current={currentSort} onSort={onSort} />
                   </tr>
                 </DenseTHead>
                 <tbody>
-                  {invoices.map((invoice) => {
-                    // Void/cancelled money is meaningless — strike the face
-                    // value and dash the balance (not $0.00, which would read
-                    // as "paid off"). Same treatment as the location tab.
-                    const voided =
-                      invoice.status === InvoiceStatus.VOID || invoice.status === InvoiceStatus.CANCELLED;
-                    return (
-                    <DenseRow key={invoice.id}>
-                      <td>
-                        <span className={clsx('id-mono', voided ? 'text-fg-muted' : 'text-fg-strong')}>{invoice.invoiceNumber}</span>
-                      </td>
-                      <td className="strong" data-label={t('invoices.table.customer')}>{invoice.customerName ?? invoice.customerId}</td>
-                      <td data-label={t('invoices.table.invoiceDate')}>{formatDate(invoice.invoiceDate)}</td>
-                      <td data-label={t('invoices.table.dueDate')}>{formatDate(invoice.dueDate)}</td>
-                      <td
-                        className={voided ? 'right num text-fg-muted line-through' : 'right num strong'}
-                        data-label={t('invoices.table.totalAmount')}
-                      >
-                        {formatCurrency(invoice.totalAmount)}
-                      </td>
-                      <td className={clsx('right num', voided && 'dt-empty')} data-label={t('invoices.table.balanceDue')}>
-                        {voided ? (
-                          <span className="text-fg-dim">—</span>
-                        ) : invoice.balanceDue > 0 ? (
-                          <span className="font-semibold text-fg-strong">{formatCurrency(invoice.balanceDue)}</span>
-                        ) : (
-                          <span className="text-fg-dim">{formatCurrency(invoice.balanceDue)}</span>
-                        )}
-                      </td>
-                      <td>{getStatusBadge(invoice)}</td>
-                      <td>
-                        <Button
-                          plain
-                          onClick={() => {
-                            setSelectedInvoice(invoice);
-                            setNewStatus(invoice.status);
-                            setIsStatusOpen(true);
-                          }}
-                        >
-                          {t('common.edit')}
-                        </Button>
-                      </td>
-                    </DenseRow>
-                    );
-                  })}
+                  {invoices.map((i) => (
+                    <InvoiceRow key={i.id} invoice={i} onOpen={() => navigate(`/invoices/${i.id}`)} />
+                  ))}
                 </tbody>
               </DenseTable>
               <ListFooter
                 page={page}
-                totalPages={totalPages}
+                totalPages={invoicePage?.totalPages ?? 0}
                 pageHref={pageHref}
-                left={t('common.pagination.showing', {
-                  start: showingStart,
-                  end: showingEnd,
-                  total: total.toLocaleString(),
-                })}
+                left={
+                  <>
+                    Showing <Strong>{invoices.length}</Strong> of {total.toLocaleString()}
+                    {view !== 'void' && !legacyStatus && ` · void ${entities.toLowerCase()} are on the Void tab`}
+                  </>
+                }
               />
-            </CardBody>
-          </Card>
-        )}
-      </div>
+            </>
+          )}
+        </CardBody>
+      </Card>
 
-      {/* Create Invoice Dialog */}
-      <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>
-        <DialogTitle>{t('common.actions.create', { entity: getName('invoice') })}</DialogTitle>
-        <DialogDescription>{t('common.form.descriptionCreate', { entity: getName('invoice') })}</DialogDescription>
-        <form onSubmit={handleSubmit}>
-          <DialogBody>
-            <div className="space-y-4">
-              <Field>
-                <Label>{t('invoices.form.customer')}</Label>
-                <Select
-                  name="customerId"
-                  value={formData.customerId}
-                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                  required
-                >
-                  <option value="">{t('workOrders.form.customerPlaceholder')}</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
-              <Field>
-                <Label>{t('invoices.form.workOrder')}</Label>
-                <Select
-                  name="workOrderId"
-                  value={formData.workOrderId}
-                  onChange={(e) => setFormData({ ...formData, workOrderId: e.target.value })}
-                >
-                  <option value="">{t('common.none')}</option>
-                  {workOrders.map((wo) => (
-                    <option key={wo.id} value={wo.id}>
-                      {wo.workOrderNumber
-                        ? `${wo.workOrderNumber}${wo.customer?.name ? ` — ${wo.customer.name}` : ''}`
-                        : wo.id}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <Label>{t('invoices.form.invoiceDate')}</Label>
-                  <Input
-                    type="date"
-                    value={formData.invoiceDate}
-                    onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
-                    required
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('invoices.form.dueDate')}</Label>
-                  <Input
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    required
-                  />
-                </Field>
-              </div>
-
-              <Field>
-                <Label>{t('invoices.form.taxRate')}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.taxRate}
-                  onChange={(e) => setFormData({ ...formData, taxRate: e.target.value })}
-                />
-              </Field>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label>{t('invoices.form.lineItems')}</Label>
-                  <Button type="button" plain onClick={addLineItem}>
-                    {t('invoices.form.addLineItem')}
-                  </Button>
-                </div>
-                {formData.lineItems.map((item, index) => (
-                  <div key={index} className="flex gap-2 mb-2">
-                    <Input
-                      placeholder={t('invoices.form.description')}
-                      value={item.description}
-                      onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                      required
-                    />
-                    <Input
-                      type="number"
-                      placeholder={t('invoices.form.quantity')}
-                      value={item.quantity}
-                      onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value))}
-                      className="w-24"
-                      required
-                    />
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder={t('invoices.form.unitPrice')}
-                      value={item.unitPrice}
-                      onChange={(e) => updateLineItem(index, 'unitPrice', parseFloat(e.target.value))}
-                      className="w-32"
-                      required
-                    />
-                    {formData.lineItems.length > 1 && (
-                      <Button type="button" plain onClick={() => removeLineItem(index)}>
-                        {t('invoices.form.removeLineItem')}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <Field>
-                <Label>{t('common.form.notes')}</Label>
-                <Textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={3}
-                />
-              </Field>
-            </div>
-          </DialogBody>
-          <DialogActions>
-            <Button plain onClick={() => { setIsCreateOpen(false); resetForm(); }}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? t('common.saving') : t('common.create')}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-
-      {/* Update Status Dialog */}
-      <Dialog open={isStatusOpen} onClose={setIsStatusOpen}>
-        <DialogTitle>{t('common.actions.edit', { entity: getName('invoice') })}</DialogTitle>
-        <DialogDescription>{t('common.updateStatus', { entity: getName('invoice') })}</DialogDescription>
-        <DialogBody>
-          <Field>
-            <Label>{t('common.form.status')}</Label>
-            <Select value={newStatus} onChange={(e) => setNewStatus(e.target.value as InvoiceStatus)}>
-              {Object.values(InvoiceStatus).map((status) => (
-                <option key={status} value={status}>
-                  {t(`invoices.status.${status.toLowerCase()}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={() => setIsStatusOpen(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleStatusUpdate} disabled={submitting}>
-            {submitting ? t('common.saving') : t('common.update')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <StartDocumentDialog kind={creating ? 'invoice' : null} onClose={() => setCreating(false)} />
     </AppLayout>
   );
 }
+
+const Strong = ({ children }: { children: ReactNode }) => (
+  <span className="font-semibold tabular-nums text-fg-strong">{children}</span>
+);
+
+function InvoiceRow({ invoice: i, onOpen }: { invoice: InvoiceListItemRow; onOpen: () => void }) {
+  const { getName } = useGlossary();
+  const status = invoiceListStatus(i);
+  const withdrawn = status === 'Void' || status === 'Cancelled';
+  const overdue = status === 'Overdue';
+  const terms = termsLabel(i.paymentTermsDays);
+  const lateDays = overdue && i.dueDate ? daysSince(i.dueDate) : 0;
+
+  return (
+    <DenseRow onClick={onOpen} className={withdrawn ? 'opacity-70' : undefined}>
+      <td>
+        <div className="flex flex-col">
+          <Link
+            to={`/invoices/${i.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className={clsx('id-mono font-semibold text-fg-strong hover:underline', withdrawn && 'line-through')}
+          >
+            {i.invoiceNumber}
+          </Link>
+          <span className="text-[11px] text-fg-muted">
+            {i.reissuedAsInvoiceNumber ? (
+              <>
+                Reissued as <span className="font-mono">{i.reissuedAsInvoiceNumber}</span>
+              </>
+            ) : i.reissuedFromInvoiceNumber ? (
+              <>
+                Reissue of <span className="font-mono">{i.reissuedFromInvoiceNumber}</span>
+              </>
+            ) : i.quoteNumber ? (
+              <>
+                from <span className="font-mono">{i.quoteNumber}</span>
+              </>
+            ) : i.agreementId ? (
+              'Installment'
+            ) : (
+              'Direct'
+            )}
+          </span>
+        </div>
+      </td>
+      <td data-label="Bill to">
+        <div className="flex flex-col">
+          <span className="flex items-center gap-1.5 font-medium text-fg-strong">
+            {i.customerName ?? '—'}
+            {i.billToIsPayer && <Tag word>{getName('payer')}</Tag>}
+          </span>
+          {terms && <span className="text-[11px] text-fg-muted">{terms}</span>}
+        </div>
+      </td>
+      <td data-label={getName('service_location')}>
+        <div className="flex flex-col">
+          <span className="text-[12px] text-fg">{i.serviceLocationName ?? i.serviceLocationAddress ?? '—'}</span>
+          {i.workOrderNumber && <span className="font-mono text-[11px] text-fg-muted">{i.workOrderNumber}</span>}
+        </div>
+      </td>
+      <td data-label={`${getName('customer')} PO`} className={clsx('font-mono text-[11.5px]', i.customerPoNumber ? 'text-fg' : 'text-fg-muted')}>
+        {i.customerPoNumber || '—'}
+      </td>
+      <td data-label="Issued">
+        <div className="flex flex-col">
+          <span className="text-[12px] text-fg">{status === 'Draft' ? 'Not sent' : day(i.invoiceDate)}</span>
+          <span className={clsx('text-[11px]', overdue ? 'font-semibold text-danger-500' : 'text-fg-muted')}>
+            {withdrawn
+              ? i.voidedAt
+                ? `Voided ${day(i.voidedAt)}`
+                : status
+              : status === 'Paid'
+                ? i.paidAt
+                  ? `Paid ${day(i.paidAt)}`
+                  : 'Paid'
+                : overdue
+                  ? `Due ${day(i.dueDate)}${lateDays > 0 ? ` · ${lateDays}d late` : ''}`
+                  : status === 'Draft'
+                    ? '—'
+                    : `Due ${day(i.dueDate)}`}
+          </span>
+        </div>
+      </td>
+      <td>
+        <Pill tone={INVOICE_STATUS_TONE[status]} dot>
+          {status}
+        </Pill>
+      </td>
+      <td className={clsx('right num', withdrawn ? 'text-fg-muted line-through' : 'text-fg')} data-label="Total">
+        {formatCurrency(i.totalAmount)}
+      </td>
+      <td className="right num" data-label="Balance">
+        {withdrawn || status === 'Draft' ? (
+          <span className="text-fg-muted">—</span>
+        ) : i.balanceDue > 0 ? (
+          <span className={clsx('font-bold', overdue ? 'text-danger-500' : 'text-fg-strong')}>{formatCurrency(i.balanceDue)}</span>
+        ) : (
+          <span className="text-fg-muted">Paid</span>
+        )}
+      </td>
+    </DenseRow>
+  );
+}
+

@@ -46,14 +46,28 @@ export function ListSearch({
   value,
   onChange,
   ariaLabel,
+  compact,
 }: {
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
   ariaLabel?: string;
+  /** Sits in a chrome band rather than above a list: 26px to match the
+   *  controls beside it, and a fixed width so the filters group next to it
+   *  instead of being pushed to the far edge. */
+  compact?: boolean;
 }) {
   return (
-    <InputGroup className="min-w-[260px] flex-1">
+    <InputGroup
+      className={
+        compact
+          ? // The icon is sized and positioned for a 32px field: 16px lands
+            // flush with the bottom edge of a 26px one and reads heavy beside
+            // 11.5px type. 14px, centred on the smaller field.
+            'w-[200px] shrink-0 [&>[data-slot=icon]]:size-3.5! [&>[data-slot=icon]]:top-[6px]!'
+          : 'min-w-[260px] flex-1'
+      }
+    >
       <MagnifyingGlassIcon data-slot="icon" />
       <Input
         type="text"
@@ -61,7 +75,7 @@ export function ListSearch({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel ?? placeholder}
-        className={dense.input}
+        className={compact ? dense.inputChrome : dense.input}
       />
     </InputGroup>
   );

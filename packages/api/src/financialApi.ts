@@ -1,5 +1,235 @@
 // Financial API Client
 import apiClient from './client';
+import type { ActivityEvent } from './activityApi';
+
+// ========== PRICING (shared by quotes and invoices) ==========
+//
+// Pricebook Phase 1 (dispatch-api handoff FE_HANDOFF_pricebook_phase1.md).
+// The server prices everything: the client sends lines and adjustments, never
+// tax or totals. Every percent here is a FRACTION (15% is 0.15) — display ×100.
+
+/** What a line is. LABOR has no pricebook item; the other four map 1:1 to item types. */
+export type LineType = 'LABOR' | 'SERVICE' | 'MATERIAL' | 'EQUIPMENT' | 'FEE';
+
+/** What a line is for tax. Defaults from the line type (LABOR/SERVICE → LABOR, MATERIAL → MATERIALS, …). */
+export type TaxClass = 'LABOR' | 'MATERIALS' | 'EQUIPMENT' | 'FEE';
+
+/** Which fee a FEE line is; the member trip-fee waiver finds the TRIP one. */
+export type FeeRole = 'TRIP' | 'DIAGNOSTIC' | 'AFTER_HOURS' | 'DISPOSAL' | 'OTHER';
+
+/**
+ * LEGACY documents predate the pricing engine: read-only (every edit is 409
+ * DOCUMENT_NOT_EDITABLE) and taxed at the header `taxRate`. ENGINE documents
+ * are taxed per line — read `tax` and the line tax fields instead.
+ */
+export type PricingModel = 'LEGACY' | 'ENGINE';
+
+/** What the account's rate plan did to a line; `pricingRuleValue` is the markup or multiplier (a fraction). */
+export type PricingRule = 'MARKUP_TIER' | 'PLAN_LABOR_RATE' | 'CATEGORY_MULTIPLIER' | 'PRICE_MULTIPLIER';
+
+export type AdjustmentKind = 'PERCENT' | 'AMOUNT' | 'WAIVE';
+
+/** MEMBER only comes from an agreement; the server refuses it on a manual add. */
+export type AdjustmentReason =
+  | 'MEMBER'
+  | 'REPAIR_APPROVED'
+  | 'GOODWILL'
+  | 'PROMOTION'
+  | 'INCENTIVE'
+  | 'DISCRETIONARY'
+  | 'OTHER';
+
+export type AdjustmentSource = 'MANUAL' | 'AGREEMENT' | 'PROMOTION' | 'MEMBERSHIP';
+
+/** Codes a draft can warn with; branch on these, never show `message` verbatim. */
+export type PricingWarningCode = 'TAX_JURISDICTION_NOT_SET' | 'TAX_RATE_NOT_SET' | 'NTE_EXCEEDED';
+
+/** Needs attention but doesn't block saving. Drafts only. */
+export interface PricingWarning {
+  code: PricingWarningCode | string;
+  message: string;
+}
+
+/** The jurisdiction and exemption an ENGINE document was taxed under. Null on LEGACY. */
+export interface DocumentTax {
+  jurisdictionId: string | null;
+  jurisdictionName: string | null;
+  /** A fraction; null when the jurisdiction has no rate yet (nothing taxed, draft warns). */
+  jurisdictionRate: number | null;
+  exempt: boolean;
+  exemptCertificate: string | null;
+}
+
+/** A discount or waive, on one line (`lineId`) or the whole document (`lineId` null). */
+export interface DocumentAdjustment {
+  id: string;
+  lineId: string | null;
+  kind: AdjustmentKind;
+  /** PERCENT: a fraction. AMOUNT: dollars. WAIVE: null. */
+  value: number | null;
+  reasonCode: AdjustmentReason;
+  reasonNote: string | null;
+  /** What it came to, in dollars. */
+  computedAmount: number;
+  createdByUserId: string | null;
+  createdAt: string | null;
+  /** On an invoice billed from a quote: the quote adjustment it was copied from. */
+  copiedFromAdjustmentId?: string | null;
+  /** A discount on one option of a proposal. */
+  optionId?: string | null;
+  /** The last day it's offered. */
+  validThrough?: string | null;
+  sourceType: AdjustmentSource;
+  /** AGREEMENT: the agreement id and its label ("Silver"). Internal — never customer-facing. */
+  sourceId?: string | null;
+  sourceLabel?: string | null;
+}
+
+/**
+ * A priced quote or invoice line. Everything past `lineTotal` is optional so
+ * LEGACY lines (and older fixtures) fit; the server sends them on ENGINE lines.
+ * Display by `sortOrder`.
+ */
+export interface DocumentLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  /** List amount: quantity × unitPrice. */
+  lineTotal: number;
+  /** This line's adjustments, including its share of document-wide ones. Null on LEGACY. */
+  adjustmentAmount?: number | null;
+  /** lineTotal − adjustmentAmount; tax is charged on this. Null on LEGACY. */
+  netAmount?: number | null;
+  type?: LineType | null;
+  unit?: string | null;
+  /** Internal only — never on anything customer-facing. */
+  unitCost?: number | null;
+  sortOrder?: number;
+  taxClass?: TaxClass | null;
+  taxable?: boolean | null;
+  /** A fraction. */
+  taxRate?: number | null;
+  taxAmount?: number | null;
+  sourcePoLineId?: string | null;
+  /** Labor lines: the rate type, and its name when the line was added. */
+  laborRateTypeId?: string | null;
+  laborRateTypeName?: string | null;
+  /** Pricebook lines: the item, its SKU when added, and which fee it is. */
+  itemId?: string | null;
+  itemSku?: string | null;
+  feeRole?: FeeRole | null;
+  /** Price before the rate plan; show "list $X" when it differs from unitPrice. */
+  catalogUnitPrice?: number | null;
+  /** The user typed the price. */
+  priceOverridden?: boolean;
+  pricingRule?: PricingRule | null;
+  pricingRuleValue?: number | null;
+  /** The work item this line is for (WO documents only). Billing a quote,
+   *  duplicating or reissuing carries it over. */
+  workItemId?: string | null;
+}
+
+/**
+ * A line's contents, to add or to replace one. Which fields are sent decides
+ * the kind of line:
+ *   - freeform: `type`, `description`, `quantity`, `unitPrice` (all required)
+ *   - labor:    `laborRateTypeId` + `quantity` (hours); the rate prices it
+ *   - pricebook: `itemId` + `quantity`; the item fills in the rest
+ * On labor/pricebook lines any of description/unitPrice/unitCost/unit/taxClass
+ * sent override the copied value. A replace must send the full contents.
+ */
+export interface LineFieldsRequest {
+  /** The document version the edit was made against (409 STALE_VERSION on mismatch). */
+  version: number;
+  type?: LineType;
+  description?: string;
+  quantity: number;
+  unitPrice?: number;
+  unitCost?: number;
+  unit?: string;
+  taxClass?: TaxClass;
+  laborRateTypeId?: string;
+  itemId?: string;
+}
+
+export interface AddLineRequest extends LineFieldsRequest {
+  /** A part bought on a purchase order; priced at whatever the user bills it at. */
+  sourcePoLineId?: string;
+  /** Quotes with options: where the line goes. Omitted = a required line on the whole quote. */
+  optionId?: string;
+  role?: 'REQUIRED' | 'ADD_ON';
+  recommended?: boolean;
+  recommendationNote?: string;
+  /** Tie the line to a work item (WO documents only; 400 otherwise). */
+  workItemId?: string;
+}
+
+/** A replace. `workItemId` is a link, not contents: omit to keep it, null to remove it. */
+export type UpdateLineRequest = LineFieldsRequest & { workItemId?: string | null };
+
+export interface ReorderLinesRequest {
+  version: number;
+  /** Every line exactly once, in the new order. */
+  lineIds: string[];
+}
+
+export interface AddAdjustmentRequest {
+  version: number;
+  /** Omit for a document-wide adjustment (spread over the lines before tax). */
+  lineId?: string;
+  kind: AdjustmentKind;
+  /** PERCENT: a fraction (0.15). AMOUNT: dollars. WAIVE: omit (lines only). */
+  value?: number;
+  /** Never MEMBER — the server refuses it. */
+  reasonCode: Exclude<AdjustmentReason, 'MEMBER'>;
+  /** ≤ 500 chars. */
+  reasonNote?: string;
+  /** Quotes with options: a discount on that option only, while it's chosen (no lineId, no WAIVE). */
+  optionId?: string;
+  /** Quotes: the last day it's offered (tenant time zone); after it, it no longer prices. Decide-today uses INCENTIVE. */
+  validThrough?: string;
+}
+
+/**
+ * The edit routes quotes and invoices share. Every call returns the whole
+ * recomputed document; take `version` from it for the next edit.
+ */
+function documentEditRoutes<D>(base: string) {
+  return {
+    addLine: async (id: string, request: AddLineRequest): Promise<D> => {
+      const response = await apiClient.post<D>(`${base}/${id}/lines`, request);
+      return response.data;
+    },
+
+    updateLine: async (id: string, lineId: string, request: UpdateLineRequest): Promise<D> => {
+      const response = await apiClient.put<D>(`${base}/${id}/lines/${lineId}`, request);
+      return response.data;
+    },
+
+    deleteLine: async (id: string, lineId: string, version: number): Promise<D> => {
+      const response = await apiClient.delete<D>(`${base}/${id}/lines/${lineId}`, { params: { version } });
+      return response.data;
+    },
+
+    reorderLines: async (id: string, request: ReorderLinesRequest): Promise<D> => {
+      const response = await apiClient.put<D>(`${base}/${id}/lines/order`, request);
+      return response.data;
+    },
+
+    addAdjustment: async (id: string, request: AddAdjustmentRequest): Promise<D> => {
+      const response = await apiClient.post<D>(`${base}/${id}/adjustments`, request);
+      return response.data;
+    },
+
+    deleteAdjustment: async (id: string, adjustmentId: string, version: number): Promise<D> => {
+      const response = await apiClient.delete<D>(`${base}/${id}/adjustments/${adjustmentId}`, {
+        params: { version },
+      });
+      return response.data;
+    },
+  };
+}
 
 // ========== INVOICES ==========
 
@@ -31,12 +261,9 @@ export const InvoiceAgingBucket = {
   DAYS_91_PLUS: 'DAYS_91_PLUS',
 } as const;
 
-export interface InvoiceLineItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  lineTotal: number;
+export interface InvoiceLineItem extends DocumentLineItem {
+  /** The quote line this was billed from, if any. */
+  sourceQuoteLineId?: string | null;
 }
 
 /**
@@ -73,20 +300,43 @@ export interface NestedInvoicePayment {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set when the invoice was voided or cancelled and this slice went back to
+   * the payment's unapplied balance. The row stays as history but no longer
+   * counts toward `amountPaid` — render it as returned to credit.
+   */
+  reversedAt?: string | null;
 }
 
+/** `invoiceDate` / `dueDate` are null until the invoice is first issued (sent); drafts show "Not sent". */
 export interface Invoice {
   id: string;
   customerId: string;
   workOrderId?: string;
   invoiceNumber: string;
   status: InvoiceStatus;
-  invoiceDate: string;
-  dueDate: string;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  /** When the work was done; membership is tested on it. */
+  serviceDate?: string | null;
+  customerPoNumber?: string | null;
+  /** Send back on every edit; see the pricing block above. */
+  version?: number;
+  pricingModel?: PricingModel;
+  /** Pre-tax, after adjustments: grossSubtotal − adjustmentTotal. */
   subtotal: number;
+  /** List total before adjustments. */
+  grossSubtotal?: number;
+  adjustmentTotal?: number;
+  adjustments?: DocumentAdjustment[];
+  /** LEGACY documents only; ENGINE documents are taxed per line (see `tax`). */
   taxRate: number;
   taxAmount: number;
   totalAmount: number;
+  ratePlanId?: string | null;
+  ratePlanName?: string | null;
+  tax?: DocumentTax | null;
+  warnings?: PricingWarning[];
   amountPaid: number;
   balanceDue: number;
   notes?: string;
@@ -113,53 +363,80 @@ export interface Invoice {
    * case is acceptable to under-display in v1.
    */
   lastSentToEmails?: string | null;
+  /** Comma-separated E.164 numbers texted at the last send; null when it didn't text. */
+  lastSentToPhones?: string | null;
+  /** On a reissue's corrected copy: the invoice it replaced ("Reissue of INV-3307"). */
+  reissuedFromInvoiceId?: string | null;
+  reissuedFromInvoiceNumber?: string | null;
+  /** On a reissued (voided) original: its corrected copy ("Reissued as INV-3412"). */
+  reissuedAsInvoiceId?: string | null;
+  reissuedAsInvoiceNumber?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
+/** A freeform line sent inline on create; labor and pricebook lines go through `addLine` after. */
 export interface CreateInvoiceLineItemRequest {
   description: string;
   quantity: number;
   unitPrice: number;
+  /** SERVICE when omitted. */
+  type?: LineType;
+  unitCost?: number;
+  unit?: string;
+  sourcePoLineId?: string;
+  taxClass?: TaxClass;
+  /** Tie the line to a work item (WO documents only). */
+  workItemId?: string;
 }
 
+/** No tax rate — the server resolves tax from the location's jurisdiction. */
 export interface CreateInvoiceRequest {
   customerId: string;
   workOrderId?: string;
-  invoiceDate: string;
-  dueDate: string;
-  taxRate: number;
+  /** Defaults to the work order's location; send it when there's no work order. */
+  serviceLocationId?: string;
+  /** Left out: dated when first sent (due = send date + the bill-to's terms). */
+  invoiceDate?: string;
+  dueDate?: string;
+  /** Defaults to the work order's completed date, else the invoice date. */
+  serviceDate?: string;
+  /** Defaults from the work order's customer order number. */
+  customerPoNumber?: string;
   notes?: string;
-  lineItems: CreateInvoiceLineItemRequest[];
+  /** Defaults to none. */
+  lineItems?: CreateInvoiceLineItemRequest[];
+}
+
+/** The whole header, replaced: send every field; null clears an optional one. DRAFT only. */
+export interface UpdateInvoiceHeaderRequest {
+  version: number;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  serviceDate: string | null;
+  customerPoNumber: string | null;
+  notes: string | null;
+}
+
+/**
+ * Bill an accepted quote: a new DRAFT invoice at the quote's prices and
+ * adjustments, for the quantities given (each ≤ the line's remaining).
+ */
+export interface CreateInvoiceFromQuoteRequest {
+  quoteId: string;
+  lines: { quoteLineId: string; quantity: number }[];
+  /** Bill someone other than the quote's customer; tax and exemption resolve for them. */
+  billToCustomerId?: string;
+  invoiceDate?: string;
+  dueDate?: string;
+  serviceDate?: string;
+  notes?: string;
+  /** Price afresh under the bill-to's plan and the current pricebook; typed prices are kept. */
+  reprice?: boolean;
 }
 
 export interface UpdateInvoiceStatusRequest {
   status: InvoiceStatus;
-}
-
-/**
- * Per-location billing rollup for the Location detail → Invoices tab header
- * strip (FIN-1). All money fields are decimals serialized as JSON numbers;
- * format client-side and key currency off the field rather than hardcoding.
- *
- *  - `billedYtd`  sum of totalAmount, calendar-year-to-date (resets Jan 1),
- *                 excluding DRAFT / VOID / CANCELLED. Server-computed — do NOT
- *                 re-derive from the list.
- *  - `openCount`  count of open invoices (status SENT or OVERDUE).
- *  - `openAmount` sum of totalAmount for those open invoices.
- *  - `aged91`     open amount past due > 90 days (dueDate < today − 90).
- *
- * serviceLocationId is derived server-side from each invoice's work order, so
- * an invoice with no work order (or whose WO has no service location) is absent
- * from both this summary and the location list — it shows only on customer-level
- * views.
- */
-export interface LocationInvoiceSummaryResponse {
-  billedYtd: number;
-  openCount: number;
-  openAmount: number;
-  aged91: number;
-  currency: string;
 }
 
 /**
@@ -212,7 +489,51 @@ export interface SendResponse {
   notificationId: string;
   queuedAt: string;
   shareUrl: string;
-  lastSentToEmails: string;
+  /** Null when the send went by text only. */
+  lastSentToEmails: string | null;
+  /** Comma-separated E.164; null when the send didn't text. */
+  lastSentToPhones?: string | null;
+}
+
+/**
+ * Who a send goes to and what it says. Emails and phones each left out
+ * (never `[]`, which would be an explicit empty list) fall back as follows:
+ * phones only → text only; neither → the customer's email on file.
+ */
+export interface SendOptions {
+  /** At most 10. */
+  recipientEmails?: string[];
+  /** US numbers in any punctuation; at most 10. */
+  recipientPhones?: string[];
+  /** Replaces the email body for this send (≤ 2,000 chars). `{{link}}` marks where the link goes; without it the link is appended. Texts always use the SMS template. */
+  message?: string;
+}
+
+const sendBody = ({ recipientEmails, recipientPhones, message }: SendOptions, date: Record<string, string>) => {
+  const body = {
+    ...(recipientEmails?.length ? { recipientEmails } : {}),
+    ...(recipientPhones?.length ? { recipientPhones } : {}),
+    ...(message?.trim() ? { message } : {}),
+    ...date,
+  };
+  return Object.keys(body).length ? body : undefined;
+};
+
+/**
+ * `POST .../preview-link`: a 30-minute link to the public page as the customer
+ * will see it, for any status. Not a view; can't approve or pay.
+ */
+export interface PreviewLink {
+  url: string;
+  expiresAt: string;
+}
+
+/** `GET .../send-preview`: render `emailNotificationTypeKey` (or the SMS key) with `templateData` via `notificationTemplateApi.render`. */
+export interface SendPreview {
+  emailNotificationTypeKey: string;
+  smsNotificationTypeKey: string;
+  /** `share_url` is the literal `{{link}}` placeholder. */
+  templateData: Record<string, unknown>;
 }
 
 /**
@@ -256,19 +577,61 @@ export interface InvoiceListItemRow {
   // installment schedule to invoices on periodKey == billingPeriodKey.
   agreementId: string | null;
   billingPeriodKey: string | null;
-  invoiceDate: string;
-  dueDate: string;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  subtotal: number;
+  taxAmount: number;
   totalAmount: number;
   amountPaid: number;
   balanceDue: number;
   overdue: boolean;
   lastSentAt: string | null;
+  // What the revenue report groups by, current values; null when there's no
+  // work order or location, or none is set.
+  workOrderNumber: string | null;
+  divisionId: string | null;
+  workOrderTypeId: string | null;
+  regionId: string | null;
+  /**
+   * Read with `openAsOf` only: the balance at the end of that date, by the
+   * receivables report's rule, so a bucket's rows add up to its amount.
+   */
+  balanceAsOf?: number | null;
+  customerPoNumber?: string | null;
+  /** The bill-to is a payer (a billing-only account). */
+  billToIsPayer?: boolean;
+  /** The bill-to's current terms: 0 = due on receipt. */
+  paymentTermsDays?: number | null;
+  serviceLocationName?: string | null;
+  /** "12 Elm St, Tempe" (street and city). */
+  serviceLocationAddress?: string | null;
+  /** Billed from this quote (a reissue keeps it). */
+  quoteId?: string | null;
+  quoteNumber?: string | null;
+  reissuedFromInvoiceId?: string | null;
+  reissuedFromInvoiceNumber?: string | null;
+  reissuedAsInvoiceId?: string | null;
+  reissuedAsInvoiceNumber?: string | null;
+  /** When the balance reached zero; cleared if a payment is voided and it reopens. */
+  paidAt?: string | null;
+  voidedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 // Custom PageResponse envelope for the invoice list endpoints — NOT Spring's
 // raw Page shape (the current index is `page`, not `number`).
+/** The financial lists' page envelope (invoices, payments, quotes). */
+export interface FinancialPage<T> {
+  content: T[];
+  page: number; // 0-based current page index
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
 export interface InvoiceListPage {
   content: InvoiceListItemRow[];
   page: number; // 0-based current page index
@@ -285,7 +648,10 @@ export type InvoiceSortField =
   | 'totalAmount'
   | 'status'
   | 'createdAt'
-  | 'updatedAt';
+  | 'updatedAt'
+  | 'invoiceNumber'
+  | 'customerName'
+  | 'balanceDue';
 
 /**
  * Filters for the paged invoice list — all AND-ed together. Quirks worth
@@ -305,12 +671,28 @@ export interface ListInvoicesParams {
   customerId?: string;
   serviceLocationId?: string;
   agreementId?: string; // installment invoices for one agreement (migration 032)
-  status?: InvoiceStatus;
+  /** One status, or several (`SENT,OVERDUE` is the Unpaid tab). */
+  status?: InvoiceStatus | InvoiceStatus[];
   from?: string; // YYYY-MM-DD, invoiceDate >= from (inclusive)
   to?: string; // YYYY-MM-DD, invoiceDate <= to (inclusive — no +1-day trick)
   overdue?: boolean; // true = open + strictly past due
   agingBucket?: InvoiceAgingBucket; // open invoices by days past dueDate; pairs with customerId. Don't also send a conflicting status.
-  q?: string; // case-insensitive substring on invoiceNumber OR customerName
+  // Receivables drill-down: open at the end of that tenant-local day (issued
+  // by then, not voided or cancelled by then, a balance left after payments
+  // dated by then). With it, `agingBucket` ages from that date. Rows'
+  // amountPaid/balanceDue stay as of now.
+  openAsOf?: string;
+  q?: string; // case-insensitive substring on invoice #, customer name, customer PO #, work order # or the site's street/name
+  regionIds?: string[]; // the invoice's service location's region; a user's own regions bound it either way
+  // Revenue report drill-down. `billed` = issued (not DRAFT/VOID/CANCELLED),
+  // the report's billed set. Division and type are the work order's current
+  // ones; each `no…` flag is that grouping's unassigned group, OR-ed with its ids.
+  billed?: boolean;
+  divisionIds?: string[];
+  noDivision?: boolean;
+  workOrderTypeIds?: string[];
+  noWorkOrderType?: boolean;
+  noRegion?: boolean;
   page?: number; // 0-indexed
   size?: number; // server-clamped to 1..200
   sort?: `${InvoiceSortField},${'asc' | 'desc'}`;
@@ -321,7 +703,16 @@ export const invoicesApi = {
   // invoice number or customer name. Returns the page envelope so callers can
   // drive a pager off totalElements / totalPages.
   getAll: async (params?: ListInvoicesParams): Promise<InvoiceListPage> => {
-    const response = await apiClient.get<InvoiceListPage>('/financial/invoices', { params });
+    const { status, ...rest } = params ?? {};
+    const response = await apiClient.get<InvoiceListPage>('/financial/invoices', {
+      params: { ...rest, ...(status ? { status: Array.isArray(status) ? status.join(',') : status } : {}) },
+    });
+    return response.data;
+  },
+
+  /** Counts per list tab and the summary totals, over the same scope as the list (no status or q). */
+  getViews: async (params: InvoiceViewsParams = {}): Promise<InvoiceViews> => {
+    const response = await apiClient.get<InvoiceViews>('/financial/invoices/views', { params });
     return response.data;
   },
 
@@ -359,20 +750,6 @@ export const invoicesApi = {
   },
 
   /**
-   * Per-location billing rollup (FIN-1) for the Invoices tab header strip. One
-   * cheap call; independent of the list. See {@link LocationInvoiceSummaryResponse}.
-   */
-  getLocationSummary: async (
-    serviceLocationId: string,
-  ): Promise<LocationInvoiceSummaryResponse> => {
-    const response = await apiClient.get<LocationInvoiceSummaryResponse>(
-      '/financial/invoices/summary',
-      { params: { serviceLocationId } },
-    );
-    return response.data;
-  },
-
-  /**
    * Customer-level AR rollup (FIN-1). One call, fired in parallel on the
    * customer detail page load. See {@link CustomerArSummaryResponse}.
    */
@@ -388,8 +765,33 @@ export const invoicesApi = {
     return response.data;
   },
 
+  /** 409 QUOTE_NOT_ACCEPTED, 409 OVER_INVOICED (past a line's remaining quantity). */
+  createFromQuote: async (request: CreateInvoiceFromQuoteRequest): Promise<Invoice> => {
+    const response = await apiClient.post<Invoice>('/financial/invoices/from-quote', request);
+    return response.data;
+  },
+
   updateStatus: async (id: string, request: UpdateInvoiceStatusRequest): Promise<Invoice> => {
     const response = await apiClient.patch<Invoice>(`/financial/invoices/${id}/status`, request);
+    return response.data;
+  },
+
+  updateHeader: async (id: string, request: UpdateInvoiceHeaderRequest): Promise<Invoice> => {
+    const response = await apiClient.put<Invoice>(`/financial/invoices/${id}/header`, request);
+    return response.data;
+  },
+
+  ...documentEditRoutes<Invoice>('/financial/invoices'),
+
+  /**
+   * Void a SENT/OVERDUE/PAID invoice and create its corrected DRAFT copy in
+   * one transaction (an already-VOID one is just copied). Returns the copy.
+   * Payments stay behind as reversed rows; apply them to the copy with
+   * `paymentsApi.apply`. 409 INVOICE_NOT_REISSUABLE (DRAFT/CANCELLED),
+   * 409 ALREADY_REISSUED.
+   */
+  reissue: async (id: string): Promise<Invoice> => {
+    const response = await apiClient.post<Invoice>(`/financial/invoices/${id}/reissue`);
     return response.data;
   },
 
@@ -424,16 +826,24 @@ export const invoicesApi = {
    */
   send: async (
     id: string,
-    recipientEmails?: string[],
+    { dueDate, ...rest }: SendOptions & {
+      /** Drafts only (409 DOCUMENT_NOT_EDITABLE once sent): overrides the due date from the terms. */
+      dueDate?: string;
+    } = {},
   ): Promise<SendResponse> => {
-    const body =
-      recipientEmails && recipientEmails.length > 0
-        ? { recipientEmails }
-        : undefined;
-    const response = await apiClient.post<SendResponse>(
-      `/financial/invoices/${id}/send`,
-      body,
-    );
+    const response = await apiClient.post<SendResponse>(`/financial/invoices/${id}/send`, sendBody(rest, dueDate ? { dueDate } : {}));
+    return response.data;
+  },
+
+  /** The public page as the customer will see it; a draft's due date override (409 DOCUMENT_NOT_EDITABLE once sent) shows on it. */
+  previewLink: async (id: string, dueDate?: string): Promise<PreviewLink> => {
+    const response = await apiClient.post<PreviewLink>(`/financial/invoices/${id}/preview-link`, dueDate ? { dueDate } : undefined);
+    return response.data;
+  },
+
+  /** What the send email would say: its type keys plus the data to render them with via `notificationTemplateApi.render`. */
+  sendPreview: async (id: string, dueDate?: string): Promise<SendPreview> => {
+    const response = await apiClient.get<SendPreview>(`/financial/invoices/${id}/send-preview`, { params: dueDate ? { dueDate } : {} });
     return response.data;
   },
 
@@ -489,61 +899,455 @@ export const QuoteStatus = {
   EXPIRED: 'EXPIRED',
 } as const;
 
-export interface QuoteLineItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  lineTotal: number;
+/** A quote line's place in a proposal: REQUIRED in an option (or on the whole quote), or an ADD_ON on the quote. */
+export type QuoteLineRole = 'REQUIRED' | 'ADD_ON';
+
+export interface QuoteLineItem extends DocumentLineItem {
+  /** The option it belongs to; null on the whole quote (always null for an add-on). */
+  optionId?: string | null;
+  role?: QuoteLineRole;
+  /** Add-ons only: "Why I recommend it" is shown on the customer's card. */
+  recommended?: boolean;
+  recommendationNote?: string | null;
+  /** Sold under the current selection. */
+  selected?: boolean;
+  /** Not sold once accepted; kept for follow-up. */
+  declined?: boolean;
+  /** An add-on an option includes at $0. */
+  included?: boolean;
 }
 
+export type QuotePresentation = 'STANDARD' | 'PROPOSAL';
+/** How an option treats an add-on. Lines missing from `addOnModes` are offered. */
+export type AddOnMode = 'OFFER' | 'INCLUDED' | 'HIDDEN';
+
+export interface QuoteOptionTotals {
+  grossSubtotal: number;
+  adjustmentTotal: number;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+}
+
+export interface QuoteOption {
+  id: string;
+  groupId: string;
+  name: string;
+  tagline?: string | null;
+  sortOrder: number;
+  /** The "Most popular" badge; at most one per group. */
+  recommended: boolean;
+  /** Under the current selection. */
+  selected: boolean;
+  /** The pricebook item it's built from. */
+  presentationItemId?: string | null;
+  /** That item's presentation, shown when the option's own photos or highlights are empty. */
+  itemPresentation?: {
+    customerName?: string | null;
+    description?: string | null;
+    highlights?: string[];
+    photos?: PresentationPhoto[];
+  } | null;
+  specs: string[];
+  /** This quote's override of the item's highlights. */
+  highlights: string[];
+  photos: PresentationPhoto[];
+  /** Utility or manufacturer; shown "after rebate", never deducted on the invoice. */
+  rebateAmount?: number | null;
+  addOnModes: Record<string, AddOnMode>;
+  /** The quote with this option chosen and no add-ons taken. */
+  totals: QuoteOptionTotals;
+}
+
+/** One saving on a priced choice, with its reason. */
+export interface PricedSaving {
+  adjustmentId: string;
+  lineId: string | null;
+  kind: AdjustmentKind;
+  reasonCode: AdjustmentReason;
+  /** The source's name where it has one (member plans, promotions); else name it from `reasonCode`. */
+  label: string | null;
+  amount: number;
+  /** PROMOTION: `adjustmentId` is the promotion's id. */
+  sourceType?: AdjustmentSource;
+  /** An option's own discount. */
+  optionId?: string | null;
+  /** The last day it's offered ("valid through Oct 31", "approve by Oct 12"). */
+  validThrough?: string | null;
+}
+
+/** Advisor only (never on the link): pre-tax, after savings, counting included add-ons' cost. */
+export interface SelectionMargin {
+  cost: number;
+  /** A fraction; null when nothing is charged. */
+  margin: number | null;
+  /** False when a sold line has no cost (counted as $0). */
+  costKnown: boolean;
+  /** The tenant's floor, a fraction; null = none. */
+  floor: number | null;
+  belowFloor: boolean;
+}
+
+export interface SelectionTotals {
+  listPrice: number;
+  youSave: number;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  /** The chosen option's rebate; null without one. Shown only, never billed. */
+  rebateAmount: number | null;
+  afterRebate: number | null;
+  margin: SelectionMargin | null;
+  /** What joining the offered plan saves here, joined or not ("Join and save $239"). */
+  joinSaves?: number | null;
+  /** The lowest monthly payment among the offered plans ("from $289/mo"). */
+  fromMonthly?: number | null;
+}
+
+export interface PricedSelectionLine {
+  id: string;
+  description: string;
+  optionId: string | null;
+  role: QuoteLineRole;
+  quantity: number;
+  unit?: string | null;
+  unitPrice: number;
+  lineTotal: number;
+  adjustmentAmount: number;
+  netAmount: number;
+  taxAmount: number;
+  /** Comes with the chosen option at $0. */
+  included: boolean;
+}
+
+export interface QuoteSelectionChoice {
+  /** Exactly one per group that has options. */
+  optionIds: string[];
+  /** Offered add-ons taken; ones the chosen option includes or hides are dropped. */
+  addOnLineIds: string[];
+  /** "Join and save": priced at the offered plan's member price. Ignored (false) with no plan offered. */
+  joinMembership?: boolean;
+  /** The payment plan picked; null = paying in full. 400 when the quote doesn't offer it. */
+  paymentPlanId?: string | null;
+}
+
+/** A payment plan's monthly payment on a choice (standard amortization, on the total after tax). */
+export interface FinancingPlanQuote {
+  planId: string;
+  label: string;
+  /** A percentage: 7.99 = 7.99%. */
+  apr: number;
+  months: number;
+  monthlyPayment: number;
+}
+
+/** The plans a proposal offers, priced on the current choice; null when it offers none. */
+export interface SelectionFinancing {
+  plans: FinancingPlanQuote[];
+  /** Null: paying in full. */
+  selectedPlanId: string | null;
+  monthlyPayment: number | null;
+  /** On the wire; the app doesn't use it (no lender is integrated). */
+  applicationUrl: string | null;
+}
+
+/** The plan a proposal offers, and its member benefits on a job. Fractions. */
+export interface MembershipOffer {
+  planId: string;
+  name: string;
+  amount: number | null;
+  cadenceUnit: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR' | string | null;
+  cadenceInterval: number | null;
+  laborDiscountPct: number | null;
+  partsDiscountPct: number | null;
+  tripFeeWaived: boolean;
+}
+
+/** A proposal signed with "join" on: the office sets the agreement up, then marks it done. */
+export interface MembershipSignup {
+  quoteId: string;
+  quoteNumber: string;
+  customerId: string;
+  customerName: string | null;
+  serviceLocationId: string | null;
+  planId: string;
+  planName: string;
+  signedAt: string;
+  status: 'PENDING' | 'DONE';
+  handledByUserId: string | null;
+  handledByName: string | null;
+  handledAt: string | null;
+}
+
+/** A choice priced by the server. Card totals (`options`) don't move with add-ons. */
+export interface PricedSelection {
+  quoteId: string;
+  selection: QuoteSelectionChoice;
+  /** Who last chose; null until anyone has. */
+  updatedVia: 'ADVISOR' | 'CUSTOMER' | null;
+  updatedAt: string | null;
+  lines: PricedSelectionLine[];
+  savings: PricedSaving[];
+  totals: SelectionTotals;
+  /** Every option of every group, in order: each chosen, no add-ons taken. */
+  options: { optionId: string; groupId: string; name: string; selected: boolean; savings: PricedSaving[]; totals: SelectionTotals }[];
+  /** Across option totals; null without options. */
+  priceRange: { low: number; high: number } | null;
+  /** The plan offered; null when none is, or the site is a member already. */
+  membership?: MembershipOffer | null;
+  financing?: SelectionFinancing | null;
+}
+
+/** The signed copy, stored once at approval; the app also sees IP and user agent. */
+export interface QuoteApproval {
+  signerName: string;
+  signedAt: string;
+  signatureImage: string | null;
+  consent: boolean;
+  revision: number | null;
+  selection: QuoteSelectionChoice;
+  lines: PricedSelectionLine[];
+  savings: Omit<PricedSaving, 'adjustmentId'>[];
+  totals: Omit<SelectionTotals, 'margin'>;
+  ipAddress: string | null;
+  userAgent: string | null;
+  /** LINK (the customer's link) or IN_PERSON (on the advisor's device). Older records are LINK. */
+  signedVia?: 'LINK' | 'IN_PERSON';
+  /** IN_PERSON: the advisor who was there. */
+  witnessUserId?: string | null;
+  witnessName?: string | null;
+  /** The payment plan as it stood when signed; null when paying in full. */
+  paymentPlan?: FinancingPlanQuote | null;
+}
+
+export interface QuoteOptionGroup {
+  id: string;
+  name: string;
+  sortOrder: number;
+  options: QuoteOption[];
+}
+
+/** An option's content; PUT replaces it as a whole. */
+export interface QuoteOptionFields {
+  name: string;
+  tagline?: string | null;
+  recommended?: boolean;
+  presentationItemId?: string | null;
+  photoIds?: string[];
+  specs?: string[];
+  highlights?: string[];
+  rebateAmount?: number | null;
+}
+
+/** `quoteDate` / `expirationDate` are null until the quote is first sent; drafts show "Not sent". */
 export interface Quote {
   id: string;
+  /** Short description of the work. */
+  title?: string | null;
   customerId: string;
+  /** Null only until the customer syncs into financial's cache. */
+  customerName?: string | null;
   /** Optional WO link (Phase 7b backend ask #7). Older quotes have null. */
   workOrderId?: string;
+  /** Where the work is; defaults to the work order's location. */
+  serviceLocationId?: string | null;
+  customerPoNumber?: string | null;
   quoteNumber: string;
   status: QuoteStatus;
-  quoteDate: string;
-  expirationDate: string;
+  /** Bumps when a SENT quote is edited (it goes back to DRAFT). */
+  revision?: number;
+  /** The revision that was approved. */
+  acceptedRevision?: number | null;
+  /** The office user who recorded a verbal yes; null for a customer approval. */
+  acceptedByUserId?: string | null;
+  /** The name the customer typed when approving on the share page; null for office acceptances. */
+  approvedByName?: string | null;
+  /** Send back on every edit; see the pricing block above. */
+  version?: number;
+  pricingModel?: PricingModel;
+  quoteDate: string | null;
+  expirationDate: string | null;
+  /** Pre-tax, after adjustments: grossSubtotal − adjustmentTotal. */
   subtotal: number;
+  /** List total before adjustments. */
+  grossSubtotal?: number;
+  adjustmentTotal?: number;
+  adjustments?: DocumentAdjustment[];
+  /** LEGACY documents only; ENGINE documents are taxed per line (see `tax`). */
   taxRate: number;
   taxAmount: number;
   totalAmount: number;
+  ratePlanId?: string | null;
+  ratePlanName?: string | null;
+  tax?: DocumentTax | null;
+  warnings?: PricingWarning[];
   notes?: string;
   lineItems: QuoteLineItem[];
+  presentation?: QuotePresentation;
+  /** Proposal: the first thing the customer reads. */
+  coverNote?: string | null;
+  /** The one set, else the quote's creator. */
+  advisorUserId?: string | null;
+  /** Null when the user cache doesn't know them. */
+  advisorName?: string | null;
+  /** The advisor's job title and photo, for the proposal; null when they have none. */
+  advisorTitle?: string | null;
+  advisorPhotoUrl?: string | null;
+  /** The payment plans offered: null (the default) = every active plan; [] = none. */
+  paymentPlanIds?: string[] | null;
+  /** The agreement plan this proposal offers ("join and save"). */
+  membershipPlanId?: string | null;
+  /** Signed with "join" on: waiting for the office to set the agreement up. */
+  membershipSignup?: MembershipSignup | null;
+  /** This quote's choice per promotion; missing = the promotion's own autoApply. */
+  promotionOverrides?: Record<string, 'APPLY' | 'EXCLUDE'>;
+  /** Recorded customer views (at most one per half hour per revision). */
+  viewCount?: number;
+  /** Who chose last, and when. */
+  selectionUpdatedVia?: 'ADVISOR' | 'CUSTOMER' | null;
+  selectionUpdatedAt?: string | null;
+  optionGroups?: QuoteOptionGroup[];
+  /** What the quote's totals are priced for: each group's chosen option and the add-ons taken. */
+  selection?: { optionIds: string[]; addOnLineIds: string[] } | null;
   /** See `Invoice.lastSentAt` — same semantics. */
   lastSentAt?: string | null;
   /** See `Invoice.lastSentToEmails` — same semantics. */
   lastSentToEmails?: string | null;
+  lastSentToPhones?: string | null;
+  /** First send; resends don't move it. Null until sent. */
+  firstSentAt?: string | null;
+  /** First open of the share link. */
+  firstViewedAt?: string | null;
+  /** Set on ACCEPTED/DECLINED, cleared on leaving them. */
+  decidedAt?: string | null;
+  /** Who first sent it; resends by others don't change it. Null when not recorded. */
+  firstSentByUserId?: string | null;
+  firstSentByName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateQuoteLineItemRequest {
-  description: string;
-  quantity: number;
-  unitPrice: number;
+/** Filters for the paged quote list, all AND-ed. */
+export interface ListQuotesParams {
+  /** Tenant-local days, inclusive, on firstSentAt; never-sent quotes drop out when either is set. */
+  firstSentFrom?: string;
+  firstSentTo?: string;
+  status?: QuoteStatus[];
+  /** The user who first sent it (a sender group's drill-in). */
+  sentByUserId?: string;
+  /** Case-insensitive, anywhere in the quote number, title or customer name. */
+  q?: string;
+  /** Accepted quotes with a line not fully invoiced (the `invoiceable` rule). */
+  readyToInvoice?: boolean;
+  /** One job's quotes. */
+  workOrderId?: string;
+  /** The work order's location's region; quotes with no work order are company-wide only. */
+  regionIds?: string[];
+  page?: number;
+  size?: number; // ≤ 200
+  sort?: string; // quoteDate | firstSentAt | lastSentAt | decidedAt | expirationDate | totalAmount | quoteNumber | customerName, e.g. 'quoteDate,desc'
 }
 
+/** Same shape as an invoice's inline freeform line. */
+export type CreateQuoteLineItemRequest = CreateInvoiceLineItemRequest;
+
+/** No tax rate — the server resolves tax from the location's jurisdiction. */
 export interface CreateQuoteRequest {
+  /** The bill-to (a payer goes here). */
   customerId: string;
+  /** Short description of the work, up to 120 characters. */
+  title?: string;
   /** Optional WO link (Phase 7b backend ask #7). */
   workOrderId?: string;
-  quoteDate: string;
-  expirationDate: string;
-  taxRate: number;
+  /** Where the work is; defaults to the work order's location. Without one: tenant-default tax, no member benefits. */
+  serviceLocationId?: string;
+  customerPoNumber?: string;
+  quoteDate?: string;
+  expirationDate?: string;
   notes?: string;
-  lineItems: CreateQuoteLineItemRequest[];
+  /** Defaults to none. */
+  lineItems?: CreateQuoteLineItemRequest[];
+  /** Defaults from the site: PROPOSAL at a residence, else STANDARD. */
+  presentation?: QuotePresentation;
+}
+
+/** The whole header, replaced: send every field; null clears an optional one. Editing a SENT quote returns it to DRAFT. */
+export interface UpdateQuoteHeaderRequest {
+  version: number;
+  /** Replaced on every header edit: send the current title back, or it is cleared. */
+  title: string | null;
+  quoteDate: string | null;
+  expirationDate: string | null;
+  serviceLocationId: string | null;
+  customerPoNumber: string | null;
+  notes: string | null;
+  /** Refused (409) once sent, and PROPOSAL → STANDARD with more than one option. */
+  presentation?: QuotePresentation;
+  coverNote?: string | null;
+  advisorUserId?: string | null;
+}
+
+/** What is left to bill on an ACCEPTED quote, per line. Drafts count as invoiced; void/cancelled don't. */
+export interface QuoteInvoiceableLine {
+  quoteLineId: string;
+  sortOrder: number;
+  description: string;
+  type: LineType | null;
+  unit: string | null;
+  unitPrice: number;
+  quantity: number;
+  invoicedQuantity: number;
+  remainingQuantity: number;
+}
+
+export interface QuoteInvoiceable {
+  quoteId: string;
+  status: QuoteStatus;
+  lines: QuoteInvoiceableLine[];
 }
 
 export interface UpdateQuoteStatusRequest {
   status: QuoteStatus;
 }
 
+/** One (work item, quote or invoice) pair with lines for the item. Quotes
+ *  first, newest first. */
+export interface WorkItemDocument {
+  workItemId: string;
+  documentType: 'QUOTE' | 'INVOICE';
+  documentId: string;
+  number: string;
+  /** The document's own status (QuoteStatus / InvoiceStatus). */
+  status: string;
+  /** The item's lines after discounts, before tax. Null on a not-yet-accepted
+   *  quote where the item sits on an option or add-on. */
+  amount: number | null;
+  /** Accepted quote on which every one of the item's lines went unsold. */
+  declined: boolean;
+}
+
+export const workItemDocumentsApi = {
+  getByWorkOrder: async (workOrderId: string): Promise<WorkItemDocument[]> => {
+    const response = await apiClient.get<WorkItemDocument[]>(
+      `/financial/work-orders/${workOrderId}/work-item-documents`,
+    );
+    return response.data;
+  },
+};
+
 export const quotesApi = {
-  getAll: async (): Promise<Quote[]> => {
-    const response = await apiClient.get<Quote[]>('/financial/quotes');
+  /** Light rows (no lines, adjustments or tax); open one with `getById`. */
+  getAll: async (params: ListQuotesParams = {}): Promise<FinancialPage<QuoteListItem>> => {
+    const { status, ...rest } = params;
+    const response = await apiClient.get<FinancialPage<QuoteListItem>>('/financial/quotes', {
+      params: { ...rest, ...(status?.length ? { status: status.join(',') } : {}) },
+    });
+    return response.data;
+  },
+
+  /** Counts per list tab and the summary totals, over the same scope as the list (no status, q or readyToInvoice). */
+  getViews: async (params: QuoteViewsParams = {}): Promise<QuoteViews> => {
+    const response = await apiClient.get<QuoteViews>('/financial/quotes/views', { params });
     return response.data;
   },
 
@@ -576,24 +1380,181 @@ export const quotesApi = {
     return response.data;
   },
 
+  /** ACCEPTED from the office records a verbal yes (`acceptedByUserId`). */
   updateStatus: async (id: string, request: UpdateQuoteStatusRequest): Promise<Quote> => {
     const response = await apiClient.patch<Quote>(`/financial/quotes/${id}/status`, request);
+    return response.data;
+  },
+
+  updateHeader: async (id: string, request: UpdateQuoteHeaderRequest): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/header`, request);
+    return response.data;
+  },
+
+  /** A new DRAFT copy — how a frozen (accepted/declined/expired) quote is changed. */
+  duplicate: async (id: string): Promise<Quote> => {
+    const response = await apiClient.post<Quote>(`/financial/quotes/${id}/duplicate`);
+    return response.data;
+  },
+
+  getInvoiceable: async (id: string): Promise<QuoteInvoiceable> => {
+    const response = await apiClient.get<QuoteInvoiceable>(`/financial/quotes/${id}/invoiceable`);
+    return response.data;
+  },
+
+  ...documentEditRoutes<Quote>('/financial/quotes'),
+
+  // Proposal structure. Every call takes the quote version and returns the whole quote.
+  addOptionGroup: async (id: string, request: { version: number; name: string }): Promise<Quote> => {
+    const response = await apiClient.post<Quote>(`/financial/quotes/${id}/option-groups`, request);
+    return response.data;
+  },
+  renameOptionGroup: async (id: string, groupId: string, request: { version: number; name: string }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/option-groups/${groupId}`, request);
+    return response.data;
+  },
+  deleteOptionGroup: async (id: string, groupId: string, version: number): Promise<Quote> => {
+    const response = await apiClient.delete<Quote>(`/financial/quotes/${id}/option-groups/${groupId}`, { params: { version } });
+    return response.data;
+  },
+  addOption: async (id: string, request: QuoteOptionFields & { version: number; groupId: string }): Promise<Quote> => {
+    const response = await apiClient.post<Quote>(`/financial/quotes/${id}/options`, request);
+    return response.data;
+  },
+  updateOption: async (id: string, optionId: string, request: QuoteOptionFields & { version: number }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/options/${optionId}`, request);
+    return response.data;
+  },
+  reorderOptions: async (id: string, groupId: string, request: { version: number; optionIds: string[] }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/option-groups/${groupId}/options/order`, request);
+    return response.data;
+  },
+  deleteOption: async (id: string, optionId: string, version: number): Promise<Quote> => {
+    const response = await apiClient.delete<Quote>(`/financial/quotes/${id}/options/${optionId}`, { params: { version } });
+    return response.data;
+  },
+  setAddOnMode: async (id: string, optionId: string, lineId: string, request: { version: number; mode: AddOnMode }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/options/${optionId}/add-ons/${lineId}`, request);
+    return response.data;
+  },
+  /**
+   * Delete a never-sent draft (204). 409 QUOTE_NOT_DELETABLE otherwise (a sent
+   * quote back in draft included), 409 STALE_VERSION, 403 without EDIT_QUOTES.
+   */
+  delete: async (id: string, version: number): Promise<void> => {
+    await apiClient.delete(`/financial/quotes/${id}`, { params: { version } });
+  },
+  /** The quote's own timeline, newest first: sends, views, the customer's choices, the decision. */
+  getActivity: async (id: string, params?: FinancialActivityParams): Promise<FinancialActivityPage> => {
+    const response = await apiClient.get<FinancialActivityPage>(`/financial/quotes/${id}/activity`, {
+      params: financialActivityQuery(params),
+    });
+    return response.data;
+  },
+  /**
+   * The customer signs on the advisor's device ("Present in home"). Needs
+   * APPROVE_QUOTES. Same rules as the link: 409 QUOTE_TOTAL_CHANGED (nothing
+   * signed), QUOTE_NOT_APPROVABLE, QUOTE_REVISION_STALE. A draft can be signed.
+   */
+  approveInPerson: async (
+    id: string,
+    body: {
+      revision?: number;
+      signerName: string;
+      signature: string;
+      consent: true;
+      selection?: QuoteSelectionChoice;
+      totalAmount: number;
+    },
+  ): Promise<Quote> => {
+    const response = await apiClient.post<Quote>(`/financial/quotes/${id}/approve`, body);
+    return response.data;
+  },
+  /** The signed copy (on the link or in person); 400 when the office recorded the yes without one. */
+  getApproval: async (id: string): Promise<QuoteApproval> => {
+    const response = await apiClient.get<QuoteApproval>(`/financial/quotes/${id}/approval`);
+    return response.data;
+  },
+  /** Which payment plans this proposal offers: null = every active plan, [] = none. */
+  setPaymentPlans: async (id: string, request: { version: number; planIds: string[] | null }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/payment-plans`, request);
+    return response.data;
+  },
+  /** Offer an agreement plan's member price ("join and save"); null offers none. 400 for an archived plan or one with no job benefit. */
+  setMembershipOffer: async (id: string, request: { version: number; planId: string | null }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/membership-offer`, request);
+    return response.data;
+  },
+  /** "Don't apply" (EXCLUDE) or take one that isn't auto-applied (APPLY); null = the promotion's own setting. */
+  setPromotion: async (id: string, promotionId: string, request: { version: number; choice: 'APPLY' | 'EXCLUDE' | null }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/promotions/${promotionId}`, request);
+    return response.data;
+  },
+  getPriceClearance: async (id: string): Promise<QuotePriceClearance> => {
+    const response = await apiClient.get<QuotePriceClearance>(`/financial/quotes/${id}/price-clearance`);
+    return response.data;
+  },
+  /**
+   * Ask a manager to approve a below-floor price. With `send` (the /send body)
+   * it goes out as soon as it's approved; without, it's for signing in person.
+   * Asking again replaces a pending ask; 400 when within the floor.
+   */
+  requestPriceApproval: async (
+    id: string,
+    { reason, send }: { reason: string; send?: SendOptions & { expirationDate?: string } },
+  ): Promise<QuotePriceApproval> => {
+    const sendRequest = send ? (sendBody(send, send.expirationDate ? { expirationDate: send.expirationDate } : {}) ?? {}) : undefined;
+    const response = await apiClient.post<QuotePriceApproval>(`/financial/quotes/${id}/price-approvals`, {
+      reason,
+      ...(sendRequest ? { send: sendRequest } : {}),
+    });
+    return response.data;
+  },
+  getPriceApprovals: async (id: string): Promise<QuotePriceApproval[]> => {
+    const response = await apiClient.get<QuotePriceApproval[]>(`/financial/quotes/${id}/price-approvals`);
+    return response.data;
+  },
+  /** The saved choice, priced. */
+  getSelection: async (id: string): Promise<PricedSelection> => {
+    const response = await apiClient.get<PricedSelection>(`/financial/quotes/${id}/selection`);
+    return response.data;
+  },
+  /** Save the whole choice (no version: the last save wins, and the quote's version doesn't move). */
+  saveSelection: async (id: string, choice: QuoteSelectionChoice): Promise<PricedSelection> => {
+    const response = await apiClient.put<PricedSelection>(`/financial/quotes/${id}/selection`, choice);
+    return response.data;
+  },
+  /** Move a line, or set an add-on's recommendation. */
+  setLinePlacement: async (
+    id: string,
+    lineId: string,
+    request: { version: number; optionId?: string | null; role: QuoteLineRole; recommended?: boolean; recommendationNote?: string | null },
+  ): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/lines/${lineId}/placement`, request);
     return response.data;
   },
 
   /** See `invoicesApi.send` — same contract, quote-scoped. */
   send: async (
     id: string,
-    recipientEmails?: string[],
+    { expirationDate, ...rest }: SendOptions & {
+      /** Drafts only (409 DOCUMENT_NOT_EDITABLE once sent): overrides the expiry from the quote validity setting. */
+      expirationDate?: string;
+    } = {},
   ): Promise<SendResponse> => {
-    const body =
-      recipientEmails && recipientEmails.length > 0
-        ? { recipientEmails }
-        : undefined;
-    const response = await apiClient.post<SendResponse>(
-      `/financial/quotes/${id}/send`,
-      body,
-    );
+    const response = await apiClient.post<SendResponse>(`/financial/quotes/${id}/send`, sendBody(rest, expirationDate ? { expirationDate } : {}));
+    return response.data;
+  },
+
+  /** See `invoicesApi.previewLink`. */
+  previewLink: async (id: string, expirationDate?: string): Promise<PreviewLink> => {
+    const response = await apiClient.post<PreviewLink>(`/financial/quotes/${id}/preview-link`, expirationDate ? { expirationDate } : undefined);
+    return response.data;
+  },
+
+  /** See `invoicesApi.sendPreview`. */
+  sendPreview: async (id: string, expirationDate?: string): Promise<SendPreview> => {
+    const response = await apiClient.get<SendPreview>(`/financial/quotes/${id}/send-preview`, { params: expirationDate ? { expirationDate } : {} });
     return response.data;
   },
 
@@ -633,18 +1594,124 @@ export const PaymentMethod = {
   OTHER: 'OTHER',
 } as const;
 
-export interface Payment {
+export interface PaymentApplication {
   id: string;
   invoiceId: string;
+  invoiceNumber: string;
+  amountApplied: number;
+}
+
+export interface Payment {
+  id: string;
+  /** The payer: the customer billed. */
   customerId: string;
+  payerName: string;
   paymentNumber: string;
+  status: PaymentStatus;
   paymentDate: string;
   amount: number;
   paymentMethod: PaymentMethod;
-  referenceNumber?: string;
-  notes?: string;
+  referenceNumber?: string | null;
+  notes?: string | null;
+  applications: PaymentApplication[];
+  /** 0 when VOID. */
+  unappliedAmount: number;
+  voidedAt: string | null;
+  /** Under a region scope, the part applied to in-scope invoices; null when not region-scoped. */
+  amountInScope: number | null;
+  /** Who recorded it; null for older payments with no record, or the System user. */
+  receivedByUserId?: string | null;
+  receivedByName?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InvoiceViewsParams {
+  customerId?: string;
+  serviceLocationId?: string;
+  from?: string;
+  to?: string;
+  regionIds?: string[];
+}
+
+/** Each count equals `totalElements` of its tab's list call. */
+export interface InvoiceViews {
+  counts: { unpaid: number; overdue: number; draft: number; paid: number; all: number; void: number };
+  /** Balance due on unpaid invoices. */
+  outstanding: number;
+  overdueAmount: number;
+}
+
+/** A quote as the list shows it. */
+export interface QuoteListItem {
+  id: string;
+  quoteNumber: string;
+  title?: string | null;
+  status: QuoteStatus;
+  customerId: string;
+  customerName?: string | null;
+  billToIsPayer?: boolean;
+  workOrderId?: string | null;
+  workOrderNumber?: string | null;
+  serviceLocationId?: string | null;
+  serviceLocationName?: string | null;
+  serviceLocationAddress?: string | null;
+  customerPoNumber?: string | null;
+  quoteDate: string | null;
+  expirationDate: string | null;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  lineCount?: number;
+  revision?: number;
+  /** Who wrote it (the Advisor column); null for older quotes with no record, so fall back to the sender. */
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+  lastSentAt?: string | null;
+  firstSentAt?: string | null;
+  firstSentByUserId?: string | null;
+  firstSentByName?: string | null;
+  firstViewedAt?: string | null;
+  decidedAt?: string | null;
+  /** Accepted quotes only: rounded down, so 100 means nothing is left. */
+  invoicedPercent?: number | null;
+  /** Accepted quotes only: what's left to bill, after discounts, before tax. */
+  remainingToInvoice?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuoteViewsParams {
+  firstSentFrom?: string;
+  firstSentTo?: string;
+  sentByUserId?: string;
+  regionIds?: string[];
+}
+
+export interface QuoteViews {
+  counts: { open: number; readyToInvoice: number; accepted: number; closed: number; all: number };
+  /** Total of SENT quotes, with tax. */
+  awaitingCustomer: number;
+  /** DRAFT or SENT quotes expiring today through the next 6 days. */
+  expiringThisWeek: number;
+  /** Sum of remainingToInvoice, before tax. */
+  readyToInvoiceAmount: number;
+}
+
+/** Filters for the paged payment list, all AND-ed. */
+export interface ListPaymentsParams {
+  from?: string; // paymentDate, inclusive
+  to?: string;
+  method?: PaymentMethod[];
+  customerId?: string;
+  status?: PaymentStatus[];
+  /** A payment is in a region when it paid an invoice there; unapplied ones are company-wide only. */
+  regionIds?: string[];
+  /** Case-insensitive, anywhere in the payment number, reference (check) number or payer name. */
+  q?: string;
+  page?: number;
+  size?: number; // ≤ 200
+  sort?: string; // paymentDate | amount | paymentNumber | payerName, e.g. 'paymentDate,desc'
 }
 
 /**
@@ -683,8 +1750,15 @@ export interface CreatePaymentRequest {
 }
 
 export const paymentsApi = {
-  getAll: async (): Promise<Payment[]> => {
-    const response = await apiClient.get<Payment[]>('/financial/payments');
+  getAll: async (params: ListPaymentsParams = {}): Promise<FinancialPage<Payment>> => {
+    const { method, status, ...rest } = params;
+    const response = await apiClient.get<FinancialPage<Payment>>('/financial/payments', {
+      params: {
+        ...rest,
+        ...(method?.length ? { method: method.join(',') } : {}),
+        ...(status?.length ? { status: status.join(',') } : {}),
+      },
+    });
     return response.data;
   },
 
@@ -700,6 +1774,16 @@ export const paymentsApi = {
 
   create: async (request: CreatePaymentRequest): Promise<Payment> => {
     const response = await apiClient.post<Payment>('/financial/payments', request);
+    return response.data;
+  },
+
+  /**
+   * Apply a payment's unapplied balance (e.g. credit a void returned) to
+   * invoices. 409 PAYMENT_NOT_APPLICABLE on a void payment; 400 when the
+   * total exceeds the unapplied balance.
+   */
+  apply: async (paymentId: string, applications: CreatePaymentApplication[]): Promise<Payment> => {
+    const response = await apiClient.post<Payment>(`/financial/payments/${paymentId}/applications`, { applications });
     return response.data;
   },
 
@@ -741,14 +1825,21 @@ export const paymentsApi = {
  *   - the WO id belongs to a different tenant (RLS isolation)
  * These three are intentionally indistinguishable (security default).
  */
+/**
+ * A work order's money, from its documents. `invoiced`, `paid` and `balance`
+ * count billed invoices only (not DRAFT, VOID or CANCELLED). All zero when
+ * the work order is outside the caller's regions. Decimals may arrive as
+ * strings.
+ */
 export interface WorkOrderFinancialSummary {
   invoiced: string;
-  /**
-   * Optional. Sum of non-DECLINED, non-EXPIRED quote totals for the WO
-   * (Phase 7b backend ask #9). Always returned on tenants where 7b has
-   * shipped; typed optional so the field can roll out additively
-   * without breaking the chip-row code path during transition.
-   */
+  /** Total of DRAFT invoices: not billed yet. */
+  inDraft: string;
+  /** Total of ACCEPTED quotes. */
+  quotedAccepted: string;
+  /** Total of SENT quotes, waiting on the customer. */
+  quotedAwaiting: string;
+  /** @deprecated Every quote not declined or expired, drafts included. Read `quotedAccepted` / `quotedAwaiting`. */
   quoted?: string;
   paid: string;
   balance: string;
@@ -764,76 +1855,1589 @@ export const financialSummaryApi = {
   },
 };
 
-// ========== LOCATION FINANCIAL ACTIVITY ==========
+// ========== TAX ==========
 
-export type FinancialActivityKind = 'INVOICE_SENT' | 'INVOICE_PAID';
-
-/**
- * A money milestone at a service location (invoice sent / paid). Standalone
- * customer payments aren't here by design — INVOICE_PAID carries the location
- * side. `workOrderId` (when present) groups the row under its work order; a
- * null actor (or null userName) means a historical/system row → gear glyph.
- * `amount` is a decimal string from the backend.
- */
-export interface FinancialActivityEvent {
+/** Where tax comes from. `rate` is a fraction (8.25% is 0.0825); null means not set yet, so nothing is taxed. */
+export interface TaxJurisdiction {
   id: string;
-  kind: FinancialActivityKind;
-  invoiceId: string;
-  invoiceNumber: string;
-  workOrderId: string | null;
-  // Non-null on the location feed; the customer feed (getForCustomer) may return
-  // null for a customer-level invoice with no site. Row rendering keys off
-  // workOrderId, not this, so null is safe.
-  serviceLocationId: string | null;
-  amount: string;
-  actor: { userId: string; userName: string | null } | null;
-  timestamp: string;
+  name: string;
+  rate: number | null;
+  taxesLabor: boolean;
+  taxesMaterials: boolean;
+  taxesEquipment: boolean;
+  taxesFees: boolean;
+  isDefault: boolean;
+  active: boolean;
+  /**
+   * Locations explicitly assigned to it; the default's count leaves out the
+   * locations that fall back to it. Null on a location's `effective` one.
+   */
+  locationCount?: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
-/** Cursor-paginated page of customer financial milestones (ACT-1). Same
- * envelope as the WO activity stream so the two co-paginate. */
+/** The whole jurisdiction, replaced on update. Never deleted: deactivate with `active: false`. */
+export interface TaxJurisdictionRequest {
+  name: string;
+  rate: number | null;
+  taxesLabor: boolean;
+  taxesMaterials: boolean;
+  taxesEquipment: boolean;
+  taxesFees: boolean;
+  /** Making one the default takes it from the previous default. */
+  isDefault: boolean;
+  active: boolean;
+}
+
+/** A location's tax: what was assigned to it (null = none) and what applies, the assignment or else the default. */
+export interface LocationTaxJurisdiction {
+  serviceLocationId: string;
+  assignedJurisdictionId: string | null;
+  effective: TaxJurisdiction | null;
+}
+
+export interface PricingSettings {
+  /** The tax class agreement installment invoices are issued under. */
+  agreementFeeTaxClass: TaxClass;
+  /** Days a quote stays open after it's sent (1–365, default 30). */
+  quoteValidityDays?: number;
+  /** Proposals: options below this margin (a fraction) are flagged. Null = none. */
+  marginFloor?: number | null;
+  /** On the wire; the app doesn't set or use it (no lender is integrated). */
+  financingApplicationUrl?: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * Tax jurisdictions and pricing settings. Reading needs no capability;
+ * writing needs MANAGE_PRICING, except a location's assignment, which
+ * EDIT_QUOTES or EDIT_INVOICES can also set. 409 codes: NAME_TAKEN,
+ * DEFAULT_REQUIRED, DEFAULT_MUST_BE_ACTIVE, JURISDICTION_IN_USE.
+ */
+export const taxApi = {
+  /** Active and inactive, by name. */
+  getJurisdictions: async (): Promise<TaxJurisdiction[]> => {
+    const response = await apiClient.get<TaxJurisdiction[]>('/financial/tax-jurisdictions');
+    return response.data;
+  },
+
+  createJurisdiction: async (request: TaxJurisdictionRequest): Promise<TaxJurisdiction> => {
+    const response = await apiClient.post<TaxJurisdiction>('/financial/tax-jurisdictions', request);
+    return response.data;
+  },
+
+  updateJurisdiction: async (id: string, request: TaxJurisdictionRequest): Promise<TaxJurisdiction> => {
+    const response = await apiClient.put<TaxJurisdiction>(`/financial/tax-jurisdictions/${id}`, request);
+    return response.data;
+  },
+
+  getLocationJurisdiction: async (serviceLocationId: string): Promise<LocationTaxJurisdiction> => {
+    const response = await apiClient.get<LocationTaxJurisdiction>(
+      `/financial/service-locations/${serviceLocationId}/tax-jurisdiction`,
+    );
+    return response.data;
+  },
+
+  /** Null clears the assignment, so the default applies. */
+  setLocationJurisdiction: async (
+    serviceLocationId: string,
+    taxJurisdictionId: string | null,
+  ): Promise<LocationTaxJurisdiction> => {
+    const response = await apiClient.put<LocationTaxJurisdiction>(
+      `/financial/service-locations/${serviceLocationId}/tax-jurisdiction`,
+      { taxJurisdictionId },
+    );
+    return response.data;
+  },
+
+  getPricingSettings: async (): Promise<PricingSettings> => {
+    const response = await apiClient.get<PricingSettings>('/financial/pricing-settings');
+    return response.data;
+  },
+
+  /**
+   * `quoteValidityDays` (1–365) left out keeps the current value. `marginFloor`:
+   * a fraction above 0 and below 1, `0` removes it, left out keeps it.
+   */
+  updatePricingSettings: async (
+    agreementFeeTaxClass: TaxClass,
+    quoteValidityDays?: number,
+    { marginFloor }: { marginFloor?: number } = {},
+  ): Promise<PricingSettings> => {
+    const response = await apiClient.put<PricingSettings>('/financial/pricing-settings', {
+      agreementFeeTaxClass,
+      ...(quoteValidityDays != null ? { quoteValidityDays } : {}),
+      ...(marginFloor != null ? { marginFloor } : {}),
+    });
+    return response.data;
+  },
+};
+
+export type LaborRateRole = 'REGULAR' | 'OVERTIME' | 'AFTER_HOURS' | 'HOLIDAY';
+
+/**
+ * A kind of labor hour and what it bills at. The four seeded types carry a
+ * `role` that can't change; types the tenant adds have none.
+ */
+export interface LaborRateType {
+  id: string;
+  name: string;
+  role: LaborRateRole | null;
+  /** What an hour bills at; null leaves it unpriced (labor can't be added at it unless the plan or the user prices it). */
+  billRate: number | null;
+  /** Loaded cost of an hour. Internal only. */
+  costRate: number | null;
+  sortOrder: number;
+  active: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** The whole rate type, replaced on update. Never deleted: deactivate with `active: false`. */
+export interface LaborRateTypeRequest {
+  name: string;
+  billRate: number | null;
+  costRate: number | null;
+  sortOrder: number;
+  active: boolean;
+}
+
+/**
+ * Labor rate types. Reading needs no capability; writing needs
+ * MANAGE_PRICING. Changing Regular's bill rate reprices every computed
+ * pricebook item. PUT replaces `sortOrder` too, so send the current one back.
+ * 409 codes: NAME_TAKEN, REGULAR_REQUIRED.
+ */
+export const laborRatesApi = {
+  /** Active and inactive, in the tenant's order. */
+  getAll: async (): Promise<LaborRateType[]> => {
+    const response = await apiClient.get<LaborRateType[]>('/financial/labor-rates');
+    return response.data;
+  },
+
+  create: async (request: LaborRateTypeRequest): Promise<LaborRateType> => {
+    const response = await apiClient.post<LaborRateType>('/financial/labor-rates', request);
+    return response.data;
+  },
+
+  update: async (id: string, request: LaborRateTypeRequest): Promise<LaborRateType> => {
+    const response = await apiClient.put<LaborRateType>(`/financial/labor-rates/${id}`, request);
+    return response.data;
+  },
+
+  /**
+   * Sets the whole order in one transaction. Lists every rate type exactly
+   * once, inactive ones included; 400 INVALID_REQUEST when the list is out
+   * of date. Returns the list in its new order.
+   */
+  reorder: async (orderedIds: string[]): Promise<LaborRateType[]> => {
+    const response = await apiClient.post<LaborRateType[]>('/financial/labor-rates/reorder', { orderedIds });
+    return response.data;
+  },
+};
+
+export type PricebookItemType = 'SERVICE' | 'MATERIAL' | 'EQUIPMENT' | 'FEE';
+
+/**
+ * How an item's price is made. FIXED: as entered. MARKUP: unitCost × (1 +
+ * markupPct). COMPUTED (services only): laborHours × the Regular rate, plus
+ * materialsCost marked up; the server calculates it.
+ */
+export type PricingMode = 'FIXED' | 'MARKUP' | 'COMPUTED';
+
+/** A pricebook category; build the tree from `parentId`. */
+export interface PricebookCategory {
+  id: string;
+  parentId: string | null;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+  /** Active items in it and all its subcategories (the same scope as the `categoryId` filter). */
+  activeItemCount?: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PricebookCategoryRequest {
+  name: string;
+  parentId: string | null;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface PricebookItem {
+  id: string;
+  itemType: PricebookItemType;
+  feeRole: FeeRole | null;
+  name: string;
+  sku: string | null;
+  categoryId: string | null;
+  unit: string;
+  taxClass: TaxClass;
+  pricingMode: PricingMode;
+  /** Null only for a COMPUTED item while the Regular rate isn't set; it can't be billed yet. */
+  unitPrice: number | null;
+  /** Internal only, as are the computed inputs below. */
+  unitCost: number | null;
+  /** A fraction: 0.35 is 35%. */
+  markupPct: number | null;
+  laborHours: number | null;
+  materialsCost: number | null;
+  active: boolean;
+  /**
+   * Only when asked with `billToCustomerId`: what a line added from it gets
+   * under that account's rate plan (equal to `unitPrice` when no rule
+   * applies; null when the item has no price at all).
+   */
+  planUnitPrice?: number | null;
+  /** The plan rule that set `planUnitPrice`; null when the list price stands. */
+  pricingRule?: PricingRule | null;
+  pricingRuleValue?: number | null;
+  /** Send back on an edit; a mismatch is 409 STALE_VERSION. */
+  version: number;
+  /** How it's shown to customers on public quotes; null when it has none. */
+  presentation?: ItemPresentation | null;
+  hasPresentation?: boolean;
+  /** The main photo's thumbnail, for the list. */
+  thumbnailUrl?: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PresentationPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string;
+}
+
+export interface ItemPresentation {
+  /** Null or blank: the item name. */
+  customerName?: string | null;
+  description?: string | null;
+  highlights: string[];
+  /** In order; the first is the main photo. */
+  photos: PresentationPhoto[];
+}
+
+/** Sent to set an item's presentation; replaces it whole. */
+export interface ItemPresentationRequest {
+  customerName?: string | null;
+  description?: string | null;
+  /** 0–5, each ≤ 120; blank entries are dropped. */
+  highlights: string[];
+  /** 0–4 READY media ids, in order. */
+  photoIds: string[];
+}
+
+/** The whole item, replaced on update. Never deleted: deactivate with `active: false`. */
+export interface PricebookItemRequest {
+  /** Required on update. */
+  version?: number;
+  itemType: PricebookItemType;
+  /** Required on FEE items, refused on others. */
+  feeRole: FeeRole | null;
+  name: string;
+  sku: string | null;
+  categoryId: string | null;
+  unit: string | null;
+  /** Null takes the type's default. */
+  taxClass: TaxClass | null;
+  pricingMode: PricingMode;
+  unitPrice: number | null;
+  unitCost: number | null;
+  markupPct: number | null;
+  laborHours: number | null;
+  materialsCost: number | null;
+  active: boolean;
+  /** Left out: unchanged. null: removed. An object: replaces it. */
+  presentation?: ItemPresentationRequest | null;
+}
+
+export interface PricebookItemQuery {
+  /** Name or SKU. */
+  q?: string;
+  type?: PricebookItemType;
+  /** Includes subcategories. */
+  categoryId?: string;
+  /** Omit for both. */
+  active?: boolean;
+  pricingMode?: PricingMode;
+  /** Price each result for this account's rate plan (the document's customer). */
+  billToCustomerId?: string;
+  page?: number;
+  /** At most 200. */
+  size?: number;
+  /** `name,asc` etc. over name, sku, itemType, unitPrice, updatedAt. */
+  sort?: string;
+}
+
+/**
+ * The pricebook. Reading needs no capability; writing needs MANAGE_PRICING.
+ * 409 codes: STALE_VERSION, SKU_TAKEN, NAME_TAKEN, CATEGORY_IN_USE.
+ */
+export const pricebookApi = {
+  /** Every category, flat. */
+  getCategories: async (): Promise<PricebookCategory[]> => {
+    const response = await apiClient.get<PricebookCategory[]>('/financial/pricebook/categories');
+    return response.data;
+  },
+
+  createCategory: async (request: PricebookCategoryRequest): Promise<PricebookCategory> => {
+    const response = await apiClient.post<PricebookCategory>('/financial/pricebook/categories', request);
+    return response.data;
+  },
+
+  updateCategory: async (id: string, request: PricebookCategoryRequest): Promise<PricebookCategory> => {
+    const response = await apiClient.put<PricebookCategory>(`/financial/pricebook/categories/${id}`, request);
+    return response.data;
+  },
+
+  getItems: async (params: PricebookItemQuery = {}): Promise<FinancialPage<PricebookItem>> => {
+    const response = await apiClient.get<FinancialPage<PricebookItem>>('/financial/pricebook/items', { params });
+    return response.data;
+  },
+
+  /**
+   * Active items ranked by how often they were added to quotes and invoices
+   * in the last 90 days. `size` at most 20.
+   */
+  getFrequent: async (params: { size?: number; billToCustomerId?: string } = {}): Promise<PricebookItem[]> => {
+    const response = await apiClient.get<PricebookItem[]>('/financial/pricebook/items/frequent', { params });
+    return response.data;
+  },
+
+  getItem: async (id: string): Promise<PricebookItem> => {
+    const response = await apiClient.get<PricebookItem>(`/financial/pricebook/items/${id}`);
+    return response.data;
+  },
+
+  createItem: async (request: PricebookItemRequest): Promise<PricebookItem> => {
+    const response = await apiClient.post<PricebookItem>('/financial/pricebook/items', request);
+    return response.data;
+  },
+
+  updateItem: async (id: string, request: PricebookItemRequest): Promise<PricebookItem> => {
+    const response = await apiClient.put<PricebookItem>(`/financial/pricebook/items/${id}`, request);
+    return response.data;
+  },
+};
+
+export type MediaStatus = 'PENDING' | 'READY';
+
+/** An image in the tenant's media library. `url` (≤1600px) and `thumbnailUrl` (400px) are permanent CDN links, null until READY. */
+export interface Media {
+  id: string;
+  status: MediaStatus;
+  url?: string | null;
+  thumbnailUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+/** Image types the library takes (HEIC is refused), up to 20 MB. */
+export const MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const MEDIA_MAX_BYTES = 20 * 1024 * 1024;
+
+/**
+ * The tenant media library (images). Upload is presigned and two-step:
+ * `upload-url` → PUT to S3 → `confirm`. Writes need MANAGE_PRICING.
+ * Errors: 400 INVALID_REQUEST (type, size, name), 409 UPLOAD_MISSING,
+ * 400 UNREADABLE_IMAGE, 404 MEDIA_NOT_FOUND.
+ */
+export const mediaApi = {
+  get: async (id: string): Promise<Media> => {
+    const response = await apiClient.get<Media>(`/financial/media/${id}`);
+    return response.data;
+  },
+
+  /** Upload one image and wait for its renditions; resolves READY media. */
+  upload: async (file: File): Promise<Media> => {
+    const { data: target } = await apiClient.post<{ mediaId: string; uploadUrl: string; contentType: string }>(
+      '/financial/media/upload-url',
+      { fileName: file.name, contentType: file.type, sizeBytes: file.size },
+    );
+    // Straight to S3, without our auth header; the content type must match exactly.
+    const res = await fetch(target.uploadUrl, { method: 'PUT', headers: { 'Content-Type': target.contentType }, body: file });
+    if (!res.ok) throw new Error(`Upload failed with ${res.status}`);
+    const { data } = await apiClient.post<Media>(`/financial/media/${target.mediaId}/confirm`);
+    return data;
+  },
+};
+
+/** A plan's bill rate for one labor rate type, replacing the tenant's rate for its accounts. */
+export interface PlanLaborRate {
+  laborRateTypeId: string;
+  billRate: number;
+}
+
+/** Materials costing `minCost` or more (to the next tier) are priced at cost × (1 + markupPct). */
+export interface PlanMarkupTier {
+  minCost: number;
+  markupPct: number;
+}
+
+/** Pricebook items in the category and its subcategories are priced × priceMultiplier. */
+export interface PlanCategoryMultiplier {
+  categoryId: string;
+  priceMultiplier: number;
+}
+
+/** How an account is priced. Every tenant has a default plan ("Standard"). */
+export interface RatePlan {
+  id: string;
+  name: string;
+  /** Internal only: why the plan exists. */
+  description?: string | null;
+  isDefault: boolean;
+  /** 0.90 = 10% off everything a more specific rule doesn't price. */
+  priceMultiplier: number | null;
+  /** False: agreement member benefits don't apply on this plan. */
+  memberBenefitsStack: boolean;
+  active: boolean;
+  laborRates: PlanLaborRate[];
+  /** Lowest first. */
+  markupTiers: PlanMarkupTier[];
+  categoryMultipliers: PlanCategoryMultiplier[];
+  createdAt: string | null;
+  updatedAt: string | null;
+  /** Accounts explicitly assigned; the default's count leaves out the accounts that fall back to it. */
+  accountCount?: number;
+}
+
+/** An account on a plan. `customerName` is null only when financial-service hasn't received the customer yet. */
+export interface RatePlanAccount {
+  customerId: string;
+  customerName: string | null;
+  assignedAt: string | null;
+}
+
+/** The whole plan; the rule lists replace the plan's existing rules. Never deleted: deactivate with `active: false`. */
+export interface RatePlanRequest {
+  name: string;
+  /** Up to 500; blank clears it. */
+  description: string | null;
+  /** Making one the default takes it from the previous default. */
+  isDefault: boolean;
+  priceMultiplier: number | null;
+  memberBenefitsStack: boolean;
+  active: boolean;
+  laborRates: PlanLaborRate[];
+  markupTiers: PlanMarkupTier[];
+  categoryMultipliers: PlanCategoryMultiplier[];
+}
+
+/** An account's plan: what was assigned to it (null = none) and what applies, the assignment or else the default. */
+export interface CustomerRatePlan {
+  customerId: string;
+  assignedRatePlanId: string | null;
+  effective: { id: string; name: string } | null;
+}
+
+/**
+ * Rate plans. Reading needs no capability; writing needs MANAGE_PRICING.
+ * 409 codes: NAME_TAKEN, DEFAULT_REQUIRED, DEFAULT_MUST_BE_ACTIVE,
+ * RATE_PLAN_IN_USE.
+ */
+export const ratePlansApi = {
+  /** Active and inactive, by name, with their rules. */
+  getAll: async (): Promise<RatePlan[]> => {
+    const response = await apiClient.get<RatePlan[]>('/financial/rate-plans');
+    return response.data;
+  },
+
+  get: async (id: string): Promise<RatePlan> => {
+    const response = await apiClient.get<RatePlan>(`/financial/rate-plans/${id}`);
+    return response.data;
+  },
+
+  create: async (request: RatePlanRequest): Promise<RatePlan> => {
+    const response = await apiClient.post<RatePlan>('/financial/rate-plans', request);
+    return response.data;
+  },
+
+  update: async (id: string, request: RatePlanRequest): Promise<RatePlan> => {
+    const response = await apiClient.put<RatePlan>(`/financial/rate-plans/${id}`, request);
+    return response.data;
+  },
+
+  /** The accounts on a plan, by name. Assign and unassign with `setCustomerPlan`. `size` at most 200. */
+  getAccounts: async (id: string, params: { page?: number; size?: number } = {}): Promise<FinancialPage<RatePlanAccount>> => {
+    const response = await apiClient.get<FinancialPage<RatePlanAccount>>(`/financial/rate-plans/${id}/accounts`, { params });
+    return response.data;
+  },
+
+  getCustomerPlan: async (customerId: string): Promise<CustomerRatePlan> => {
+    const response = await apiClient.get<CustomerRatePlan>(`/financial/customers/${customerId}/rate-plan`);
+    return response.data;
+  },
+
+  /** Null clears the assignment, so the default plan applies. */
+  setCustomerPlan: async (customerId: string, ratePlanId: string | null): Promise<CustomerRatePlan> => {
+    const response = await apiClient.put<CustomerRatePlan>(`/financial/customers/${customerId}/rate-plan`, { ratePlanId });
+    return response.data;
+  },
+};
+
+/** A part bought on a purchase order for a job and not yet on an invoice that counts (not void or cancelled; drafts count). */
+export interface UnbilledPurchase {
+  purchaseOrderId: string;
+  purchaseOrderNumber: string;
+  purchaseOrderType: 'ORDER' | 'FIELD' | 'STOCK';
+  poLineId: string;
+  description: string;
+  sku?: string | null;
+  /** Ordered. */
+  quantity: number;
+  billedQuantity: number;
+  /** Always above 0 on the list. */
+  unbilledQuantity: number;
+  /** Internal only. */
+  unitCost: number;
+  unbilledCost: number;
+  /** The PO line's bill price, when it has one. */
+  suggestedUnitPrice?: number | null;
+  /** Only with `includeNotBillable`, on parts marked not billable. */
+  notBillable?: PurchaseLineBilling | null;
+}
+
+/** Whether a PO line is marked as never billed to the customer, and who said so. */
+export interface PurchaseLineBilling {
+  poLineId: string;
+  notBillable: boolean;
+  reason?: string | null;
+  markedByUserId?: string | null;
+  markedByName?: string | null;
+  markedAt?: string | null;
+}
+
+/**
+ * Parts bought for a job that aren't billed yet, and dismissing ones that
+ * never will be. No capability beyond tenant membership.
+ */
+export const purchaseBillingApi = {
+  /** By PO number, then line order. `includeNotBillable` brings back dismissed parts with their decision. */
+  getUnbilled: async (workOrderId: string, includeNotBillable = false): Promise<UnbilledPurchase[]> => {
+    const response = await apiClient.get<UnbilledPurchase[]>(`/financial/work-orders/${workOrderId}/unbilled-purchases`, {
+      params: includeNotBillable ? { includeNotBillable: true } : undefined,
+    });
+    return response.data;
+  },
+
+  /** Mark not billable with a reason (required, ≤ 500), or undo. 400 INVALID_REQUEST for an unknown line or bad reason. */
+  setBilling: async (
+    poLineId: string,
+    body: { notBillable: true; reason: string } | { notBillable: false },
+  ): Promise<PurchaseLineBilling> => {
+    const response = await apiClient.put<PurchaseLineBilling>(`/financial/purchase-order-lines/${poLineId}/billing`, body);
+    return response.data;
+  },
+};
+
+/** Whether an accepted quote's line is marked as never billed, and who said so. */
+export interface QuoteLineBilling {
+  quoteLineId: string;
+  notBillable: boolean;
+  reason?: string | null;
+  markedByUserId?: string | null;
+  markedByName?: string | null;
+  markedAt?: string | null;
+}
+
+export const quoteLineBillingApi = {
+  /** Dismiss (with a reason, ≤500 chars) or restore a line of an accepted quote. */
+  setBilling: async (
+    quoteLineId: string,
+    body: { notBillable: true; reason: string } | { notBillable: false },
+  ): Promise<QuoteLineBilling> => {
+    const response = await apiClient.put<QuoteLineBilling>(`/financial/quote-lines/${quoteLineId}/billing`, body);
+    return response.data;
+  },
+};
+
+// ========== QUOTE PRICE APPROVALS ==========
+
+export type PriceApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+/** A quote held below the margin floor until a manager (APPROVE_QUOTES) answers. */
+export interface QuotePriceApproval {
+  id: string;
+  quoteId: string;
+  quoteNumber: string;
+  quoteTitle: string | null;
+  customerName: string | null;
+  revision: number | null;
+  status: PriceApprovalStatus;
+  /** False once the quote was edited after the ask: it can't be approved ("changed since asked"). */
+  current: boolean;
+  requestedByUserId: string | null;
+  requestedByName: string | null;
+  requestedAt: string;
+  reason: string | null;
+  /** Approving sends the quote as the asker's send; false = for signing in person. */
+  sendsOnApproval: boolean;
+  /** Fractions. */
+  lowestMargin: number | null;
+  floor: number | null;
+  totalAmount: number | null;
+  respondedByUserId: string | null;
+  respondedByName: string | null;
+  respondedAt: string | null;
+  responseNote: string | null;
+}
+
+/** Whether a quote can be sent (or signed in person) as it stands. */
+export interface QuotePriceClearance {
+  /** An option's card or the current choice sells under the floor after savings. */
+  belowFloor: boolean;
+  lowestMargin: number | null;
+  floor: number | null;
+  /** Below the floor and not approved as the quote stands: "Request approval & send". */
+  approvalRequired: boolean;
+  /** A manager: their own sends aren't held. */
+  callerCanApprove: boolean;
+  latest: QuotePriceApproval | null;
+}
+
+export interface ListPriceApprovalsParams {
+  status?: PriceApprovalStatus[];
+  /** The caller's own requests. */
+  mine?: boolean;
+  limit?: number;
+}
+
+export const quotePriceApprovalsApi = {
+  list: async ({ status, ...rest }: ListPriceApprovalsParams = {}): Promise<QuotePriceApproval[]> => {
+    const response = await apiClient.get<QuotePriceApproval[]>('/financial/quote-price-approvals', {
+      params: { ...rest, ...(status?.length ? { status } : {}) },
+    });
+    return response.data;
+  },
+  count: async (): Promise<{ pending: number }> => {
+    const response = await apiClient.get<{ pending: number }>('/financial/quote-price-approvals/count');
+    return response.data;
+  },
+  /** APPROVE_QUOTES. 409 PRICE_APPROVAL_CLOSED when answered already or the quote changed. */
+  approve: async (id: string, note?: string): Promise<QuotePriceApproval> => {
+    const response = await apiClient.post<QuotePriceApproval>(`/financial/quote-price-approvals/${id}/approve`, note ? { note } : {});
+    return response.data;
+  },
+  reject: async (id: string, note?: string): Promise<QuotePriceApproval> => {
+    const response = await apiClient.post<QuotePriceApproval>(`/financial/quote-price-approvals/${id}/reject`, note ? { note } : {});
+    return response.data;
+  },
+  /** Withdraw: the asker, or a manager. */
+  cancel: async (id: string): Promise<QuotePriceApproval> => {
+    const response = await apiClient.post<QuotePriceApproval>(`/financial/quote-price-approvals/${id}/cancel`);
+    return response.data;
+  },
+};
+
+// ========== PAYMENT PLANS ==========
+
+/** A payment plan the company offers on proposals. No delete: switch it off. Writes need MANAGE_PRICING. */
+export interface PaymentPlanRequest {
+  /** Up to 80 characters. */
+  label: string;
+  /** A percentage (7.99 = 7.99%), 0 to under 100, up to 3 decimals. */
+  apr: number;
+  /** 1–360. */
+  months: number;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface PaymentPlan extends PaymentPlanRequest {
+  id: string;
+}
+
+export const paymentPlansApi = {
+  /** By sortOrder then label, inactive included. */
+  getAll: async (): Promise<PaymentPlan[]> => {
+    const response = await apiClient.get<PaymentPlan[]>('/financial/payment-plans');
+    return response.data;
+  },
+  create: async (request: PaymentPlanRequest): Promise<PaymentPlan> => {
+    const response = await apiClient.post<PaymentPlan>('/financial/payment-plans', request);
+    return response.data;
+  },
+  update: async (id: string, request: PaymentPlanRequest): Promise<PaymentPlan> => {
+    const response = await apiClient.put<PaymentPlan>(`/financial/payment-plans/${id}`, request);
+    return response.data;
+  },
+};
+
+// ========== MEMBERSHIP SIGN-UPS ==========
+
+/** The office's worklist: proposals signed with "join" on, newest first. */
+export const membershipSignupsApi = {
+  list: async (status: 'PENDING' | 'DONE' = 'PENDING'): Promise<MembershipSignup[]> => {
+    const response = await apiClient.get<MembershipSignup[]>('/financial/membership-signups', { params: { status } });
+    return response.data;
+  },
+  /** DONE once the agreement is set up (records who and when); PENDING reopens it. */
+  setStatus: async (quoteId: string, status: 'PENDING' | 'DONE'): Promise<MembershipSignup> => {
+    const response = await apiClient.put<MembershipSignup>(`/financial/membership-signups/${quoteId}`, { status });
+    return response.data;
+  },
+};
+
+// ========== PROMOTIONS ==========
+
+/** Tenant-authored, dated, auto-applying offers ("Fall Comfort Event — $500 off"). Writes need MANAGE_PRICING. */
+export interface PromotionRequest {
+  name: string;
+  /** What the customer reads. */
+  customerCopy?: string | null;
+  startsOn: string;
+  endsOn: string;
+  kind: 'AMOUNT' | 'PERCENT';
+  /** AMOUNT: dollars. PERCENT: a fraction (0.15). */
+  value: number;
+  /** Applies when its covered lines come to at least this at list; null = no minimum. */
+  minAmount?: number | null;
+  /** What it covers; both empty = every line. */
+  itemIds: string[];
+  categoryIds: string[];
+  autoApply: boolean;
+  /** No delete; switch it off. */
+  active: boolean;
+}
+
+export interface Promotion extends PromotionRequest {
+  id: string;
+  /** Active and in its window today. */
+  onOffer: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const promotionsApi = {
+  /** Latest ending first. */
+  getAll: async (): Promise<Promotion[]> => {
+    const response = await apiClient.get<Promotion[]>('/financial/promotions');
+    return response.data;
+  },
+  get: async (id: string): Promise<Promotion> => {
+    const response = await apiClient.get<Promotion>(`/financial/promotions/${id}`);
+    return response.data;
+  },
+  create: async (request: PromotionRequest): Promise<Promotion> => {
+    const response = await apiClient.post<Promotion>('/financial/promotions', request);
+    return response.data;
+  },
+  update: async (id: string, request: PromotionRequest): Promise<Promotion> => {
+    const response = await apiClient.put<Promotion>(`/financial/promotions/${id}`, request);
+    return response.data;
+  },
+};
+
+// ========== LOCATION FINANCIAL ACTIVITY ==========
+
+/** The quote, invoice and payment steps the financial feeds carry. */
+export type FinancialActivityKind =
+  | 'QUOTE_SENT'
+  | 'QUOTE_VIEWED'
+  | 'QUOTE_ACCEPTED'
+  | 'QUOTE_DECLINED'
+  | 'QUOTE_CHOICE_CHANGED'
+  | 'QUOTE_PRICE_APPROVAL_REQUESTED'
+  | 'QUOTE_PRICE_APPROVED'
+  | 'QUOTE_PRICE_REJECTED'
+  | 'QUOTE_MEMBERSHIP_SIGNUP'
+  | 'QUOTE_DELETED'
+  | 'INVOICE_SENT'
+  | 'INVOICE_PAID'
+  | 'INVOICE_VOIDED'
+  | 'PAYMENT_RECEIVED';
+
+/**
+ * A quote or invoice step at a location, for a customer, or tenant-wide: the
+ * work order tab's row (`subject` is the document, `data.totalAmount` or a
+ * payment's `data.amount`) plus where it happened. `serviceLocationId` may be
+ * null on the customer feed for a document with no site.
+ */
+export type FinancialActivityEvent = ActivityEvent & {
+  workOrderId: string | null;
+  serviceLocationId: string | null;
+};
+
+/** Cursor-paginated, same envelope as the work order streams so they co-paginate. */
 export interface FinancialActivityPage {
   content: FinancialActivityEvent[];
   nextCursor: string | null;
   hasMore: boolean;
 }
 
+/** `kinds` filters on the server, which keeps paging correct. */
+export interface FinancialActivityParams {
+  cursor?: string;
+  limit?: number;
+  kinds?: FinancialActivityKind[];
+}
+
+const financialActivityQuery = ({ kinds, ...rest }: FinancialActivityParams = {}) => ({
+  ...rest,
+  ...(kinds?.length ? { kinds: kinds.join(',') } : {}),
+});
+
 export const financialActivityApi = {
-  /** Location-scoped financial milestones, newest-first. Cursor-paginated
-   * (keyset, hole-free), same envelope as {@link getForCustomer}, so it
-   * co-paginates with the WO activity stream — pass `nextCursor` back as
-   * `cursor`. Defensive: tolerates the pre-cursor bare-array response during the
-   * backend deploy window (wraps it as a single final page). */
-  getForLocation: async (
-    serviceLocationId: string,
-    params?: { cursor?: string; limit?: number },
-  ): Promise<FinancialActivityPage> => {
-    const response = await apiClient.get<FinancialActivityPage | FinancialActivityEvent[]>(
-      `/financial/locations/${serviceLocationId}/activity`,
-      { params },
-    );
-    const data = response.data;
-    return Array.isArray(data) ? { content: data, nextCursor: null, hasMore: false } : data;
+  /** A location's quote and invoice steps (the document's site), newest first. */
+  getForLocation: async (serviceLocationId: string, params?: FinancialActivityParams): Promise<FinancialActivityPage> => {
+    const response = await apiClient.get<FinancialActivityPage>(`/financial/locations/${serviceLocationId}/activity`, {
+      params: financialActivityQuery(params),
+    });
+    return response.data;
   },
 
-  /** Customer-scoped financial milestones (ACT-1), newest-first. Same row shape
-   * as {@link getForLocation} (interleaved with the WO activity stream), except
-   * `serviceLocationId` may be null for customer-level invoices with no site.
-   *
-   * Cursor-paginated (keyset, hole-free) so the FE co-paginates it against the
-   * cursor-based WO activity stream — pass `nextCursor` back as `cursor`.
-   * Defensive: tolerates the pre-cursor bare-array response during the backend
-   * deploy window (wraps it as a single, final page). */
-  getForCustomer: async (
-    customerId: string,
-    params?: { cursor?: string; limit?: number },
-  ): Promise<FinancialActivityPage> => {
-    const response = await apiClient.get<FinancialActivityPage | FinancialActivityEvent[]>(
-      `/financial/customers/${customerId}/activity`,
-      { params },
-    );
-    const data = response.data;
-    return Array.isArray(data) ? { content: data, nextCursor: null, hasMore: false } : data;
+  /** A customer's quote and invoice steps (documents billed to them), newest first. */
+  getForCustomer: async (customerId: string, params?: FinancialActivityParams): Promise<FinancialActivityPage> => {
+    const response = await apiClient.get<FinancialActivityPage>(`/financial/customers/${customerId}/activity`, {
+      params: financialActivityQuery(params),
+    });
+    return response.data;
+  },
+
+  /** Tenant-wide steps (home dashboard); `regionIds` narrows to documents in those regions. */
+  getForTenant: async (params?: FinancialActivityParams & { regionIds?: string[] }): Promise<FinancialActivityPage> => {
+    const { regionIds, ...rest } = params ?? {};
+    const response = await apiClient.get<FinancialActivityPage>('/financial/activity', {
+      params: { ...financialActivityQuery(rest), ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
+
+// ========== REPORTS ==========
+// The Revenue report. Same billed/collected definitions as the dashboard
+// revenue read (a whole calendar month or quarter matches it to the cent).
+
+export type RevenueReportCompare = 'sameDatesLastYear' | 'previousPeriod' | 'none';
+export type RevenueReportGroupBy = 'division' | 'workOrderType' | 'region' | 'none';
+
+export interface RevenueReportParams {
+  /** Tenant-local YYYY-MM-DD; at most 3 years apart. */
+  from: string;
+  /** Cut off at today by the server; read the response's `to`. */
+  to: string;
+  compare?: RevenueReportCompare;
+  groupBy?: RevenueReportGroupBy;
+  regionIds?: string[];
+}
+
+export interface RevenueReportComparison {
+  basis: Exclude<RevenueReportCompare, 'none'>;
+  from: string;
+  to: string;
+  billed: number;
+  invoiceCount: number;
+  collected: number;
+}
+
+/** One group's share. `id` null = unassigned (no work order or location, or none set). */
+export interface RevenueReportGroup {
+  id: string | null;
+  billed: number;
+  invoiceCount: number;
+  /** Null when the report has no comparison. */
+  comparisonBilled: number | null;
+  comparisonInvoiceCount: number | null;
+}
+
+export interface RevenueReport {
+  from: string;
+  /** The day the figures actually end on. */
+  to: string;
+  billed: number;
+  invoiceCount: number;
+  collected: number;
+  /** Every day from `from` to `to`, zero-filled. */
+  billedByDay: DailyAmount[];
+  /** Null with `compare=none`, or when billing in scope began after the comparison window's start. */
+  comparison: RevenueReportComparison | null;
+  groupBy: RevenueReportGroupBy;
+  /** Add up to `billed` and `invoiceCount` exactly; the null group is last, the rest by billed. */
+  groups: RevenueReportGroup[];
+  currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
+}
+
+/**
+ * GET /financial/reports/receivables: what was open at the end of `asOf`
+ * (tenant-local, default today), aged from that date. Same buckets as the
+ * dashboard's receivables; `overdue` is the four past-due ones. Each bucket's
+ * count is the invoice list's `totalElements` with `openAsOf` and that bucket.
+ */
+export interface ReceivablesReport {
+  asOf: string;
+  outstanding: number;
+  overdue: ArAgingBucket;
+  current: ArAgingBucket;
+  days1To30: ArAgingBucket;
+  days31To60: ArAgingBucket;
+  days61To90: ArAgingBucket;
+  days91Plus: ArAgingBucket;
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const receivablesReportApi = {
+  get: async ({ asOf, regionIds }: { asOf?: string; regionIds?: string[] } = {}): Promise<ReceivablesReport> => {
+    const response = await apiClient.get<ReceivablesReport>('/financial/reports/receivables', {
+      params: { ...(asOf ? { asOf } : {}), ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
+
+export type PaymentReportGroupBy = 'method' | 'payer' | 'day' | 'none';
+
+export interface PaymentReportParams {
+  /** By paymentDate, tenant-local, inclusive. */
+  from: string;
+  to: string;
+  compare?: RevenueReportCompare;
+  groupBy?: PaymentReportGroupBy;
+  regionIds?: string[];
+}
+
+export interface PaymentDay {
+  date: string;
+  amount: number;
+  count: number;
+}
+
+export interface PaymentMethodAmount {
+  method: PaymentMethod;
+  amount: number;
+  count: number;
+}
+
+/**
+ * A method (`id` the method), a payer (`id` the customer, with its `name`) or a
+ * day (`id` the date, with `byMethod`, the deposit view). Comparison fields are
+ * null without a comparison and always null on days.
+ */
+export interface PaymentReportGroup {
+  id: string;
+  name: string | null;
+  amount: number;
+  count: number;
+  comparisonAmount: number | null;
+  comparisonCount: number | null;
+  byMethod?: PaymentMethodAmount[];
+}
+
+export interface PaymentReport {
+  from: string;
+  /** Cut off at today. */
+  to: string;
+  /** Revenue's `collected` for the same range and scope. Scoped, the part applied in scope. */
+  received: ArAgingBucket;
+  /** Payments dated in the range since voided, by the same rule. */
+  voided: ArAgingBucket;
+  /** Every day in the range, zero-filled. */
+  receivedByDay: PaymentDay[];
+  /** Exactly when Revenue's is: null when not asked for, or billing in scope began after its start. */
+  comparison: {
+    basis: Exclude<RevenueReportCompare, 'none'>;
+    from: string;
+    to: string;
+    received: ArAgingBucket;
+    voided: ArAgingBucket;
+  } | null;
+  groupBy: PaymentReportGroupBy;
+  groups: PaymentReportGroup[];
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const paymentReportApi = {
+  get: async ({ regionIds, ...params }: PaymentReportParams): Promise<PaymentReport> => {
+    const response = await apiClient.get<PaymentReport>('/financial/reports/payments', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
+
+export type DiscountReportGroupBy = 'reason' | 'givenBy' | 'customer' | 'lineType';
+export type DiscountReportMember = 'include' | 'exclude';
+
+export interface DiscountReportParams {
+  from: string;
+  to: string;
+  member?: DiscountReportMember;
+  groupBy?: DiscountReportGroupBy;
+  regionIds?: string[];
+}
+
+/** One adjustment on a billed invoice: a sample row, a `/rows` row, a CSV row. */
+export interface DiscountReportRow {
+  adjustmentId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  billToCustomerId: string | null;
+  billToName: string | null;
+  /** The serviced customer (the location's owner); null with no location. */
+  customerId: string | null;
+  customerName: string | null;
+  /** All three null for a whole-invoice discount. */
+  lineId: string | null;
+  lineDescription: string | null;
+  lineType: LineType | null;
+  reasonCode: AdjustmentReason;
+  reasonNote: string | null;
+  kind: AdjustmentKind;
+  /** PERCENT: a fraction. AMOUNT: dollars. WAIVE: null. */
+  value: number | null;
+  /** What it took off, positive. */
+  amount: number;
+  source: AdjustmentSource;
+  /** AGREEMENT rows: the plan label. */
+  sourceLabel: string | null;
+  /** Null when automatic or unrecorded. Credited to whoever gave it on the quote, for a copied adjustment. */
+  givenByUserId: string | null;
+  givenByName: string | null;
+  automatic: boolean;
+}
+
+/**
+ * `key` by grouping: reason → an AdjustmentReason, `FEE_WAIVED` or
+ * `MEMBER:{plan label}`; givenBy → a user id, `AUTOMATIC` or `UNRECORDED`;
+ * customer → the bill-to id; lineType → a LineType, `DOCUMENT` (whole invoice)
+ * or `UNTYPED`. `label` is the server-side name (person, bill-to, plan), null
+ * for codes.
+ */
+export interface DiscountReportGroup {
+  key: string;
+  label: string | null;
+  /** Member savings, from an agreement. */
+  automatic: boolean;
+  count: number;
+  amount: number;
+  /** Of `total.amount`, 0–1. */
+  share: number;
+  /** Per adjustment. */
+  average: number;
+  /** The first 4 rows, largest first. */
+  sample: DiscountReportRow[];
+}
+
+export interface DiscountReport {
+  from: string;
+  /** Cut off at today. */
+  to: string;
+  member: DiscountReportMember;
+  groupBy: DiscountReportGroupBy;
+  /** Every source, whatever `member` is. staff + feesWaived + memberSavings = totalReduced. */
+  summary: {
+    totalReduced: number;
+    adjustmentCount: number;
+    /** The billed invoices' gross subtotal, before adjustments. */
+    listPrice: number;
+    /** totalReduced / listPrice; null when listPrice is 0. */
+    shareOfList: number | null;
+    staff: number;
+    feesWaived: number;
+    memberSavings: number;
+  };
+  /** Largest first; they add up to `total`. Member groups drop out with `member=exclude`. */
+  groups: DiscountReportGroup[];
+  total: { count: number; amount: number };
+  currency: string;
+  regionIds: string[] | null;
+}
+
+const reportParams = <P extends { regionIds?: string[] }>({ regionIds, ...params }: P) => ({
+  ...params,
+  ...(regionIds?.length ? { regionIds } : {}),
+});
+
+export const discountReportApi = {
+  get: async (params: DiscountReportParams): Promise<DiscountReport> => {
+    const response = await apiClient.get<DiscountReport>('/financial/reports/discounts', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One group's adjustments, in sample order: the "View all" behind an expanded row. */
+  rows: async (
+    params: DiscountReportParams & { groupKey: string; page?: number; size?: number },
+  ): Promise<FinancialPage<DiscountReportRow>> => {
+    const response = await apiClient.get<FinancialPage<DiscountReportRow>>('/financial/reports/discounts/rows', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One row per adjustment, newest invoice first; built on the server. */
+  exportCsv: async (params: Omit<DiscountReportParams, 'groupBy'>): Promise<Blob> => {
+    const response = await apiClient.get<Blob>('/financial/reports/discounts/export.csv', {
+      params: reportParams(params),
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
+export type SalesTaxBasis = 'sent';
+
+export interface SalesTaxReportParams {
+  from: string;
+  to: string;
+  basis?: SalesTaxBasis;
+  regionIds?: string[];
+}
+
+/** Gross is the line net (after adjustments, before tax): taxable + nonTaxable + exempt. */
+export interface SalesTaxFigures {
+  gross: number;
+  taxable: number;
+  nonTaxable: number;
+  exempt: number;
+  tax: number;
+}
+
+/** One tax class in a jurisdiction, on invoices to non-exempt bill-tos. */
+export interface SalesTaxClassRow {
+  /** Null = unclassified lines. */
+  taxClass: TaxClass | null;
+  /** Whether the jurisdiction taxes this class today. */
+  taxedHere: boolean;
+  gross: number;
+  taxable: number;
+  nonTaxable: number;
+  tax: number;
+}
+
+/**
+ * A jurisdiction, or one of two special rows with no class split: `NONE`
+ * (invoices written with no jurisdiction) and `LEGACY` (before per-line tax,
+ * `rates` empty).
+ */
+export interface SalesTaxJurisdiction extends SalesTaxFigures {
+  key: string;
+  jurisdictionId: string | null;
+  name: string | null;
+  /** Distinct stored rates, fractions; null = not set; 2+ when the rate changed in range. */
+  rates: (number | null)[];
+  /** Today's rate; null = not set today. */
+  currentRate: number | null;
+  classes: SalesTaxClassRow[];
+  /** Every line on invoices to exempt bill-tos; null when none. */
+  exemptAccounts: { gross: number; tax: number } | null;
+}
+
+export type SalesTaxWarning =
+  | { code: 'NO_RATE'; jurisdictionId: string; jurisdictionName: string; amount: number }
+  | { code: 'TAX_MISMATCH'; count: number; invoiceNumbers: string[] };
+
+export interface SalesTaxReport {
+  from: string;
+  /** Cut off at today. */
+  to: string;
+  basis: SalesTaxBasis;
+  total: SalesTaxFigures;
+  jurisdictionCount: number;
+  /** Real jurisdictions by gross descending, then NONE and LEGACY. They add up to `total`. */
+  jurisdictions: SalesTaxJurisdiction[];
+  /** The invoices' own tax; equals `total.tax` unless a TAX_MISMATCH warning says otherwise. */
+  invoiceTaxTotal: number;
+  warnings: SalesTaxWarning[];
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const salesTaxReportApi = {
+  get: async (params: SalesTaxReportParams): Promise<SalesTaxReport> => {
+    const response = await apiClient.get<SalesTaxReport>('/financial/reports/sales-tax', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One row per invoice line, for audit; built on the server. */
+  exportCsv: async (params: SalesTaxReportParams): Promise<Blob> => {
+    const response = await apiClient.get<Blob>('/financial/reports/sales-tax/export.csv', {
+      params: reportParams(params),
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
+export type UnbilledReportSource = 'all' | 'quote' | 'po';
+export type UnbilledReportGroupBy = 'job' | 'source' | 'age';
+export type UnbilledItemSource = 'QUOTE' | 'PO';
+/** How a PO part's ≈ amount was priced: its own bill price, the rate plan's markup on cost, or cost. */
+export type UnbilledEstimateBasis = 'BILL_PRICE' | 'MARKUP_TIER' | 'COST';
+
+export interface UnbilledReportParams {
+  source?: UnbilledReportSource;
+  groupBy?: UnbilledReportGroupBy;
+  regionIds?: string[];
+}
+
+/** An accepted quote line or placed PO line not fully on issued invoices. */
+export interface UnbilledItem {
+  /** The quote line id (QUOTE) or PO line id (PO): what dismissal takes. */
+  itemId: string;
+  source: UnbilledItemSource;
+  description: string;
+  /** What's left to bill. */
+  quantity: number;
+  amount: number;
+  /** PO parts: priced as the line editor would, so shown with ≈. */
+  estimate: boolean;
+  estimateBasis: UnbilledEstimateBasis | null;
+  /** Quote acceptance or PO placed date. */
+  since: string;
+  ageDays: number;
+  workOrderId: string | null;
+  workOrderNumber: string | null;
+  billToCustomerId: string | null;
+  billToName: string | null;
+  billToIsPayer: boolean;
+  /** The serviced customer (location owner). */
+  customerId: string | null;
+  customerName: string | null;
+  quoteId: string | null;
+  quoteNumber: string | null;
+  purchaseOrderId: string | null;
+  poNumber: string | null;
+  /** On a draft invoice, which bills nothing until it's issued. */
+  onDraftInvoice: { invoiceId: string; invoiceNumber: string } | null;
+}
+
+/**
+ * `key` by grouping: job → the work order id, or `QUOTE:{quoteId}` for a
+ * quote with no work order (`label` the WO or quote number); source →
+ * `QUOTE` | `PO`; age → `DAYS_0_30` … `DAYS_91_PLUS` (oldest first).
+ */
+export interface UnbilledReportGroup {
+  key: string;
+  label: string | null;
+  count: number;
+  amount: number;
+  /** Of `total.amount`, 0–1. */
+  share: number;
+  oldestAgeDays: number;
+  /** Job groups only. `workOrderId` null for a quote with no work order. */
+  job?: {
+    workOrderId: string | null;
+    workOrderNumber: string | null;
+    billToCustomerId: string | null;
+    billToName: string | null;
+    billToIsPayer: boolean;
+  } | null;
+  /** The first 4 items, oldest first. */
+  sample: UnbilledItem[];
+}
+
+export interface UnbilledReport {
+  /** Today, tenant-local: the report has no range. */
+  asOf: string;
+  source: UnbilledReportSource;
+  groupBy: UnbilledReportGroupBy;
+  /** Follows the source filter. total = quoted + estimated. */
+  summary: {
+    total: number;
+    itemCount: number;
+    jobCount: number;
+    quoted: number;
+    estimated: number;
+    overThirtyDays: number;
+    overThirtyDaysCount: number;
+  };
+  groups: UnbilledReportGroup[];
+  total: { count: number; amount: number };
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const unbilledReportApi = {
+  get: async (params: UnbilledReportParams): Promise<UnbilledReport> => {
+    const response = await apiClient.get<UnbilledReport>('/financial/reports/unbilled', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One group's items, oldest first: the "View all" behind an expanded row. */
+  rows: async (
+    params: UnbilledReportParams & { groupKey: string; page?: number; size?: number },
+  ): Promise<FinancialPage<UnbilledItem>> => {
+    const response = await apiClient.get<FinancialPage<UnbilledItem>>('/financial/reports/unbilled/rows', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One row per item, oldest first; built on the server. */
+  exportCsv: async (params: Omit<UnbilledReportParams, 'groupBy'>): Promise<Blob> => {
+    const response = await apiClient.get<Blob>('/financial/reports/unbilled/export.csv', {
+      params: reportParams(params),
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
+export type QuoteReportGroupBy = 'sender' | 'none';
+
+export interface QuoteReportParams {
+  from: string;
+  to: string;
+  compare?: RevenueReportCompare;
+  groupBy?: QuoteReportGroupBy;
+  regionIds?: string[];
+}
+
+/** The funnel: quotes first sent in the range, split by current status. */
+export interface QuoteFunnelFigures {
+  /** The whole cohort. */
+  sent: ArAgingBucket;
+  /** Opened by the customer through a share link. */
+  viewed: ArAgingBucket;
+  accepted: ArAgingBucket;
+  declined: ArAgingBucket;
+  expired: ArAgingBucket;
+  /** Still SENT. A cohort quote moved back to DRAFT is in `sent` only. */
+  open: ArAgingBucket;
+  /** accepted ÷ (accepted + declined) by count, 0–1; null when none decided. */
+  winRate: number | null;
+  /** First send → decision, over decisions with a recorded time; null when none. */
+  averageDaysToDecision: number | null;
+}
+
+export interface QuoteReportComparison extends QuoteFunnelFigures {
+  basis: Exclude<RevenueReportCompare, 'none'>;
+  from: string;
+  to: string;
+}
+
+/** One first sender's share; `id` null is quotes with no recorded sender (sorted last). */
+export interface QuoteReportGroup extends QuoteFunnelFigures {
+  id: string | null;
+  /** Null without a comparison; zero (rate null) for a sender with none then. */
+  comparisonSent: ArAgingBucket | null;
+  comparisonAccepted: ArAgingBucket | null;
+  comparisonWinRate: number | null;
+}
+
+export interface QuoteReport extends QuoteFunnelFigures {
+  from: string;
+  /** Cut off at today. */
+  to: string;
+  /** Null when not asked for, or when the first quote in scope went out after the comparison's start. */
+  comparison: QuoteReportComparison | null;
+  groupBy: QuoteReportGroupBy;
+  /** Empty with groupBy none. */
+  groups: QuoteReportGroup[];
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const quoteReportApi = {
+  get: async ({ regionIds, ...params }: QuoteReportParams): Promise<QuoteReport> => {
+    const response = await apiClient.get<QuoteReport>('/financial/reports/quotes', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
+
+export const revenueReportApi = {
+  get: async ({ regionIds, ...params }: RevenueReportParams): Promise<RevenueReport> => {
+    const response = await apiClient.get<RevenueReport>('/financial/reports/revenue', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
+
+// ========== HOME DASHBOARD ==========
+// Tenant-wide aggregates, one endpoint per card so each card loads on its own.
+// Each takes optional `regionIds`: an invoice is in its service location's
+// region, a quote in its work order's location's. Invoices and quotes with no
+// location count only in whole-company figures. A user with assigned regions
+// sees only theirs either way; the response's `regionIds` is what the figures
+// cover (null = whole company). Dates are the tenant's zone; money is decimal
+// dollars.
+
+/** Optional dashboard scope; omit (or empty) for the whole company. */
+export interface DashboardScopeParams {
+  regionIds?: string[];
+}
+
+/** A dashboard read. No params at all for the default, so an unscoped
+ * current-month request is unchanged. */
+async function dashboardGet<T>(path: string, params: { period?: string; regionIds?: string[] }): Promise<T> {
+  const query = {
+    ...(params.period ? { period: params.period } : {}),
+    ...(params.regionIds?.length ? { regionIds: params.regionIds } : {}),
+  };
+  const response = Object.keys(query).length
+    ? await apiClient.get<T>(path, { params: query })
+    : await apiClient.get<T>(path);
+  return response.data;
+}
+
+/** "Needs attention" rows owned by financial-service. `overdue` is open invoices
+ * past due, net of payments. `unbilledWorkOrderCount` is completed hand-entered
+ * work orders with no non-void invoice (a draft counts as invoiced; agreement-
+ * generated orders never count). */
+export interface FinancialDashboardAttention {
+  overdue: ArAgingBucket;
+  /** @deprecated Use `workOrderApi.getAll({ unbilled: true, size: 1 })` →
+   *  `totalElements`, which matches the list it opens and drops deleted work
+   *  orders. Will be removed by the backend. */
+  unbilledWorkOrderCount: number;
+  currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
+}
+
+export interface DailyAmount {
+  date: string; // ISO date yyyy-MM-dd
+  amount: number;
+}
+
+/** Month to date. `billed` = issued invoices (not DRAFT/VOID/CANCELLED) by
+ * invoice date; `collected` = received payments by payment date. `*PreviousPeriod`
+ * covers the same days of last month. `billedByDay` runs `periodStart`..`asOf`,
+ * zero-filled — group it into weeks client-side. */
+/**
+ * A Revenue-tab reporting period: `YYYY-MM` (month), `YYYY-Qn` (quarter),
+ * `YYYY-YTD` (year to date; a past year's is the whole year) or `YYYY` (full
+ * year). Omit for the current month to date. Tenant-local; a period that
+ * contains today stops at today; a future one or a bad format is a 400.
+ */
+export type ReportingPeriodParam = string;
+
+/** What the billed delta is measured against; `basis` null (and `billed` null) when nothing is. */
+export type RevenueComparisonBasis = 'sameDaysLastYear' | 'samePeriodLastYear' | 'previousMonth';
+
+export interface FinancialDashboardRevenue {
+  periodStart: string;
+  /** Last day counted: today for a current period, else the period's last day. */
+  asOf: string;
+  /** Where the period ends if it runs its course; equals `asOf` for a past period. */
+  periodEnd: string;
+  /** The period contains today. */
+  isCurrent: boolean;
+  /** Issued invoices by invoice date, total including tax. */
+  billed: number;
+  /** The previous period of the same kind, like for like. */
+  billedPreviousPeriod: number;
+  collected: number;
+  collectedPreviousPeriod: number;
+  /** One per day from `periodStart` to `asOf`, zero-filled. */
+  billedByDay: DailyAmount[];
+  comparison: { basis: RevenueComparisonBasis | null; billed: number | null };
+  currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
+}
+
+/** Open AR, **net of payments applied** (the customer ar-summary is face value,
+ * so the two can differ). Bucket counts match the invoice list's `agingBucket`
+ * filter; `overdue` is the four past-due buckets. `averageDaysToPay` is invoice
+ * date → payment over the last 30 days, null when nothing was paid. */
+export interface FinancialDashboardReceivables {
+  asOf: string;
+  outstanding: number;
+  overdue: ArAgingBucket;
+  current: ArAgingBucket;
+  days1To30: ArAgingBucket;
+  days31To60: ArAgingBucket;
+  days61To90: ArAgingBucket;
+  days91Plus: ArAgingBucket;
+  averageDaysToPay: number | null;
+  currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
+}
+
+/** `open*` = sent and not yet expired. The funnel is quotes FIRST SENT in the
+ * last 30 days, by current status. `winRate` is 0–1 (accepted ÷ decided), null
+ * when none decided. `viewed` and `averageDaysToDecision` only count from the
+ * backend deploy onward, so they under-count for the first 30 days. */
+export interface FinancialDashboardQuotes {
+  openCount: number;
+  openAmount: number;
+  sent: ArAgingBucket;
+  viewed: ArAgingBucket;
+  accepted: ArAgingBucket;
+  declined: ArAgingBucket;
+  winRate: number | null;
+  averageDaysToDecision: number | null;
+  currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
+}
+
+export const financialDashboardApi = {
+  getAttention: (params: DashboardScopeParams = {}) =>
+    dashboardGet<FinancialDashboardAttention>('/financial/dashboard/attention', params),
+
+  getRevenue: (params: { period?: ReportingPeriodParam } & DashboardScopeParams = {}) =>
+    dashboardGet<FinancialDashboardRevenue>('/financial/dashboard/revenue', params),
+
+  getReceivables: (params: DashboardScopeParams = {}) =>
+    dashboardGet<FinancialDashboardReceivables>('/financial/dashboard/receivables', params),
+
+  getQuotes: (params: DashboardScopeParams = {}) =>
+    dashboardGet<FinancialDashboardQuotes>('/financial/dashboard/quotes', params),
+};
+
+/** One calendar month's target. `amount` null = no target (never 0). */
+export interface MonthlyRevenueTarget {
+  /** 1–12. */
+  month: number;
+  amount: number | null;
+}
+
+/**
+ * A year of company-wide revenue targets: always 12 months, January first.
+ * Reading needs `VIEW_ALL_INVOICES` or `MANAGE_REVENUE_TARGETS`; a year never
+ * set comes back as 12 nulls, not a 404.
+ */
+export interface RevenueTargets {
+  year: number;
+  months: MonthlyRevenueTarget[];
+  /** Who last saved the year; null if never saved. */
+  updatedBy: string | null;
+  updatedByName: string | null;
+  updatedAt: string | null;
+  /** Year of the first billed invoice; null with none yet. Targets can be set
+   *  from it (this year when null) through next year. */
+  firstInvoiceYear: number | null;
+}
+
+/** A PUT's 400: `field` is `months.<1-12>.amount`, `months` or `year`. */
+export type RevenueTargetErrorCode =
+  | 'TARGET_ZERO'
+  | 'TARGET_NOT_POSITIVE'
+  | 'TARGET_TOO_LARGE'
+  | 'TARGET_TOO_PRECISE'
+  | 'INVALID_MONTHS'
+  | 'YEAR_OUT_OF_RANGE';
+
+export const revenueTargetsApi = {
+  get: async (year: number): Promise<RevenueTargets> => {
+    const response = await apiClient.get<RevenueTargets>('/financial/revenue-targets', { params: { year } });
+    return response.data;
+  },
+
+  /** Replaces the whole year (all 12 months; null clears one, all null clears
+   *  the year). Needs `MANAGE_REVENUE_TARGETS`. Returns the year as saved. */
+  replace: async (year: number, months: MonthlyRevenueTarget[]): Promise<RevenueTargets> => {
+    const response = await apiClient.put<RevenueTargets>(`/financial/revenue-targets/${year}`, { months });
+    return response.data;
   },
 };
 
@@ -844,6 +3448,62 @@ export const financialApi = {
   payments: paymentsApi,
   summary: financialSummaryApi,
   activity: financialActivityApi,
+  dashboard: financialDashboardApi,
+  revenueTargets: revenueTargetsApi,
 };
 
 export default financialApi;
+
+/** A location's or customer's quotes and invoices, together. One of the two scopes is required; both means that customer at that site. */
+export interface DocumentScope {
+  serviceLocationId?: string;
+  customerId?: string;
+}
+
+/**
+ * `open`: draft and sent quotes, accepted ones with something left to invoice, and draft, sent and
+ * overdue invoices. `all` and `invoice` leave out void and cancelled invoices.
+ */
+export type DocumentView = 'open' | 'all' | 'quote' | 'invoice';
+
+export interface ListDocumentsParams extends DocumentScope {
+  view?: DocumentView;
+  /** Document number, a quote's title, or the work order number. */
+  q?: string;
+  /**
+   * Open invoices (SENT, OVERDUE) by days past due, on top of `view` (send `view=invoice`). With
+   * `customerId`, only invoices billed to that customer, so the total matches its AR-summary bucket.
+   */
+  agingBucket?: InvoiceAgingBucket;
+  page?: number;
+  size?: number; // ≤ 200
+}
+
+/** Each row embeds the same row the quotes or invoices list returns. Order is fixed: drafts first, then by document date, newest first. */
+export type DocumentRow =
+  | { kind: 'QUOTE'; id: string; quote: QuoteListItem }
+  | { kind: 'INVOICE'; id: string; invoice: InvoiceListItemRow };
+
+/**
+ * Counts per view (each equals that view's `totalElements`) and the header figures, over the scope
+ * alone. `openQuotes` is DRAFT and SENT; `due` is what SENT and OVERDUE invoices still owe, and
+ * `overdue` the part of it past due.
+ */
+export interface DocumentViews {
+  counts: Record<DocumentView, number>;
+  openQuotes: { count: number; amount: number };
+  due: number;
+  overdue: number;
+}
+
+export const documentsApi = {
+  list: async (params: ListDocumentsParams): Promise<FinancialPage<DocumentRow>> => {
+    const response = await apiClient.get<FinancialPage<DocumentRow>>('/financial/documents', { params });
+    return response.data;
+  },
+
+  getViews: async (scope: DocumentScope): Promise<DocumentViews> => {
+    const response = await apiClient.get<DocumentViews>('/financial/documents/views', { params: scope });
+    return response.data;
+  },
+};

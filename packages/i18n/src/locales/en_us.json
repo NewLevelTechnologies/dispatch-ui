@@ -37,6 +37,59 @@
     "verify": "Verify",
     "verifyCodeFailed": "Could not verify that code."
   },
+  "callbacks": {
+    "agreementVisit": "{{agreement}} visit",
+    "and": "and",
+    "backTitle": "Callbacks",
+    "backToSuggestions": "← Suggestions",
+    "callbackOf": "Callback of",
+    "change": "Change",
+    "chargesNobody": "No {{tech, lowercase}} arrived on the original {{entity, lowercase}}, so this callback isn't charged to anyone.",
+    "chipLabel": "Callback of {{number}}",
+    "completed": "Completed {{date}}",
+    "consequence": "Link it only if our earlier work didn't hold. A callback counts against the {{techs, lowercase}} on the original {{entity, lowercase}}.",
+    "countedFor": "Counted for {{names}}",
+    "countsFor": "Counts as a callback for",
+    "countsForShort": "Counts for",
+    "daysAfter_one": "{{count}} day after completion",
+    "daysAfter_other": "{{count}} days after completion",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago",
+    "formerUser": "Former user",
+    "isThisOne": "Is this a callback?",
+    "label": "Callback",
+    "link": "Link",
+    "linkAsCallback": "Link as callback…",
+    "linkFailed": "Couldn't update the callback link",
+    "linkIt": "Link it",
+    "linkOther": "Link a different {{entity, lowercase}}…",
+    "linkWorkOrder": "Link a {{entity, lowercase}}",
+    "linkedBy": "Linked by {{name}} · {{time}}",
+    "newWork": "No, it's new work",
+    "noMatches": "No completed {{entities, lowercase}} match “{{q}}”.",
+    "notACallback": "Not a callback.",
+    "notACallbackAction": "Not a callback",
+    "notLinkedYet": "Not linked to an earlier {{entity, lowercase}} yet.",
+    "nothingRecent": "Nothing was completed at this {{location, lowercase}} or on its {{equipment, lowercase}} in the last 30 days.",
+    "onTechProductivity": "on {{tech}} productivity.",
+    "openedBy": "Opened {{date}} by {{name}}",
+    "question": "Is this a callback of an earlier {{entity, lowercase}}?",
+    "quietQuestion": "Callback of an earlier {{entity, lowercase}}?",
+    "recentOnEquipment_one": "{{count}} on the same {{equipment, lowercase}}",
+    "recentOnEquipment_other": "{{count}} on the same {{equipment, lowercase}}",
+    "recent_one": "{{count}} {{entity, lowercase}} was completed here in the last 30 days",
+    "recent_other": "{{count}} {{entities, lowercase}} were completed here in the last 30 days",
+    "review": "Review",
+    "sameEquipment": "Same {{equipment, lowercase}}",
+    "sameLocation": "Same {{location, lowercase}}",
+    "searchAnyDate": "Search completed {{entities, lowercase}} from any date.",
+    "searchPlaceholder": "{{entity}} number, {{location, lowercase}}, or description…",
+    "searchTitle": "Link a callback to an earlier {{entity, lowercase}}",
+    "typeIndependent": "The link is what counts, not the type.",
+    "typeStays": "Type stays {{type}}. The link is what counts.",
+    "unlink": "Unlink",
+    "unlinked": "Unlinked from {{number}}"
+  },
   "common": {
     "accountManagerPicker": {
       "noResults": "No users match \"{{query}}\".",
@@ -84,9 +137,9 @@
     "builtIn": "Built-in",
     "cancel": "Cancel",
     "clear": "Clear",
-    "customer": "Customer",
+    "customer": "{{customer}}",
     "id": "ID",
-    "serviceLocation": "Service location",
+    "serviceLocation": "{{location}}",
     "close": "Close",
     "cloning": "Cloning...",
     "create": "Create",
@@ -119,7 +172,7 @@
       "addressLine2": "Address Line 2",
       "afterHoursPhone": "After-Hours Phone",
       "billingAddress": "Billing Address",
-      "billingAddressSameAsService": "Send invoice to same address",
+      "billingAddressSameAsService": "Send {{invoice, lowercase}} to same address",
       "city": "City",
       "code": "Code",
       "color": "Color",
@@ -157,6 +210,8 @@
       "stateHelper": "CA",
       "status": "Status",
       "streetAddress": "Street Address",
+      "successCreate": "{{entity}} created",
+      "successUpdate": "{{entity}} updated",
       "taxExempt": "Tax Exempt",
       "taxExemptCertificate": "Tax Exempt Certificate",
       "timezone": "Timezone",
@@ -190,10 +245,183 @@
     "update": "Update",
     "updateStatus": "Update {{entity, lowercase}} status"
   },
+  "agreements": {
+    "list": {
+      "cell": {
+        "behind_one": "{{count}} behind",
+        "behind_other": "{{count}} behind",
+        "cancelledOn": "Cancelled {{date}}",
+        "dueBy": "Due by {{date}}",
+        "endedOn": "Ended {{date}}",
+        "finalTerm": "Final term",
+        "locations_one": "{{count}} {{locations}}",
+        "locations_other": "{{count}} {{locations}}",
+        "manualRenewal": "Manual renewal",
+        "noBilling": "No billing set up",
+        "noPlannedVisits": "No planned visits",
+        "notGenerated": "Not yet generated",
+        "onTrack": "On track",
+        "perMonth": "/mo",
+        "plan": "{{plan}} plan",
+        "renewalBooked": "Renewal booked · to {{date}}",
+        "renewsIn_one": "in {{count}} day",
+        "renewsIn_other": "in {{count}} days",
+        "started": "Started {{date}}",
+        "startedBy": "Started by {{name}}, {{date}}",
+        "termPassed": "Past its term end",
+        "unassigned": "Unassigned",
+        "unscheduled": "Unscheduled",
+        "visitsOf": "of {{planned}}"
+      },
+      "csv": {
+        "billingAmount": "Billing amount",
+        "billingCadence": "Billing cadence",
+        "endedOn": "Ended on",
+        "export": "Export",
+        "exporting": "Exporting…",
+        "failed": "Couldn't export",
+        "monthly": "Monthly value",
+        "name": "Name",
+        "nextWorkOrder": "Next visit {{workOrder}}",
+        "no": "No",
+        "number": "Number",
+        "termEnd": "Term end",
+        "visitsCompleted": "Visits completed",
+        "visitsPlanned": "Visits planned",
+        "yes": "Yes"
+      },
+      "emptyHint": "Add one from a {{customer}}'s {{agreements}} tab.",
+      "filters": {
+        "clear": "Clear filters",
+        "noBilling": "No billing set up",
+        "plan": "Plan",
+        "planAny": "Any plan",
+        "planCustom": "Custom (no plan)",
+        "renewing": "Renewing in {{days}} days",
+        "statusAll": "All",
+        "statusAllShortcut": "All {{agreements}}",
+        "visitsBehind": "Visits behind"
+      },
+      "menu": {
+        "cancel": "Cancel…",
+        "cancelBody": "Ends the {{agreement}} mid-term. {{workOrder}} and {{invoice, lowercase}} history are kept; new {{workOrders}} stop generating.",
+        "cancelConfirm": "Cancel {{agreement}}",
+        "cancelFailed": "Couldn't cancel the {{agreement}}",
+        "cancelTitle": "Cancel {{number}}?",
+        "cancelled": "{{number}} cancelled",
+        "open": "Open",
+        "renew": "Renew…",
+        "setUpBilling": "Set up billing"
+      },
+      "search": "Search by {{agreement}}, {{customer}} or {{location}}…",
+      "status": {
+        "ACTIVE": "Active",
+        "CANCELLED": "Cancelled",
+        "DRAFT": "Draft",
+        "EXPIRED": "Expired",
+        "SUSPENDED": "Suspended"
+      },
+      "table": {
+        "autoRenews": "Auto-renews",
+        "nextVisit": "Next visit",
+        "openEnded": "Open-ended",
+        "renews": "Renews",
+        "status": "Status",
+        "value": "Value",
+        "visits": "Visits this term"
+      }
+    },
+    "page": {
+      "active_one": "{{count}} active",
+      "active_other": "{{count}} active",
+      "recurring": "{{amount}}/mo recurring",
+      "renewing_one": "{{count}} renewing in {{days}} days",
+      "renewing_other": "{{count}} renewing in {{days}} days",
+      "visitsTab": "Visits to schedule"
+    },
+    "renew": {
+      "booked": "Renewal booked: {{number}} runs to {{date}}",
+      "bookedHint": "The current term runs to {{date}}, then the new one starts. Nothing changes until then.",
+      "endAfterCurrent": "Must be after {{date}}",
+      "endAfterToday": "Must be after today",
+      "expiredHint": "Makes it active again with a term starting {{date}}. {{workOrders}} and billing for windows that already closed aren't created.",
+      "failed": "Couldn't renew the {{agreement}}",
+      "nowHint": "The term ended {{date}}, so the new one starts now. {{workOrders}} and billing for windows that already closed aren't created.",
+      "price": "Price {{cadence}}",
+      "priceHint": "Now {{amount}}. Leave blank to keep it.",
+      "rebookHint": "Renewal booked to {{date}}, starting {{end}}. Change the end or price, or cancel the renewal.",
+      "renewed": "{{number}} renewed to {{date}}",
+      "startsOn": "Starts {{date}}",
+      "submit": "Renew",
+      "submitBooked": "Book renewal",
+      "submitRebook": "Update renewal",
+      "termEnd": "New term ends",
+      "title": "Renew {{number}}",
+      "unbook": "Cancel renewal",
+      "unbookFailed": "Couldn't cancel the renewal",
+      "unbooked": "Renewal cancelled for {{number}}"
+    },
+    "visits": {
+      "empty": {
+        "body": "No visit due in the next {{days}} days is waiting on a {{dispatch}}.",
+        "title": "Every visit due soon is scheduled"
+      },
+      "filters": {
+        "days_one": "Next {{count}} day",
+        "days_other": "Next {{count}} days",
+        "within": "Due"
+      },
+      "loadFailed": "Couldn't load the visits to schedule.",
+      "pending": "{{workOrder}} not created yet",
+      "pendingHint": "The nightly job creates each visit's {{workOrder}} and will retry. If this stays, tell support.",
+      "schedule": "Schedule",
+      "state": {
+        "open_one": "Window closes tomorrow",
+        "open_other": "Window open · {{count}} days left",
+        "overdue_one": "Overdue 1 day",
+        "overdue_other": "Overdue {{count}} days",
+        "upcoming_one": "Opens tomorrow",
+        "upcoming_other": "Opens in {{count}} days"
+      },
+      "table": {
+        "visit": "Visit",
+        "window": "Window"
+      }
+    }
+  },
   "approvals": {
+    "price": {
+      "approved": "{{number}} price approved",
+      "approvedSends": "It’s being sent to the customer now.",
+      "changed": "Changed since asked",
+      "changedBody": "The {{quote, lowercase}} was edited after this was asked, so it can’t be approved. The advisor needs to ask again.",
+      "header": "{{name}} asks to approve a price",
+      "inPerson": "For signing in person",
+      "margin": "Margin after savings",
+      "marginValue": "{{margin}}, under the {{floor}} floor",
+      "quote": "{{quote}}",
+      "rejected": "{{number}} price rejected",
+      "rowSummary": "Price below the floor · {{margin}} vs {{floor}}",
+      "section": "Prices",
+      "sendsOnApproval": "Sends to the customer once approved",
+      "someone": "Someone",
+      "status": {
+        "APPROVED": "Approved",
+        "CANCELLED": "Withdrawn",
+        "PENDING": "Pending",
+        "REJECTED": "Rejected"
+      },
+      "title": "Title",
+      "total": "Total",
+      "waiting": "Waiting on a manager who can approve {{quotes, lowercase}}.",
+      "withdraw": "Withdraw the request",
+      "withdrawFailed": "Couldn’t withdraw the request",
+      "withdrawn": "Request withdrawn",
+      "workflowSection": "Status changes"
+    },
     "title": "Approvals",
     "subtitle": "Work item transitions waiting on your sign-off · expiries auto-reject if untouched",
-    "filteredByWorkOrder": "Filtered by work order",
+    "filteredByWorkOrder": "Filtered by {{workOrder, lowercase}}",
     "tabs": {
       "pending": "Pending",
       "myRequests": "My requests",
@@ -210,7 +438,7 @@
     "detail": {
       "header": "{{name}} requested an approval",
       "workflowName": "{{workflow}} workflow",
-      "workOrder": "Work order",
+      "workOrder": "{{workOrder}}",
       "workItem": "Work item",
       "reasonFromRequester": "Reason from requester",
       "notApprover": "You don't have the capability to approve this transition. The request is visible here for reference.",
@@ -319,7 +547,7 @@
   },
   "customers": {
     "agedBadge": "91+ aged",
-    "agedBadgeAria": "Has invoices aged 91 or more days",
+    "agedBadgeAria": "Has {{invoices, lowercase}} aged 91 or more days",
     "category": {
       "billingOnly": "Bill-only",
       "commercial": "Commercial",
@@ -367,7 +595,7 @@
       "all": "All",
       "allStatuses": "All Statuses",
       "openBalance": "Open balance",
-      "openJobs": "Open jobs",
+      "openJobs": "Open {{workOrders, lowercase}}",
       "status": "Status",
       "statusActive": "Active",
       "statusInactive": "Inactive",
@@ -380,20 +608,20 @@
     "subtitle": {
       "totalActive": "{{total}} total · {{active}} active"
     },
-    "entityToggleAria": "Switch between customers and payers",
+    "entityToggleAria": "Switch between {{customers, lowercase}} and {{payers, lowercase}}",
     "form": {
       "accessInstructionsOptional": "Access Instructions (optional)",
       "accessInstructionsPlaceholder": "e.g., Use back entrance, gate code 1234",
       "billingAddressHelp": "Check this if invoices should be sent to the service address",
       "billingAddressSection": "Billing Address",
-      "billingInvoiceRecipient": "Invoice Recipient",
-      "billingOnlyConversionBlocked": "Delete this customer's service location(s) before converting to Bill-only.",
-      "billingOnlyHeading": "Bill-only customer — Billing address",
-      "billingOnlyHint": "Invoiced only — no service address. Use for warranty companies, property managers, and other third-party payers.",
+      "billingInvoiceRecipient": "{{invoice}} Recipient",
+      "billingOnlyConversionBlocked": "Delete this {{customer, lowercase}}'s {{locations, lowercase}} before converting to Bill-only.",
+      "billingOnlyHeading": "Bill-only {{customer, lowercase}} — Billing address",
+      "billingOnlyHint": "Invoiced only — no service address. Use for warranty companies, property managers, and other third-party {{payers, lowercase}}.",
       "businessDetails": "Business Details",
       "companyName": "Company/Name *",
-      "customerTypeBillingOnly": "Bill-only customer",
-      "customerTypeStandard": "Service customer",
+      "customerTypeBillingOnly": "Bill-only {{customer, lowercase}}",
+      "customerTypeStandard": "Service {{customer, lowercase}}",
       "locationNameHelp": "Optional - useful for businesses with multiple locations",
       "newWorkOrder": "New Work Order",
       "paymentTermsHelp": "0 = Due on receipt",
@@ -404,17 +632,17 @@
       "billingAddress": "Billing Address",
       "contact": "Contact",
       "customer": "Customer",
-      "jobsCount_one": "{{count}} job",
-      "jobsCount_other": "{{count}} jobs",
+      "jobsCount_one": "{{count}} {{workOrder, lowercase}}",
+      "jobsCount_other": "{{count}} {{workOrders, lowercase}}",
       "location": "Location",
       "locationName": "Location Name",
       "locationAddress": "Address",
       "locationContact": "Contact",
       "locations": "Locations",
-      "locationsCount": "{{count}} locations",
+      "locationsCount": "{{count}} {{locations, lowercase}}",
       "moreLocations": "+{{count}} more",
       "none": "None",
-      "openJobs": "Open jobs",
+      "openJobs": "Open {{workOrders, lowercase}}",
       "tags": "Tags",
       "terms": "Terms",
       "type": "Type"
@@ -426,19 +654,247 @@
     }
   },
   "dashboard": {
-    "stats": {
-      "activeWorkOrders": "Active work orders",
-      "thisMonth": "This month",
-      "totalCustomers": "Total customers"
+    "activity": {
+      "empty": "No activity yet.",
+      "error": "Couldn't load activity",
+      "title": "Activity"
     },
-    "welcome": "Welcome to Dispatch"
+    "attention": {
+      "actions": {
+        "review": "Review",
+        "schedule": "Schedule",
+        "view": "View"
+      },
+      "partialError": "Some counts couldn't load.",
+      "quietBody": "Today's work is released, and nothing is waiting on you or past due.",
+      "quietTitle": "Nothing needs you right now",
+      "releaseConfirmBody": "This sends {{parts}} to {{techs, lowercase}} working today. It can't be undone.",
+      "rows": {
+        "approvals_one": "approval waiting on you",
+        "approvals_other": "approvals waiting on you",
+        "overdueMeta": "{{amount}} past due",
+        "overdue_one": "{{entity, lowercase}} overdue",
+        "overdue_other": "{{entity, lowercase}} overdue",
+        "poLate_one": "purchase order past ETA",
+        "poLate_other": "purchase orders past ETA",
+        "unbilled_one": "completed {{entity, lowercase}} not yet invoiced",
+        "unbilled_other": "completed {{entity, lowercase}} not yet invoiced",
+        "unreleased_one": "{{entity, lowercase}} staged but not released",
+        "unreleased_other": "{{entity, lowercase}} staged but not released",
+        "unscheduled_one": "{{entity, lowercase}} waiting to be scheduled",
+        "unscheduled_other": "{{entity, lowercase}} waiting to be scheduled",
+        "visitsMeta": "Window starts within {{days}} days, overdue included",
+        "visits_one": "{{entity, lowercase}} visit due soon, unscheduled",
+        "visits_other": "{{entity, lowercase}} visits due soon, unscheduled"
+      },
+      "thisWeek": "This week",
+      "title": "Needs attention",
+      "today": "Today"
+    },
+    "board": {
+      "all": "All {{entities, lowercase}}",
+      "done": "Done",
+      "empty": "No {{entities, lowercase}} are booked today.",
+      "error": "Couldn't load today's board",
+      "next": "next {{time}}",
+      "openBoard": "Open board",
+      "showing": "Showing {{shown}} of {{total}}",
+      "since": "since {{time}}",
+      "title": "Today's board",
+      "whosWhere": "Who's where"
+    },
+    "greeting": {
+      "afternoon": "Good afternoon",
+      "afternoonNamed": "Good afternoon, {{name}}",
+      "evening": "Good evening",
+      "eveningNamed": "Good evening, {{name}}",
+      "morning": "Good morning",
+      "morningNamed": "Good morning, {{name}}"
+    },
+    "kpis": {
+      "arrivalHit": "Arrival window hit",
+      "completed": "Completed",
+      "error": "Couldn't load",
+      "jobsToday": "{{dispatches}} today",
+      "last7Days": "last 7 days",
+      "noArrivals": "no arrivals in 7 days",
+      "of": "of {{count}}",
+      "sameAsLastWeek": "same as last {{weekday}}",
+      "techsMeta": "{{off}} off · {{idle}} idle",
+      "techsOnRoad": "{{entities}} on the road",
+      "vsLastWeek": "vs last {{weekday}}"
+    },
+    "newWorkOrder": "New {{entity, lowercase}}",
+    "period": {
+      "groups": {
+        "month": "Month",
+        "quarter": "Quarter",
+        "year": "Year"
+      },
+      "hints": {
+        "lastMonth": "Last month",
+        "lastQuarter": "Last quarter",
+        "lastYear": "Last year",
+        "thisMonth": "This month",
+        "thisQuarter": "This quarter",
+        "yearToDate": "Year to date"
+      },
+      "label": "Period",
+      "toDate": {
+        "month": "month to date",
+        "quarter": "quarter to date",
+        "year": "year to date",
+        "ytd": "year to date"
+      },
+      "toDateTitle": {
+        "month": "Month to date",
+        "quarter": "Quarter to date",
+        "year": "Year to date",
+        "ytd": "Year to date"
+      }
+    },
+    "revenue": {
+      "aging": {
+        "avgDaysToPay": "Avg days to pay · 30d",
+        "current": "Current",
+        "days1To30": "1–30 days",
+        "days31To60": "31–60 days",
+        "days61Plus": "61+ days",
+        "days_one": "{{count}} day",
+        "days_other": "{{count}} days",
+        "report": "Aging report",
+        "title": "Receivables aging"
+      },
+      "agreements": {
+        "active": "Active",
+        "all": "All {{entities, lowercase}}",
+        "perMonthValue": "{{amount}}/mo",
+        "planned": "Planned visits this month",
+        "recurring": "Recurring / mo",
+        "remaining": "{{remaining}} remaining · {{unscheduled}} unscheduled",
+        "renewing": "Renewing · {{days}}d"
+      },
+      "asOfToday": "As of today",
+      "byMonth": {
+        "title": "Revenue by month"
+      },
+      "byWeek": {
+        "empty": "Nothing invoiced in {{period}}.",
+        "soFar": "so far",
+        "title": "Revenue by week"
+      },
+      "chart": {
+        "invoiced": "Invoiced",
+        "monthsHit_one": "{{hit}} of {{count}} month hit target",
+        "monthsHit_other": "{{hit}} of {{count}} months hit target",
+        "report": "Revenue report",
+        "setTargets": "Set targets",
+        "target": "Target",
+        "weeksHit_one": "{{hit}} of {{count}} week hit target",
+        "weeksHit_other": "{{hit}} of {{count}} weeks hit target"
+      },
+      "error": "Couldn't load",
+      "kpis": {
+        "active": "{{count}} active {{entities, lowercase}}",
+        "agreementRevenue": "{{entity}} revenue",
+        "collected": "Collected",
+        "collectedPct": "{{pct}}% of invoiced",
+        "collectedToDate": "Collected {{suffix}}",
+        "noComparison": "No prior-year data",
+        "ofTarget": "of {{amount}} target",
+        "openQuotes": "Open {{entities, lowercase}}",
+        "openQuotesCount": "{{count}} {{entities, lowercase}}",
+        "openQuotesMeta": "{{count}} {{entities, lowercase}} · {{rate}}% win rate, 30d",
+        "outstandingAr": "Outstanding AR",
+        "overdueDelta": "{{amount}} overdue",
+        "pastDue": "{{count}} {{entities, lowercase}} past due",
+        "perMonth": "/mo",
+        "revenue": "Revenue",
+        "revenueToDate": "Revenue {{suffix}}",
+        "vs": "vs {{label}}",
+        "vsSameDays": "vs same days {{label}}"
+      },
+      "quotes": {
+        "accepted": "Accepted",
+        "all": "All {{entities, lowercase}}",
+        "avgDecision": "Avg time to decision",
+        "declined": "Declined",
+        "report": "{{entities}} report",
+        "sent": "Sent",
+        "title": "{{entities}} · last 30 days",
+        "viewed": "Viewed"
+      },
+      "techs": {
+        "avgTicket": "Avg ticket",
+        "callbacks": "Callbacks",
+        "callbacksSince": "Callbacks · since {{date}}",
+        "differs": "{{label}} shows {{amount}}",
+        "drawer": {
+          "callback": "Callback",
+          "credited": "Credited",
+          "creditedRevenue": "Credited revenue",
+          "excluded": "Not included: {{parts}}.",
+          "invoiceTotal": "{{invoice}} total",
+          "invoicedHours": "Hours on invoiced {{workOrders, lowercase}}",
+          "issued": "Issued",
+          "notRecorded": "Not recorded",
+          "note": "Each {{invoice, lowercase}}'s total is split equally among the {{techs, lowercase}} who arrived on its {{workOrder, lowercase}}. Revenue per hour uses all of this {{tech, lowercase}}'s on-site time on those {{workOrders, lowercase}}, whenever it happened.",
+          "opened": "Opened",
+          "original": "Original {{entity, lowercase}}",
+          "perHour": "Per invoiced hr",
+          "period": "{{period}} · whole company",
+          "share": "1 of {{count}} · {{pct}}%",
+          "solo": "Solo",
+          "split": "Split",
+          "writtenBy": "Written by"
+        },
+        "empty": "No {{invoices, lowercase}} this month yet.",
+        "excluded": {
+          "agreement": "{{hours}} {{agreement, lowercase}}",
+          "billedEarlier": "{{hours}} billed earlier",
+          "billedLater": "{{hours}} billed later",
+          "notBilled": "{{hours}} not billed"
+        },
+        "excludedHint": "Not counted in revenue per hour:",
+        "excludedLong": {
+          "agreement": "{{hours}}h on {{agreement, lowercase}} visits",
+          "billedEarlier": "{{hours}}h on {{workOrders, lowercase}} invoiced before this period",
+          "billedLater": "{{hours}}h on {{workOrders, lowercase}} invoiced after this period",
+          "notBilled": "{{hours}}h on {{workOrders, lowercase}} not yet invoiced"
+        },
+        "firstVisit": "First-visit complete",
+        "foot": "Revenue is each {{invoice, lowercase}}'s total, split equally among the {{techs, lowercase}} who arrived on its {{workOrder, lowercase}}. Revenue per hour uses the hours on those same {{workOrders, lowercase}}, so {{agreement, lowercase}} visits and unbilled work don't count against anyone. First-visit complete excludes {{agreement, lowercase}} visits; callbacks count only links confirmed on the {{workOrder, lowercase}}.",
+        "formerUser": "Former user",
+        "jobs": "{{workOrders}}",
+        "matches": "Matches {{label}}",
+        "onSite": "On-site hrs",
+        "perHour": "Revenue / invoiced hr",
+        "report": "{{tech}} productivity report",
+        "revenue": "Revenue",
+        "title": "{{tech}} productivity",
+        "total": "Total",
+        "unattributed": "Unattributed",
+        "unattributedSub": "{{noWorkOrder}} with no {{workOrder, lowercase}} · {{noTechArrived}} where no {{tech, lowercase}} arrived"
+      }
+    },
+    "scope": {
+      "all": "Whole company",
+      "label": "Scope",
+      "labelAll": "Scope: Whole company"
+    },
+    "sub": "{{date}} · Today",
+    "subToDate": "{{period}} · {{toDate}}",
+    "tabs": {
+      "operations": "Operations",
+      "revenue": "Revenue & productivity"
+    }
   },
   "entities": {
     "agreement": "Agreement",
     "agreements": "Agreements",
     "customer": "Customer",
     "customers": "Customers",
-    "dashboard": "Dashboard",
+    "dashboard": "Home",
     "dispatch": "Dispatch",
     "dispatches": "Dispatches",
     "division": "Division",
@@ -462,7 +918,6 @@
     "revenue": "Revenue",
     "role": "Role",
     "roles": "Roles",
-    "scheduling": "Scheduling",
     "serviceLocation": "Location",
     "serviceLocations": "Locations",
     "settings": "Settings",
@@ -471,6 +926,7 @@
     "users": "Users",
     "vendor": "Vendor",
     "vendors": "Vendors",
+    "work": "Work",
     "workOrder": "Work Order",
     "workOrders": "Work Orders"
   },
@@ -481,8 +937,9 @@
   },
   "serviceLocations": {
     "actions": {
-      "close": "Close Location",
-      "closeConfirm": "Are you sure you want to close {{name}}? This location will no longer be available for new work orders."
+      "close": "Close {{location}}",
+      "closeConfirm": "Are you sure you want to close {{name}}? This location will no longer be available for new work orders.",
+      "closed": "{{location}} closed"
     },
     "activity": {
       "audit": {
@@ -494,7 +951,7 @@
         "hideDiff": "Hide",
         "object": {
           "address": "address",
-          "location": "location details",
+          "location": "{{location, lowercase}} details",
           "siteContact": "site contact"
         },
         "showDiff": "Show change"
@@ -506,11 +963,6 @@
         "all": "All",
         "changes": "Changes",
         "notes": "Notes"
-      },
-      "financial": {
-        "paid": "Invoice {{invoice}} paid · {{amount}}",
-        "sent": "Invoice {{invoice}} sent · {{amount}}",
-        "viewJob": "View {{entity}}"
       },
       "heading": "Activity",
       "loadMore": "Load more",
@@ -549,13 +1001,13 @@
     },
     "filter": {
       "all": "All",
-      "allRegions": "All regions",
+      "allRegions": "All {{regions, lowercase}}",
       "allStatuses": "All statuses",
       "business": "Business",
-      "live": "Tech on site",
-      "openJobs": "Open jobs",
+      "live": "{{technician}} on site",
+      "openJobs": "Open {{workOrders, lowercase}}",
       "overdue": "Visit overdue",
-      "region": "Region",
+      "region": "{{region}}",
       "residence": "Residence",
       "status": "Status",
       "statusActive": "Active",
@@ -564,7 +1016,7 @@
       "tags": "Tags"
     },
     "search": {
-      "placeholder": "Search by address, customer, contact, phone…"
+      "placeholder": "Search by address, {{customer, lowercase}}, contact, phone…"
     },
     "subtitle": {
       "totalActiveAcrossCustomers": "{{total}} total · {{active}} active · across {{customers}} customers"
@@ -583,8 +1035,8 @@
       "location": "Location",
       "locationName": "Location Name",
       "neverServiced": "Never",
-      "newCustomer": "New customer",
-      "region": "Region",
+      "newCustomer": "New {{customer, lowercase}}",
+      "region": "{{region}}",
       "tags": "Tags",
       "type": "Type"
     },
@@ -607,8 +1059,8 @@
       "descriptionPlaceholder": "Add a description…",
       "editLifecycleFullPage": "Edit specs, warranty & dates on full page →",
       "editOnFullPage": "Edit on full page →",
-      "editScopeHint": "Applies to this equipment everywhere",
-      "editScopeReminder": "Editing the equipment record — changes apply everywhere this equipment appears, on every work order.",
+      "editScopeHint": "Applies to this {{equipment, lowercase}} everywhere",
+      "editScopeReminder": "Editing the {{equipment, lowercase}} record — changes apply everywhere this {{equipment, lowercase}} appears, on every {{workOrder, lowercase}}.",
       "filtersNone": "None on file",
       "identification": "Identification",
       "installed": "Installed",
@@ -621,7 +1073,7 @@
       "noUnits": "No {{entities, lowercase}} on this system",
       "photos": "Photos",
       "profileImageAlt": "{{name}} profile image",
-      "scopeReminder": "This is the equipment record — notes & photos here follow it across every work order, not just this job.",
+      "scopeReminder": "This is the {{equipment, lowercase}} record — notes & photos here follow it across every {{workOrder, lowercase}}, not just this one.",
       "serial": "Serial",
       "tabComingSoon": "Coming soon.",
       "type": "Type",
@@ -680,10 +1132,10 @@
       "errorUpdate": "Failed to update note",
       "heading": "Notes",
       "headingWithCount": "Notes ({{count}})",
-      "helper": "Saved with this equipment, not this work order",
-      "none": "No notes on this equipment yet.",
+      "helper": "Saved with this {{equipment, lowercase}}, not this {{workOrder, lowercase}}",
+      "none": "No notes on this {{equipment, lowercase}} yet.",
       "systemAuthor": "System",
-      "viewAll": "{{count}} more on the equipment page"
+      "viewAll": "{{count}} more on the {{equipment, lowercase}} page"
     },
     "filters": {
       "addFilter": "Add Filter",
@@ -721,7 +1173,7 @@
       "allTypes": "All Types"
     },
     "search": {
-      "placeholder": "Search by serial number, model, or location…"
+      "placeholder": "Search by serial number, model, or {{location, lowercase}}…"
     },
     "picker": {
       "clear": "Clear selection",
@@ -803,11 +1255,13 @@
   "invoices": {
     "description": "Manage customer invoices and billing",
     "filters": {
+      "any": "Any",
       "anyStatus": "Any status",
-      "issued": "Issued"
-    },
-    "search": {
-      "placeholder": "Search by {{entity, lowercase}} #, {{customer, lowercase}}, or amount…"
+      "issued": "Issued",
+      "noDivision": "No {{division}}",
+      "noRegion": "No {{region}}",
+      "noType": "No {{workOrder, lowercase}} type",
+      "type": "{{workOrder}} type"
     },
     "form": {
       "addLineItem": "Add Line Item",
@@ -822,13 +1276,17 @@
       "removeLineItem": "Remove",
       "subtotal": "Subtotal",
       "taxAmount": "Tax Amount",
-      "taxRate": "Tax Rate (%)",
       "totalAmount": "Total Amount",
       "unitPrice": "Unit Price",
       "workOrder": "Work Order (Optional)"
     },
+    "notSent": "Not sent",
+    "search": {
+      "placeholder": "Search by {{entity, lowercase}} #, {{customer, lowercase}}, or amount…"
+    },
     "status": {
       "all": "All",
+      "billed": "Billed",
       "cancelled": "Cancelled",
       "draft": "Draft",
       "overdue": "Overdue",
@@ -840,8 +1298,8 @@
       "balanceDue": "Balance Due",
       "customer": "Customer",
       "dueDate": "Due Date",
-      "invoiceDate": "Invoice Date",
-      "invoiceNumber": "Invoice Number",
+      "invoiceDate": "{{invoice}} Date",
+      "invoiceNumber": "{{invoice}} Number",
       "status": "Status",
       "totalAmount": "Total"
     }
@@ -937,12 +1395,12 @@
       "tags": "Tags"
     },
     "search": {
-      "placeholder": "Search payers…"
+      "placeholder": "Search {{payers, lowercase}}…"
     },
     "table": {
       "dueOnReceipt": "Due on receipt",
       "in91": "{{amount}} in 91+",
-      "lastPayment": "Last payment",
+      "lastPayment": "Last {{payment, lowercase}}",
       "lifetimePaid": "Lifetime paid",
       "net": "Net {{days}}",
       "openInvoices": "Open inv.",
@@ -952,17 +1410,21 @@
     }
   },
   "payments": {
-    "description": "Track customer payments and transactions",
-    "search": {
-      "placeholder": "Search by reference, {{customer, lowercase}}, or {{invoice, lowercase}} #…"
+    "description": "Track {{customer, lowercase}} {{payments, lowercase}} and transactions",
+    "filters": {
+      "anyMethod": "Any method",
+      "anyStatus": "Any status",
+      "noMatch": "No {{entities}} match these filters",
+      "onePayer": "One {{payer, lowercase}}",
+      "received": "Received"
     },
     "form": {
       "amount": "Amount",
       "balance": "Balance",
-      "invoice": "Invoice",
-      "invoiceBalance": "Invoice balance",
-      "paymentDate": "Payment Date",
-      "paymentMethod": "Payment Method",
+      "invoice": "{{invoice}}",
+      "invoiceBalance": "{{invoice}} balance",
+      "paymentDate": "{{payment}} Date",
+      "paymentMethod": "{{payment}} Method",
       "paymentNumber": "Payment Number",
       "referenceNumber": "Reference Number"
     },
@@ -975,20 +1437,32 @@
       "other": "Other",
       "wireTransfer": "Wire Transfer"
     },
+    "search": {
+      "placeholder": "Search by {{entity, lowercase}} #, check #, or payer…"
+    },
+    "status": {
+      "RECEIVED": "Received",
+      "VOID": "Void"
+    },
     "table": {
       "amount": "Amount",
-      "customer": "Customer",
-      "invoice": "Invoice",
+      "appliedTo": "Applied to",
       "method": "Method",
+      "ofTotal": "of {{amount}}",
+      "payer": "{{payer}}",
       "paymentDate": "Date",
-      "paymentNumber": "Payment #",
-      "reference": "Reference"
+      "paymentNumber": "{{payment}} #",
+      "receivedBy": "Received by",
+      "reference": "Reference",
+      "unapplied": "Unapplied"
     }
   },
   "public": {
     "common": {
       "logoAlt": "{{name}} logo",
       "contactPhone": " at {{phone}}",
+      "previewBody": "This is what {{customer}} will see. Nothing here can be approved or paid, and opening it doesn't count as a view.",
+      "previewTitle": "Preview",
       "retry": "Try again",
       "slowLoad": "Still loading — this is taking longer than usual.",
       "theSender": "the sender"
@@ -1000,22 +1474,20 @@
       "contact": "Please contact the company that sent this to you for an updated link."
     },
     "invoice": {
-      "loading": "Loading invoice…",
-      "label": "Invoice",
+      "loading": "Loading {{invoice, lowercase}}…",
+      "label": "{{invoice}}",
       "amountDue": "Amount due",
       "amountPaid": "Amount paid",
       "dueOn": "Due {{date}}",
       "billedTo": "Billed to",
-      "invoiceDate": "Invoice date",
+      "invoiceDate": "{{invoice}} date",
       "items": "Items",
       "subtotal": "Subtotal",
-      "tax": "Tax",
-      "taxWithRate": "Tax ({{rate}}%)",
       "total": "Total",
       "paid": "Paid",
       "balanceDue": "Balance due",
       "notes": "Notes",
-      "paymentsReceived": "Payments received",
+      "paymentsReceived": "{{payments}} received",
       "paymentVoided": "Voided",
       "paymentMethod": {
         "CASH": "Cash",
@@ -1026,9 +1498,9 @@
         "WIRE_TRANSFER": "Wire transfer",
         "OTHER": "Other"
       },
-      "voidedHeadline": "This invoice has been voided",
-      "voidedSubline": "Please contact {{tenant}} for the current invoice.",
-      "questions": "Questions about this invoice?",
+      "voidedHeadline": "This {{invoice, lowercase}} has been voided",
+      "voidedSubline": "Please contact {{tenant}} for the current {{invoice, lowercase}}.",
+      "questions": "Questions about this {{invoice, lowercase}}?",
       "contactCta": "Contact {{tenant}}",
       "status": {
         "draft": "Draft",
@@ -1040,20 +1512,36 @@
       }
     },
     "quote": {
-      "loading": "Loading quote…",
-      "label": "Quote",
-      "total": "Total",
-      "validThrough": "Valid through {{date}}",
-      "expiredOn": "Expired {{date}}",
-      "quotedTo": "Quoted to",
-      "quoteDate": "Quote date",
-      "items": "Items",
-      "subtotal": "Subtotal",
-      "tax": "Tax",
-      "taxWithRate": "Tax ({{rate}}%)",
-      "notes": "Notes",
-      "questions": "Questions about this quote?",
+      "approve": "Approve {{quote, lowercase}}",
+      "approveBody": "{{tenant}} will be notified and will contact you to schedule the work.",
+      "approveCancel": "Not yet",
+      "approveConfirm": "Yes, approve",
+      "approveConsent": "I approve {{quote, lowercase}} #{{number}} for {{total}}.",
+      "approveError": "Something went wrong. Try again.",
+      "approveTitle": "Approve {{quote, lowercase}} #{{number}} for {{total}}?",
+      "approved": "You approved this {{quote, lowercase}}",
+      "approvedBody": "{{tenant}} has been notified and will be in touch to schedule the work.",
+      "approvedOn": "Approved {{date}}",
+      "approvedOnBy": "Approved {{date}} by {{name}}",
+      "approverName": "Your name",
+      "approverNamePlaceholder": "Full name",
+      "approving": "Approving…",
+      "beingUpdated": "This {{quote, lowercase}} is being updated",
+      "beingUpdatedBody": "{{tenant}} is making changes. You'll get the updated {{quote, lowercase}} when it's ready.",
       "contactCta": "Contact {{tenant}}",
+      "declined": "Declined",
+      "declinedBody": "Questions, or changed your mind? Contact {{tenant}}.",
+      "declinedOn": "Declined {{date}}",
+      "expiredBody": "This {{quote, lowercase}} expired {{date}}. Contact {{tenant}} for an updated {{quote, lowercase}}.",
+      "items": "Items",
+      "label": "{{quote}}",
+      "loading": "Loading {{quote, lowercase}}…",
+      "notApprovable": "This {{quote, lowercase}} can't be approved anymore. Contact {{tenant}} if you have questions.",
+      "notes": "Notes",
+      "questions": "Questions about this {{quote, lowercase}}?",
+      "quoteDate": "{{quote}} date",
+      "quotedTo": "Quoted to",
+      "revisionStale": "This {{quote, lowercase}} was just updated. Review the new version before approving.",
       "status": {
         "draft": "Draft",
         "pending": "Pending",
@@ -1061,7 +1549,160 @@
         "declined": "Declined",
         "cancelled": "Cancelled",
         "expired": "Expired"
-      }
+      },
+      "subtotal": "Subtotal",
+      "total": "Total",
+      "validThrough": "Valid through {{date}}"
+    },
+    "document": {
+      "adjustment": {
+        "amountOff": "{{amount}} off",
+        "percentOff": "{{percent}} off",
+        "waived": "Waived"
+      },
+      "reason": {
+        "DISCRETIONARY": "Discount",
+        "GOODWILL": "Courtesy",
+        "INCENTIVE": "Incentive",
+        "MEMBER": "Member",
+        "OTHER": "Discount",
+        "PROMOTION": "Promotion",
+        "REPAIR_APPROVED": "Repair approved"
+      },
+      "tax": "Tax",
+      "taxExempt": "Tax (exempt)",
+      "taxNamed": "Tax · {{name}}",
+      "youSave": "You save"
+    },
+    "proposal": {
+      "addOn": "Add-on",
+      "addons": {
+        "add": "Add",
+        "addLabel": "Add {{name}}",
+        "added": "Added",
+        "included": "Included with {{option}}",
+        "lede": "Optional extras for {{option}}. Add any you like; your total updates as you go.",
+        "ledeRecommended": "Optional extras for {{option}}. {{advisor}} recommends some based on what they found at your home.",
+        "recommended": "Recommended for your home",
+        "removeLabel": "Remove {{name}}",
+        "title": "Make it yours"
+      },
+      "approve": "Approve & sign",
+      "approveShort": "Approve",
+      "approving": "Approving…",
+      "back": "Back",
+      "call": "Call {{name}} · {{phone}}",
+      "cartSaving": "You’re saving",
+      "club": {
+        "add": "Add {{name}}",
+        "added": "{{name}} added",
+        "benefit": {
+          "labor": "{{pct}} off labor",
+          "parts": "{{pct}} off parts",
+          "trip": "No trip charges"
+        },
+        "billedSeparately": "billed separately",
+        "cardSaves": "Save {{amount}} more with {{name}}",
+        "eyebrow": "Membership",
+        "fine": "Billed separately from this proposal. {{tenant}} sets up your membership after you sign.",
+        "lede": "Members pay less on this job, and on every visit after.",
+        "price": "{{amount}} / {{every}}",
+        "saves": "Join today and save {{amount}} on this job.",
+        "title": "Protect your investment",
+        "welcome": "Welcome to the club: {{tenant}} will set up your membership and be in touch."
+      },
+      "continue": "Continue",
+      "continueTo": "Continue to {{step}}",
+      "deals": {
+        "approveBy": "approve by {{date}}",
+        "ends": "ends {{date}}",
+        "endsToday": "ends today",
+        "off": "off"
+      },
+      "decideToday": "Decide-today savings",
+      "done": {
+        "lede": "{{tenant}} has your signed {{quote, lowercase}} and will be in touch to schedule the work.",
+        "questions": "Questions? {{tenant}} · {{phone}}",
+        "signatureAlt": "{{name}}’s signature",
+        "signedBy": "Signed by {{name}} · {{date}}",
+        "signedCopy": "Your signed copy",
+        "signedInPerson": "Signed in person by {{name}} with {{witness}} · {{date}}",
+        "title": "You’re all set, {{name}}."
+      },
+      "exit": "Back to the quote",
+      "expired": {
+        "body": "It expired on {{date}}, so the prices may have changed. Ask {{advisor}} to refresh it.",
+        "title": "This {{quote, lowercase}} has expired"
+      },
+      "hidePackage": "Hide package",
+      "included": "Included",
+      "includedWith": "Included with {{option}}",
+      "noSignPermission": "Your role can’t take signatures. Ask someone who can approve quotes.",
+      "notice": {
+        "marginApproval": "This choice is under the margin floor. Ask a manager to approve the price on the quote, then sign.",
+        "saveFailed": "We couldn’t save that choice. Check your connection and try again.",
+        "slowDown": "That was a lot of changes at once. Wait a moment, then try again.",
+        "totalChanged": "The total changed since you looked. Check the new figure and sign again."
+      },
+      "number": "{{quote}} #{{number}}",
+      "options": {
+        "lede": "{{advisor}} put these together for you. Pick the one that fits.",
+        "title_one": "Hi {{name}}, here’s your option.",
+        "title_other": "Hi {{name}}, here are {{count}} ways to go."
+      },
+      "package": "Your package",
+      "pay": {
+        "authorizeMonthly": "You chose to pay {{monthly}} a month on {{plan}}, subject to approval.",
+        "doneBody": "You chose {{plan}}, about {{monthly}} a month. {{tenant}} will be in touch to set it up.",
+        "doneTitle": "Your payment plan",
+        "fine": "Payment plans are subject to approval. Monthly payments are estimates on the total shown, before any rebate.",
+        "fromMonthly": "or from {{monthly}}/mo",
+        "full": "Pay in full",
+        "fullSub": "Card, bank transfer or check",
+        "orMonthly": "or {{monthly}}/mo · {{plan}}",
+        "perMonth": "/mo",
+        "terms_one": "{{apr}} APR · {{count}} month",
+        "terms_other": "{{apr}} APR · {{count}} months",
+        "title": "How would you like to pay?"
+      },
+      "popular": "Most popular",
+      "preparedFor": "Prepared for",
+      "previewHint": "Preview: the customer chooses and signs on their own link.",
+      "questions": "Questions?",
+      "questionsFor": "Questions? Call {{name}}",
+      "rebate": "Plus an estimated {{amount}} rebate, paid to you",
+      "rebateNote": "Plus an estimated {{amount}} rebate, paid to you after the work. It isn’t taken off your total.",
+      "review": {
+        "approveTitle": "Approve and sign",
+        "authorize": "By signing, you authorize {{tenant}} to do the work above for {{total}}. Proposal {{number}}, valid through {{date}}.",
+        "clear": "Clear",
+        "consent": "I agree to the terms of this proposal from {{tenant}}.",
+        "lede": "Everything in one place. Change anything by going back a step.",
+        "name": "Your name",
+        "signHere": "Sign here with your finger",
+        "signatureLabel": "Signature",
+        "title": "Review & approve"
+      },
+      "saving": "Saving {{amount}}",
+      "select": "Select {{name}}",
+      "selected": "Selected",
+      "signHint": "Sign and check the box to approve.",
+      "stepOf": "Step {{step}} of {{count}}",
+      "steps": {
+        "addons": "Add-ons",
+        "options": "Options",
+        "protect": "Protect",
+        "review": "Review"
+      },
+      "stepsLabel": "Proposal steps",
+      "tax": "Tax",
+      "total": "Total",
+      "updating": "Updating your total…",
+      "validThrough": "Prices valid through {{date}}.",
+      "viewPackage": "View package",
+      "with": "with {{name}}",
+      "youSave": "You save {{amount}}",
+      "youreSaving": "You’re saving {{amount}}"
     }
   },
   "capabilities": {
@@ -1081,8 +1722,12 @@
   },
   "quotes": {
     "description": "Create and manage customer quotes",
-    "search": {
-      "placeholder": "Search by {{entity, lowercase}} #, {{customer, lowercase}}, or amount…"
+    "filters": {
+      "anyStatus": "Any status",
+      "noMatch": "No {{entities}} match these filters",
+      "sent": "Sent",
+      "sentBy": "Sent by {{name}}",
+      "sentByOne": "One sender"
     },
     "form": {
       "addLineItem": "Add Line Item",
@@ -1096,9 +1741,11 @@
       "removeLineItem": "Remove",
       "subtotal": "Subtotal",
       "taxAmount": "Tax Amount",
-      "taxRate": "Tax Rate (%)",
       "totalAmount": "Total Amount",
       "unitPrice": "Unit Price"
+    },
+    "search": {
+      "placeholder": "Search by {{entity, lowercase}} # or {{customer, lowercase}}…"
     },
     "status": {
       "accepted": "Accepted",
@@ -1112,6 +1759,7 @@
       "expirationDate": "Expires",
       "quoteDate": "Quote Date",
       "quoteNumber": "Quote #",
+      "sentBy": "Sent by",
       "status": "Status",
       "totalAmount": "Total"
     }
@@ -1185,7 +1833,7 @@
       "editTitle": "Edit {{name}}",
       "errorEmptyCapabilities": "Pick at least one capability. A role with zero capabilities can't grant access.",
       "namePlaceholder": "e.g. Refund Approver",
-      "performsFieldWorkHint": "Users in this role can be assigned to work orders and appear in dispatch-board pickers.",
+      "performsFieldWorkHint": "Users in this role can be assigned to {{workOrders, lowercase}} and appear in {{dispatch, lowercase}}-board pickers.",
       "performsFieldWorkLabel": "Performs field work",
       "removalWarningArea": "{{area}}: removing {{count}} capability",
       "removalWarningArea_other": "{{area}}: removing {{count}} capabilities",
@@ -1242,10 +1890,6 @@
     "search": {
       "placeholder": "Search roles…"
     },
-    "sort": {
-      "users": "Users (desc)",
-      "label": "Sort by"
-    },
     "summary": {
       "builtIn": "Built-in",
       "custom": "Custom",
@@ -1274,99 +1918,851 @@
     }
   },
   "reports": {
+    "agreements": {
+      "bridge": {
+        "end": "Recurring at the end of {{date}}",
+        "hint": "Start plus every line is the end. Pick a line to list its events",
+        "line": "Movement",
+        "monthly": "Per month",
+        "renewedSub": "{{auto}} auto · {{manual}} manual. Only a price change or a revival moves the total",
+        "start": "Recurring at the start of {{date}}",
+        "title": "Recurring revenue, start to end"
+      },
+      "csv": {
+        "after": "Monthly after",
+        "before": "Monthly before",
+        "change": "Change",
+        "number": "{{entity}} #"
+      },
+      "events": {
+        "by": "By",
+        "date": "Date",
+        "event": "Event",
+        "hint": "Newest first, renewal bookings included",
+        "loadFailed": "Couldn't load the events",
+        "none": "Nothing happened in this range.",
+        "showAll": "Show every event",
+        "title": "Events"
+      },
+      "exportFailed": "Couldn't export the events",
+      "exported": "Exported {{file}} · {{count}} events",
+      "kind": {
+        "ACTIVATED": "Activated",
+        "CANCELLED": "Cancelled",
+        "EXPIRED": "Expired",
+        "RENEWAL_BOOKED": "Renewal booked",
+        "RENEWAL_CANCELLED": "Renewal cancelled",
+        "RENEWED": "Renewed",
+        "RENEWED_AUTO": "Renewed automatically",
+        "RENEWED_MANUAL": "Renewed by hand",
+        "REPRICED": "Repriced",
+        "RESUMED": "Resumed",
+        "RETURNED_TO_DRAFT": "Returned to draft",
+        "SUSPENDED": "Suspended"
+      },
+      "line": {
+        "cancelled": "Cancelled",
+        "expired": "Expired",
+        "new": "New",
+        "renewed": "Renewed",
+        "repriced": "Repriced",
+        "resumed": "Resumed",
+        "returnedToDraft": "Returned to draft",
+        "suspended": "Suspended"
+      },
+      "loadFailed": "Couldn't load the {{entities}} report",
+      "noComparison": "Nothing to compare before {{date}}",
+      "sub": "{{range}} · {{dates}}. Recurring revenue per month, and what moved it. The end matches Home.",
+      "subToDate": "{{range}} · {{dates}}, to date. Recurring revenue per month, and what moved it. The end matches Home.",
+      "summary": {
+        "count": "{{count}} {{entities}}",
+        "net": "Net change",
+        "netSub": "From {{amount}} a month",
+        "netUnknown": "History begins {{date}}",
+        "recurring": "Recurring per month at the end",
+        "visits": "Visits completed",
+        "visitsSub": "{{completed}} of {{planned}} · {{missed}} missed"
+      },
+      "untracked": "History begins {{date}}. Before then the starting figure isn't known, so the bridge can't be drawn for this range."
+    },
+    "alsoFromHome": "Also opens from Home: {{where}}",
+    "arrivals": {
+      "chart": {
+        "day": "On time by day",
+        "month": "On time by month",
+        "week": "On time by week"
+      },
+      "csv": {
+        "arrived": "Arrived",
+        "minutesLate": "Minutes late",
+        "windowEnd": "Window end",
+        "windowStart": "Window start"
+      },
+      "empty": {
+        "body": "Nothing was booked in {{range}}.",
+        "title": "No {{dispatches}} in this range"
+      },
+      "exportFailed": "Couldn't export the late arrivals",
+      "exported": "Exported {{file}} · {{count}} late arrivals",
+      "groupBy": {
+        "none": "Nothing"
+      },
+      "late": {
+        "arrived": "Arrived",
+        "clearTech": "Show everyone",
+        "hint": "Latest first",
+        "lateBy": "Late by",
+        "loadFailed": "Couldn't load the late arrivals",
+        "none": "Nobody arrived after their window in this range.",
+        "noneForTech": "{{name}} wasn't late in this range.",
+        "onlyTech": "Only {{name}}",
+        "title": "Late arrivals",
+        "window": "Window"
+      },
+      "loadFailed": "Couldn't load the arrival report",
+      "sub": "{{range}} · {{dates}}. On time is arriving by the window's end. Same rule as Home.",
+      "subToDate": "{{range}} · {{dates}}, to date. On time is arriving by the window's end. Same rule as Home.",
+      "summary": {
+        "arrived": "Arrived",
+        "arrivedSub": "of {{count}} {{dispatches}} booked",
+        "averageLate": "Average late by",
+        "averageLateSub": "Over late arrivals only",
+        "late": "Late",
+        "onTime": "On time"
+      },
+      "table": {
+        "arrived": "Arrived",
+        "hintRegion": "Pick one to scope the report to it",
+        "hintTech": "Pick one to list their late arrivals",
+        "late": "Late",
+        "onTime": "On time",
+        "title": "On time by {{group}}",
+        "visits": "Booked"
+      },
+      "title": "Arrival windows",
+      "unassigned": "No {{tech}}"
+    },
     "backToReports": "Back to Reports",
-    "description": "Operational, financial, and equipment reports.",
+    "callbacks": {
+      "csv": {
+        "originalCompleted": "Original completed",
+        "raised": "Raised"
+      },
+      "exportFailed": "Couldn't export the callbacks",
+      "exported": "Exported {{file}} · {{count}} callbacks",
+      "groupBy": {
+        "none": "Nothing",
+        "originalDivision": "Original {{workOrder, lowercase}}'s {{division}}",
+        "originalType": "Original {{workOrder}} type"
+      },
+      "list": {
+        "callback": "Callback",
+        "charged": "Charged to",
+        "completedOn": "Completed {{date}}",
+        "daysBetween": "Days after",
+        "hint": "Newest first",
+        "linkedBy": "Linked by",
+        "loadFailed": "Couldn't load the callbacks",
+        "none": "No callbacks were raised in this range.",
+        "original": "Original {{workOrder, lowercase}}",
+        "originalGone": "Original {{workOrder}} removed",
+        "title": "Callbacks"
+      },
+      "loadFailed": "Couldn't load the callbacks report",
+      "nobodyArrived": "No {{tech}} arrived on the original",
+      "sub": "{{range}} · {{dates}}. Confirmed callbacks raised in the range, charged to every {{tech}} who arrived on the original {{workOrder, lowercase}}.",
+      "subToDate": "{{range}} · {{dates}}, to date. Confirmed callbacks raised in the range, charged to every {{tech}} who arrived on the original {{workOrder, lowercase}}.",
+      "summary": {
+        "count": "Callbacks",
+        "daysBetween": "Average days after",
+        "daysBetweenNone": "No original with a completion date",
+        "daysBetweenSub": "From the original {{workOrder}}'s completion"
+      },
+      "table": {
+        "hint": "By the original {{workOrder, lowercase}}. Pick one to list its callbacks",
+        "hintTech": "A callback with two {{tech}}s counts for both. Pick one to list theirs"
+      },
+      "title": "Callbacks",
+      "untracked": "Callback linking began {{date}}. Before then, zero means nothing was linked, not that nothing came back."
+    },
+    "catalog": {
+      "agreements": {
+        "description": "Recurring revenue's movement (new, renewed, repriced, cancelled, expired) from start to end, with visit completion. The end matches Home.",
+        "name": "{{agreements}}"
+      },
+      "arrivals": {
+        "description": "On-time arrival by {{tech, lowercase}} and {{region, lowercase}}, with every late visit listed. Same rule as Home's arrival card.",
+        "name": "Arrival windows"
+      },
+      "callbacks": {
+        "description": "Every confirmed callback with its original {{workOrder, lowercase}}, the {{techs, lowercase}} charged and the days between. A {{tech, lowercase}}'s count matches Tech productivity.",
+        "name": "Callbacks"
+      },
+      "discounts": {
+        "description": "Every price reduction on billed {{invoices, lowercase}}, by reason, who gave it, {{customer, lowercase}} or line type. Member savings are counted on their own.",
+        "name": "Discounts & concessions"
+      },
+      "filter-pull-list": {
+        "description": "The filters each {{tech, lowercase}} pulls for tomorrow's {{dispatches, lowercase}}, from the board, with a company total. Print and tape to the truck before heading out.",
+        "name": "Filter Pull List"
+      },
+      "jobs-completed": {
+        "description": "Completed {{workOrders, lowercase}} and average ticket by type, {{division, lowercase}} or {{region, lowercase}}, by the day they were completed.",
+        "name": "{{workOrders}} completed"
+      },
+      "payments": {
+        "description": "Received {{payments, lowercase}} by method, {{payer, lowercase}} or day, for bank reconciliation. Totals match the Revenue report's collected.",
+        "name": "{{payments}} received"
+      },
+      "quotes": {
+        "description": "Sent, viewed, accepted and declined, by who sent them, with win rate and time to decision. Same rule as Home's {{quotes, lowercase}} card.",
+        "fromHome": "{{quotes}} card",
+        "name": "{{quotes}}"
+      },
+      "receivables": {
+        "description": "What was owed at the end of any day, aged from that day, with every open {{invoices, lowercase}} behind it. For month-end close.",
+        "fromHome": "Receivables aging card",
+        "name": "Receivables as of a date"
+      },
+      "revenue": {
+        "description": "Billed revenue over any range, by {{division, lowercase}}, {{workOrder, lowercase}} type or {{region, lowercase}}, compared with last year or the period before.",
+        "fromHome": "Revenue chart",
+        "name": "Revenue"
+      },
+      "sales-tax": {
+        "description": "Taxable, non-taxable and exempt sales with the tax collected, by jurisdiction and tax class, from what each {{invoice, lowercase}} line stored. For filing.",
+        "name": "Sales tax"
+      },
+      "tech-productivity": {
+        "description": "Home's {{tech, lowercase}} scorecard over any range, compared with last year or the period before, with a weekly trend per {{tech, lowercase}}.",
+        "fromHome": "{{tech}} productivity card",
+        "name": "{{tech}} productivity"
+      },
+      "unbilled": {
+        "description": "Accepted {{quotes, lowercase}} and job purchases that aren't on an issued {{invoice, lowercase}} yet, by {{workOrder, lowercase}}, source or age. As of today.",
+        "name": "Unbilled work"
+      }
+    },
+    "description": "Fixed reports with filters and export. Their numbers match Home.",
+    "discounts": {
+      "automatic": "Automatic",
+      "empty": {
+        "body": "No {{invoices}} billed in {{range}} had a discount or waive.",
+        "title": "No discounts in this range"
+      },
+      "exportFailed": "Couldn't export the discounts",
+      "exported": "Exported {{file}}",
+      "filters": {
+        "member": "Member savings"
+      },
+      "groupBy": {
+        "customer": "Bill-to {{customer, lowercase}}",
+        "givenBy": "Given by",
+        "lineType": "Line type",
+        "reason": "Reason"
+      },
+      "key": {
+        "automatic": "Automatic",
+        "feeWaived": "Fee waived",
+        "member": "Member · {{plan}}",
+        "unrecorded": "Not recorded",
+        "untyped": "No line type",
+        "wholeInvoice": "Whole invoice"
+      },
+      "list": {
+        "billTo": "Bill-to",
+        "billed": "Billed",
+        "failed": "Couldn't load the adjustments",
+        "line": "Line",
+        "range": "{{first}}–{{last}} of {{count}} adjustments",
+        "title": "{{group}} · every adjustment"
+      },
+      "loadFailed": "Couldn't load the discounts report",
+      "member": {
+        "exclude": "Exclude",
+        "include": "Include"
+      },
+      "sub": "{{range}} · {{dates}}. Every price reduction on {{invoices}} billed in the range, with its reason. Member savings come from agreements, not from a person, so they're shown separately.",
+      "subToDate": "{{range}} · {{dates}}, to date. Every price reduction on {{invoices}} billed in the range, with its reason. Member savings come from agreements, not from a person, so they're shown separately.",
+      "summary": {
+        "count_one": "{{count}} adjustment",
+        "count_other": "{{count}} adjustments",
+        "feesWaived": "Fees waived",
+        "member": "Member savings",
+        "memberSub": "Automatic, from agreements",
+        "ofList": "{{pct}} of list price · {{count}}",
+        "staff": "Given by staff",
+        "staffSub": "Manual discounts and waives",
+        "total": "Total reduced"
+      },
+      "table": {
+        "amount": "Amount",
+        "average": "Avg",
+        "count": "Adjustments",
+        "hint": "Pick a row to see its largest adjustments",
+        "onlyMember": "Only member savings in this range. Include them to see them.",
+        "viewAll": "View all"
+      },
+      "title": "Discounts & concessions"
+    },
     "empty": "No reports are available yet.",
-    "errorLoading": "Error loading report",
-    "filterPullList": {
-      "date": "Date",
-      "description": "Filter sizes and quantities needed for scheduled work orders. Print and tape to the truck before heading out.",
-      "empty": "No filters needed for {{date}}.",
-      "equipmentCount": "Equipment",
-      "from": "From",
-      "mode": "Date mode",
-      "mode_range": "Range",
-      "mode_single": "Single day",
-      "printContext": "For scheduled work on {{date}}",
-      "quantity": "Quantity",
-      "size": "Size",
-      "title": "Filter Pull List",
-      "to": "To",
-      "total": "Total filters: {{count}}"
+    "groups": {
+      "money": "Money",
+      "people": "People",
+      "sales": "Sales",
+      "work": "Work"
+    },
+    "jobs": {
+      "chart": {
+        "day": "Completed by day",
+        "month": "Completed by month",
+        "week": "Completed by week"
+      },
+      "empty": {
+        "body": "Nothing was completed in {{range}}.",
+        "title": "No {{entities}} completed in this range"
+      },
+      "exportFailed": "Couldn't export the report",
+      "exported": "Exported {{file}}",
+      "groupBy": {
+        "none": "Nothing"
+      },
+      "loadFailed": "Couldn't load the completed {{entities}}",
+      "sub": "{{range}} · {{dates}}. {{entities}} by the day they were completed, with everything billed on them.",
+      "subToDate": "{{range}} · {{dates}}, to date. {{entities}} by the day they were completed, with everything billed on them.",
+      "summary": {
+        "billedSub": "On these {{workOrders, lowercase}}, whatever the {{invoices}}' dates",
+        "jobs": "Completed",
+        "notBilledSub": "Left out of the average ticket",
+        "notBilledVisitsSub_one": "Left out of the average ticket, as is {{count}} {{agreement}} visit",
+        "notBilledVisitsSub_other": "Left out of the average ticket, as are {{count}} {{agreement}} visits"
+      },
+      "table": {
+        "averageTicket": "Average ticket",
+        "billed": "Billed",
+        "hint": "Pick one to list its {{entities}}",
+        "notBilled": "Not billed yet",
+        "perTech": "Per {{tech}}: {{technician}} productivity"
+      },
+      "title": "{{entities}} completed"
     },
     "loading": "Loading report…",
     "notFound": "That report does not exist.",
-    "print": "Print",
+    "payments": {
+      "chart": {
+        "day": "Received by day",
+        "month": "Received by month",
+        "week": "Received by week"
+      },
+      "csv": {
+        "inScope": "In scope"
+      },
+      "days": {
+        "byMethod": "By method",
+        "hint": "Each day split by method, to match deposits. Pick one to list its {{entities}}",
+        "title": "By day"
+      },
+      "empty": {
+        "body": "Nothing was received in {{range}}.",
+        "title": "No {{entities}} in this range"
+      },
+      "exportFailed": "Couldn't export the {{entities}}",
+      "exported": "Exported {{file}} · {{count}} {{entities}}",
+      "groupBy": {
+        "day": "Day",
+        "method": "Method",
+        "none": "Nothing",
+        "payer": "{{payer}}"
+      },
+      "loadFailed": "Couldn't load the {{entities}} report",
+      "sub": "{{range}} · {{dates}}. {{entities}} by date received. The Revenue report's collected, split.",
+      "subToDate": "{{range}} · {{dates}}, to date. {{entities}} by date received. The Revenue report's collected, split.",
+      "summary": {
+        "average": "Average {{entity, lowercase}}",
+        "received": "Received",
+        "voided": "Voided since",
+        "voidedSub": "{{count}} {{entities}} dated in the range"
+      },
+      "table": {
+        "hint": "Pick one to list its {{entities}}"
+      },
+      "title": "{{entities}} received"
+    },
+    "printList": "Print list",
+    "pullList": {
+      "companyTotal": "Company total",
+      "counts": {
+        "filters_one": "{{count}} filter",
+        "filters_other": "{{count}} filters",
+        "stops_one": "{{count}} stop",
+        "stops_other": "{{count}} stops",
+        "techs_one": "{{count}} {{tech, lowercase}}",
+        "techs_other": "{{count}} {{techs, lowercase}}"
+      },
+      "csv": {
+        "address": "Address",
+        "city": "City",
+        "date": "Date"
+      },
+      "days": {
+        "custom": "Dates",
+        "customOption": "Pick dates…",
+        "today": "Today",
+        "tomorrow": "Tomorrow"
+      },
+      "empty": {
+        "body": "The list is built from {{entities}} on the board. Nothing is dispatched for these days yet.",
+        "title": "Nothing on the board for {{days}}"
+      },
+      "export": "Export CSV",
+      "exportFailed": "Couldn't export the list. Try again.",
+      "exported": "Exported {{file}}",
+      "filters": {
+        "anyDivision": "Any {{division}}",
+        "anyType": "Any type",
+        "days": "Day",
+        "from": "From",
+        "problem": {
+          "order": "The end date is before the start date.",
+          "tooLong": "Pick a month or less."
+        },
+        "through": "through",
+        "to": "Through",
+        "type": "Type"
+      },
+      "loadFailed": "Couldn't load the pull list.",
+      "noFiltersAll": "None of these {{entities}} have filters on file.",
+      "noFiltersStop": "No filters on file",
+      "noFiltersTech": "No filters on file for these {{dispatches, lowercase}}.",
+      "print": "Print",
+      "pull": "Pull",
+      "regionTotal": "{{region}} total",
+      "stops": "Stops",
+      "table": {
+        "filters": "Filters",
+        "pulled": "Pulled",
+        "qty": "Qty",
+        "size": "Size",
+        "total": "Total",
+        "window": "Window"
+      },
+      "title": "Filter Pull List",
+      "totalHint": "Each {{entity}} counted once, however many {{techs, lowercase}} are on it.",
+      "unnamed": "Unnamed {{tech, lowercase}}"
+    },
+    "quotes": {
+      "csv": {
+        "decided": "Decided",
+        "firstSent": "First sent",
+        "number": "{{entity}} #",
+        "total": "Total",
+        "viewed": "Viewed"
+      },
+      "empty": {
+        "body": "Nothing was first sent in {{range}}.",
+        "title": "No {{entities}} sent in this range"
+      },
+      "exportFailed": "Couldn't export the {{entities}}",
+      "exported": "Exported {{file}} · {{count}} {{entities}}",
+      "funnel": {
+        "accepted": "Accepted",
+        "amount": "Amount",
+        "declined": "Declined",
+        "expired": "Expired",
+        "hint": "Counts open the {{entities}} behind them",
+        "open": "Still open",
+        "sent": "Sent",
+        "share": "Of sent",
+        "stage": "Stage",
+        "title": "Where they stand now",
+        "viewed": "Viewed"
+      },
+      "groupBy": {
+        "none": "Nothing",
+        "sender": "Sender"
+      },
+      "loadFailed": "Couldn't load the {{entities}} report",
+      "noSender": "Sender not recorded",
+      "senders": {
+        "decision": "Days to decide",
+        "hint": "Pick one to list their {{entities}}",
+        "title": "By who sent them"
+      },
+      "sub": "{{range}} · {{dates}}. {{entities}} first sent in the range, by where they stand now. Same rule as Home.",
+      "subToDate": "{{range}} · {{dates}}, to date. {{entities}} first sent in the range, by where they stand now. Same rule as Home.",
+      "summary": {
+        "decision": "Time to decision",
+        "decisionNone": "Nothing decided yet",
+        "open": "Still open",
+        "openSub": "{{count}} awaiting an answer",
+        "sent": "Sent",
+        "sentSub": "{{amount}} · {{vs}}",
+        "winRate": "Win rate"
+      }
+    },
+    "range": {
+      "backHome": "Home",
+      "compare": {
+        "none": "No comparison",
+        "previousPeriod": "Previous period",
+        "sameDatesLastYear": "Same period last year"
+      },
+      "filters": {
+        "compare": "Compare",
+        "custom": "Custom",
+        "customGroup": "Custom",
+        "customOption": "Custom range…",
+        "dates": "Dates",
+        "problem": {
+          "future": "The range starts after today.",
+          "order": "The end date is before the start date.",
+          "tooLong": "A range can be at most 3 years long."
+        },
+        "range": "Range"
+      },
+      "noComparison": {
+        "previousPeriod": "No data for the previous period",
+        "sameDatesLastYear": "No {{year}} data to compare"
+      },
+      "noComparisonPicked": "No comparison",
+      "vs": "vs {{window}}"
+    },
+    "receivables": {
+      "asOf": {
+        "lastMonthEnd": "End of last month",
+        "lastQuarterEnd": "End of last quarter",
+        "lastYearEnd": "End of last year",
+        "pick": "Pick a date…",
+        "today": "Today"
+      },
+      "buckets": {
+        "current": "Current",
+        "days1To30": "1–30 days",
+        "days31To60": "31–60 days",
+        "days61To90": "61–90 days",
+        "days91Plus": "91+ days"
+      },
+      "csv": {
+        "balanceOn": "Balance on {{date}}",
+        "bucket": "Age on {{date}}",
+        "daysPastDue": "Days past due on {{date}}",
+        "due": "Due",
+        "issued": "Issued"
+      },
+      "empty": {
+        "body": "Every {{invoice}} issued by {{date}} had been paid, voided or cancelled by the end of that day.",
+        "title": "Nothing was owed"
+      },
+      "filters": {
+        "asOf": "As of",
+        "date": "Date",
+        "future": "Pick today or an earlier day."
+      },
+      "list": {
+        "all": "Open {{invoices, lowercase}}",
+        "bucket": "Open {{invoices, lowercase}} · {{bucket}}"
+      },
+      "loadFailed": "Couldn't load receivables.",
+      "sub": "Owed at the end of {{date}}, aged from that day: {{invoices}} issued by then, less {{payments}} dated by then. Voids and cancellations count from the day they happened.",
+      "summary": {
+        "count_one": "{{count}} {{invoice}}",
+        "count_other": "{{count}} {{invoices}}",
+        "outstanding": "Outstanding",
+        "overdue": "Overdue",
+        "share": "{{pct}}% · {{detail}}"
+      },
+      "table": {
+        "age": "Age",
+        "amount": "Owed",
+        "balanceOn": "Balance {{date}}",
+        "daysPastDue": "Days past due",
+        "hint": "Open a row for its {{invoices}}; open it again for all of them.",
+        "title": "Aging"
+      },
+      "title": "Receivables"
+    },
+    "revenue": {
+      "chart": {
+        "day": "Daily revenue",
+        "month": "Monthly revenue",
+        "sameWeekdays": "{{window}}, same weekdays",
+        "week": "Weekly revenue"
+      },
+      "csv": {
+        "date": "Date",
+        "number": "{{entity}} number",
+        "subtotal": "Subtotal",
+        "tax": "Tax",
+        "total": "Total"
+      },
+      "empty": {
+        "body": "Nothing was billed in {{range}}.",
+        "title": "No {{entities}} in this range"
+      },
+      "export": "Export CSV",
+      "exportFailed": "Couldn't export the report",
+      "exported": "Exported {{file}} · {{count}} {{entities}}",
+      "exporting": "Exporting…",
+      "filters": {
+        "groupBy": "Group by"
+      },
+      "groupBy": {
+        "none": "None",
+        "noneOption": "None (list {{entities}})",
+        "workOrderType": "{{workOrder}} type"
+      },
+      "loadFailed": "Couldn't load the report",
+      "sub": "{{range}} · {{dates}}. Issued {{invoices, lowercase}} including tax; drafts and voided excluded.",
+      "subToDate": "{{range}} · {{dates}} · to date. Issued {{invoices, lowercase}} including tax; drafts and voided excluded.",
+      "summary": {
+        "collected": "Collected",
+        "revenue": "Revenue"
+      },
+      "table": {
+        "avg": "Avg {{entity, lowercase}}",
+        "change": "Change",
+        "hint": "Click a row to see its {{entities}}",
+        "issued": "Issued",
+        "listFailed": "Couldn't load {{entities}}",
+        "previewFailed": "Couldn't load these",
+        "range": "{{first}}–{{last}} of {{count}} {{entities}}",
+        "revenue": "Revenue",
+        "share": "Share",
+        "showing": "Showing {{shown}} of {{count}}",
+        "title": "By {{group}}",
+        "total": "Total",
+        "viewAll": "View all in {{entities}}"
+      },
+      "title": "Revenue",
+      "unassigned": "No {{group}}",
+      "unknown": "Unknown"
+    },
+    "salesTax": {
+      "basis": {
+        "cash": "Payment date (cash basis)",
+        "sent": "Invoice date",
+        "soon": "Soon"
+      },
+      "empty": {
+        "body": "No {{invoices}} were billed in {{range}}.",
+        "title": "No billed {{invoices}} in this range"
+      },
+      "exemptAccounts": "Exempt accounts",
+      "exportFailed": "Couldn't export the sales tax lines",
+      "exported": "Exported {{file}}",
+      "filters": {
+        "basis": "Basis"
+      },
+      "key": {
+        "legacy": "Before tax setup",
+        "none": "No jurisdiction",
+        "unclassified": "Unclassified"
+      },
+      "loadFailed": "Couldn't load the sales tax report",
+      "notSet": "Not set",
+      "notTaxedHere": "not taxed here",
+      "sub": "{{range}} · {{dates}}. {{invoices}} billed in the range, by the tax each line stored when it was written. Voids are excluded; a reissued invoice counts once. For filing, check against your accountant's basis (billed vs. paid).",
+      "subToDate": "{{range}} · {{dates}}, to date. {{invoices}} billed in the range, by the tax each line stored when it was written. Voids are excluded; a reissued invoice counts once. For filing, check against your accountant's basis (billed vs. paid).",
+      "summary": {
+        "exemptSub": "{{amount}} to exempt accounts",
+        "gross": "Gross sales",
+        "jurisdictions_one": "{{count}} jurisdiction",
+        "jurisdictions_other": "{{count}} jurisdictions",
+        "notTaxed": "Non-taxable + exempt",
+        "tax": "Tax collected",
+        "taxable": "Taxable"
+      },
+      "table": {
+        "exempt": "Exempt",
+        "gross": "Gross",
+        "hint": "Pick a jurisdiction to split it by tax class",
+        "jurisdiction": "Jurisdiction",
+        "nonTaxable": "Non-taxable",
+        "notTaxed": "Not taxed",
+        "rate": "Rate",
+        "tax": "Tax",
+        "taxable": "Taxable",
+        "title": "By jurisdiction"
+      },
+      "title": "Sales tax",
+      "warn": {
+        "mismatch": "{{count}} {{invoices}}' tax doesn't match their lines: {{numbers}}. Report this to support.",
+        "noRate": "{{name}} has no rate set, so {{amount}} of taxable sales collected no tax.",
+        "nowSet": "It's now set to {{rate}}.",
+        "setRate": "Set rate"
+      }
+    },
+    "techs": {
+      "csv": {
+        "agreement": "Hours on {{agreement, lowercase}} visits",
+        "billedEarlier": "Hours billed earlier",
+        "billedLater": "Hours billed later",
+        "comparison": {
+          "callbacks": "Callbacks, {{window}}",
+          "jobs": "{{workOrders}}, {{window}}",
+          "onSiteHours": "On-site hours, {{window}}",
+          "revenue": "Revenue, {{window}}"
+        },
+        "firstVisitCompleted": "First-visit completed",
+        "firstVisitEligible": "First-visit eligible",
+        "invoicedHours": "Hours on invoiced {{workOrders, lowercase}}",
+        "noTechArrived": "Unattributed: no {{tech, lowercase}} arrived",
+        "noWorkOrder": "Unattributed: no {{workOrder, lowercase}}",
+        "notBilled": "Hours not billed",
+        "onSiteHours": "On-site hours"
+      },
+      "empty": {
+        "body": "Nothing was billed in {{range}}.",
+        "title": "No {{invoices}} in this range"
+      },
+      "exportFailed": "Couldn't export the report. Try again.",
+      "exported": "Exported {{file}}",
+      "loadFailed": "Couldn't load the report.",
+      "sub": "{{range}} · {{dates}}. Each {{invoice, lowercase}}'s total split among the {{techs, lowercase}} who arrived; same numbers as Home.",
+      "subToDate": "{{range}} · {{dates}} · to date. Each {{invoice, lowercase}}'s total split among the {{techs, lowercase}} who arrived; same numbers as Home.",
+      "summary": {
+        "callbacksNone": "Tracked from {{date}}",
+        "callbacksSince": "Since {{date}}, when tracking started",
+        "callbacksSub": "Charged to {{techs, lowercase}}",
+        "credited": "Credited to {{techs, lowercase}}",
+        "creditedSub_one": "{{pct}}% of revenue · {{count}} {{tech, lowercase}}",
+        "creditedSub_other": "{{pct}}% of revenue · {{count}} {{techs, lowercase}}",
+        "unattributedSub": "No {{workOrder, lowercase}}, or no {{tech, lowercase}} arrived"
+      },
+      "table": {
+        "hint": "Open a {{tech, lowercase}} for the {{invoices, lowercase}} behind their figure.",
+        "title": "By {{tech, lowercase}}",
+        "trend": "Trend",
+        "trendBar_one": "{{window}}: {{revenue}} · {{count}} {{workOrder, lowercase}}",
+        "trendBar_other": "{{window}}: {{revenue}} · {{count}} {{workOrders, lowercase}}"
+      },
+      "title": "{{tech}} productivity"
+    },
     "title": "Reports",
-    "uncategorized": "Other"
+    "unbilled": {
+      "age": {
+        "DAYS_0_30": "0–30 days",
+        "DAYS_31_60": "31–60 days",
+        "DAYS_61_90": "61–90 days",
+        "DAYS_91_PLUS": "Over 90 days"
+      },
+      "basis": {
+        "BILL_PRICE": "Estimate: the PO line's bill price",
+        "COST": "Estimate: at cost (no bill price or markup)",
+        "MARKUP_TIER": "Estimate: the rate plan's markup on cost"
+      },
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "dismiss": {
+        "action": "Dismiss",
+        "body": "For work that will never go on an {{invoice}}, like warranty work. It applies for everyone and the reason is kept. It drops off this report.",
+        "confirm": "Dismiss",
+        "done": "{{name}} dismissed",
+        "failed": "Couldn't dismiss the item",
+        "placeholder": "e.g. Warranty part",
+        "reason": "Reason",
+        "title": "Dismiss {{name}}?"
+      },
+      "empty": {
+        "body": "Every accepted line and placed part is on an issued invoice.",
+        "title": "Nothing unbilled"
+      },
+      "exportFailed": "Couldn't export the unbilled work",
+      "exported": "Exported {{file}}",
+      "filters": {
+        "source": "Source"
+      },
+      "groupBy": {
+        "age": "Age",
+        "source": "Source"
+      },
+      "itemSource": {
+        "PO": "PO parts",
+        "QUOTE": "Accepted quotes"
+      },
+      "list": {
+        "age": "Age",
+        "billTo": "Bill-to",
+        "description": "Item",
+        "failed": "Couldn't load the items",
+        "range": "{{first}}–{{last}} of {{count}} items",
+        "since": "Since",
+        "source": "Source",
+        "title": "{{group}} · every item"
+      },
+      "loadFailed": "Couldn't load the unbilled work report",
+      "onDraft": "on draft",
+      "source": {
+        "all": "All",
+        "po": "PO parts",
+        "quote": "Accepted quotes"
+      },
+      "sub": "As of {{date}}. Work approved or bought that isn't on an issued {{invoice}} yet; a draft doesn't count. Amounts marked ≈ are estimates at the job's rate plan; the {{invoice}} prices them for real.",
+      "summary": {
+        "estimated": "PO parts",
+        "estimatedSub": "Estimated at the rate plan",
+        "items_one": "{{count}} item",
+        "items_other": "{{count}} items",
+        "over30": "Over 30 days",
+        "quoted": "Accepted quotes",
+        "total": "Unbilled total",
+        "totalSub": "{{items}} on {{count}} {{jobs}}"
+      },
+      "table": {
+        "actions": "Actions",
+        "hint": "Pick a row to see its oldest items",
+        "items": "Items",
+        "oldest": "Oldest",
+        "open": "Open",
+        "unbilled": "Unbilled",
+        "viewAll": "View all"
+      },
+      "title": "Unbilled work",
+      "today": "today"
+    }
   },
   "scheduling": {
-    "description": "Manage dispatches, availability, and recurring orders",
-    "descriptionDispatches": "Schedule and manage work order dispatches",
-    "descriptionAvailability": "Manage user availability schedules",
-    "descriptionRecurringOrders": "Manage recurring maintenance schedules",
-    "entities": {
-      "availability": "Availability",
-      "availabilityRecord": "Availability Record",
-      "dispatch": "Dispatch",
-      "dispatches": "Dispatches",
-      "recurringOrder": "Recurring Order",
-      "recurringOrders": "Recurring Orders"
-    },
     "form": {
-      "assignedUser": "Assigned User",
-      "customer": "Customer",
-      "date": "Date",
-      "descriptionPlaceholder": "Regular maintenance service",
-      "durationPlaceholder": "Minutes",
-      "endTime": "End Time",
-      "equipment": "Equipment",
-      "estimatedDuration": "Estimated Duration (minutes)",
-      "frequency": "Frequency",
-      "nextScheduledDate": "Next Scheduled Date",
-      "reason": "Reason",
-      "reasonPlaceholder": "e.g., Vacation, Training, Meeting",
-      "arrivalWindowStart": "Arrival Window Start",
-      "scheduledDate": "Scheduled Date",
-      "startTime": "Start Time",
-      "user": "User",
-      "workOrder": "Work Order"
-    },
-    "frequency": {
-      "annually": "Annually",
-      "monthly": "Monthly",
-      "quarterly": "Quarterly",
-      "weekly": "Weekly"
-    },
-    "status": {
-      "available": "Available",
-      "busy": "Busy",
-      "tentative": "Tentative",
-      "unavailable": "Unavailable"
-    },
-    "table": {
-      "assignedUser": "Assigned User",
-      "customer": "Customer",
-      "date": "Date",
-      "arrivalWindowStart": "Arrival Window",
-      "endTime": "End Time",
-      "equipment": "Equipment",
-      "estimatedDuration": "Duration",
-      "frequency": "Frequency",
-      "nextScheduled": "Next Scheduled",
-      "reason": "Reason",
-      "scheduledDate": "Scheduled",
-      "startTime": "Start Time",
-      "user": "User",
-      "workOrder": "Work Order"
+      "durationPlaceholder": "Minutes"
     }
   },
   "settings": {
+    "financing": {
+      "add": "New plan",
+      "col": {
+        "apr": "APR",
+        "label": "Plan",
+        "status": "Status",
+        "term": "Term"
+      },
+      "description": "Payment plans you offer. Proposals show a monthly payment for each; the {{customer, lowercase}} picks one and the office sets it up.",
+      "empty": {
+        "body": "Add your payment plans to show monthly payments on {{quotes, lowercase}}.",
+        "title": "No payment plans yet"
+      },
+      "form": {
+        "active": "On",
+        "activeHint": "Off stops offering it on proposals. There’s no delete.",
+        "addTitle": "New payment plan",
+        "apr": "APR (%)",
+        "aprHint": "0 for same-as-cash.",
+        "editTitle": "Edit {{name}}",
+        "label": "Name",
+        "months": "Months"
+      },
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months",
+      "off": "Off",
+      "on": "On",
+      "saveFailed": "Couldn’t save the plan",
+      "saved": "{{name}} saved",
+      "title": "Financing"
+    },
     "itemStatuses": {
       "builtInBadge": "Built-in",
       "builtInCantDelete": "Built-in statuses can't be deleted.",
-      "categoryChangedWarning": "Changing a built-in status's category may affect dispatch queue and progress rollups.",
-      "categoryHelper": "Groups statuses for the dispatch queue and progress rollups.",
+      "categoryChangedWarning": "Changing a built-in status's category may affect {{dispatch, lowercase}} queue and progress rollups.",
+      "categoryHelper": "Groups statuses for the {{dispatch, lowercase}} queue and progress rollups.",
       "codeHint": "Stable identifier. UPPERCASE_WITH_UNDERSCORES. Auto-generated from name.",
       "codeImmutable": "Code cannot be changed after creation.",
       "codeLockedHint": "Built-in status codes are stable identifiers used by reports and integrations. Rename it freely — the code stays.",
@@ -1374,7 +2770,7 @@
       "colCode": "Code",
       "colName": "Name",
       "colorConflict": "This color is already used by {{statusName}}. Pick a different color.",
-      "colorHint": "Shown on work item lists, the dispatch board, and reports.",
+      "colorHint": "Shown on {{workItem, lowercase}} lists, the {{dispatch, lowercase}} board, and reports.",
       "colorLabel": "Color",
       "colorTakenBy": "Used by {{name}}",
       "couldNotLoad": "Couldn't load {{workItem, lowercase}} statuses",
@@ -1399,7 +2795,7 @@
       "searchPlaceholder": "Search statuses…",
       "singular": "Status",
       "statusSingular": "Status",
-      "subtitle": "{{count}} statuses · used to track {{workItem, lowercase}} progress through dispatch and completion",
+      "subtitle": "{{count}} statuses · used to track {{workItem, lowercase}} progress through {{dispatch, lowercase}} and completion",
       "table": {
         "category": "Category",
         "terminal": "Terminal"
@@ -1490,7 +2886,7 @@
       "add": "Add size",
       "addRowLabel": "Add filter size — Length × Width × Thickness in inches",
       "clearSearch": "Clear search",
-      "deleteBody": "This size won't appear as a quick-add chip on equipment forms. Existing equipment records keep their dimensions.",
+      "deleteBody": "This size won't appear as a quick-add chip on {{equipment, lowercase}} forms. Existing {{equipment, lowercase}} records keep their dimensions.",
       "deleteTitle": "Delete \"{{name}}\"?",
       "description": "Common filter sizes that appear as quick-add chips on the equipment filters tab.",
       "dimAbbrev": {
@@ -1525,8 +2921,8 @@
       "seedSuccess_other": "{{count}} sizes added",
       "seedSkipped": "All common sizes are already in your list.",
       "size": "Size",
-      "subtitle_one": "{{count}} filter size · quick-add chips on equipment forms",
-      "subtitle_other": "{{count}} filter sizes · quick-add chips on equipment forms",
+      "subtitle_one": "{{count}} filter size · quick-add chips on {{equipment, lowercase}} forms",
+      "subtitle_other": "{{count}} filter sizes · quick-add chips on {{equipment, lowercase}} forms",
       "thickness": "Thickness (in)",
       "title": "Filter Sizes",
       "titleAdd": "Add Filter Size",
@@ -1545,10 +2941,10 @@
         "status": "Status"
       },
       "disableConfirm": {
-        "body": "Service locations and technicians assigned to \"{{name}}\" will lose their region. They'll appear in an Unassigned bucket on the {{dispatch, lowercase}} board until reassigned.",
+        "body": "{{locations}} and {{technicians, lowercase}} assigned to \"{{name}}\" will lose their {{region, lowercase}}. They'll appear in an Unassigned bucket on the {{dispatch, lowercase}} board until reassigned.",
         "title": "Disable \"{{name}}\"?"
       },
-      "emptyDescription": "Add a region to start organizing service locations and technicians on the {{dispatch, lowercase}} board.",
+      "emptyDescription": "Add a {{region, lowercase}} to start organizing {{locations, lowercase}} and {{technicians, lowercase}} on the {{dispatch, lowercase}} board.",
       "emptyTitle": "No {{regions, lowercase}} yet",
       "field": {
         "abbreviation": "Abbreviation",
@@ -1561,11 +2957,11 @@
       "titleAdd": "Add {{region}}",
       "titleEdit": "Edit {{region}}",
       "toast": {
-        "disabled": "Region disabled",
-        "disableFailed": "Couldn't disable region",
-        "enabled": "Region enabled",
-        "enableFailed": "Couldn't enable region",
-        "reorderFailed": "Couldn't reorder regions"
+        "disabled": "{{region}} disabled",
+        "disableFailed": "Couldn't disable {{region, lowercase}}",
+        "enabled": "{{region}} enabled",
+        "enableFailed": "Couldn't enable {{region, lowercase}}",
+        "reorderFailed": "Couldn't reorder {{regions, lowercase}}"
       }
     },
     "companyProfile": {
@@ -1587,7 +2983,7 @@
         "edit": "Edit"
       },
       "audience": {
-        "customer": "Customer",
+        "customer": "{{customer}}",
         "internal": "Internal"
       },
       "channel": {
@@ -1614,7 +3010,7 @@
       "loading": "Loading templates...",
       "nounPlural": "templates",
       "searchPlaceholder": "Search templates…",
-      "subtitle": "Customize the email and SMS messages sent to customers. Use Mustache variables like",
+      "subtitle": "Customize the email and SMS messages sent to {{customers, lowercase}}. Use Mustache variables like",
       "summary": "customized · {{systemDefault}} on system defaults",
       "versionShort": "v{{version}}",
       "status": {
@@ -1632,28 +3028,91 @@
     },
     "nav": {
       "companyProfile": "Company Profile",
+      "documents": "{{quotes}} & {{invoices, lowercase}}",
       "equipmentCategories": "Categories",
       "equipmentTaxonomy": "Types & Categories",
       "equipmentTypes": "Types",
       "filterSizes": "Filter Sizes",
+      "financing": "Financing",
       "general": "General",
       "itemStatuses": "Item Statuses",
+      "laborRates": "Labor rates",
       "notificationTemplates": "Notification Templates",
       "plans": "Plans",
+      "pricebook": "Pricebook",
+      "promotions": "Promotions",
+      "ratePlans": "Rate plans",
+      "revenueTargets": "Revenue Targets",
+      "tax": "Tax",
       "terminology": "Terminology",
       "types": "Types",
       "workflows": "Workflows"
     },
     "openNav": "Open settings menu",
     "planned": "Planned",
+    "promotions": {
+      "add": "New promotion",
+      "auto": "Auto",
+      "col": {
+        "covers": "Covers",
+        "dates": "Runs",
+        "name": "Promotion",
+        "offer": "Off",
+        "status": "Status"
+      },
+      "description": "Dated offers that come off proposals on their own, like “$500 off a new system”. Each {{quote, lowercase}} can still leave one off.",
+      "empty": {
+        "body": "Add one to show a saving on {{quotes, lowercase}} while it runs.",
+        "title": "No promotions yet"
+      },
+      "everything": "Every line",
+      "form": {
+        "active": "On",
+        "activeHint": "Off stops it applying anywhere. There’s no delete.",
+        "addTitle": "New promotion",
+        "amount": "Amount",
+        "amountOff": "$ off",
+        "autoApply": "Apply automatically",
+        "autoApplyHint": "On every proposal it covers, unless a quote leaves it off. Otherwise it’s applied per quote.",
+        "copy": "What the customer reads",
+        "covers": "Covers",
+        "coversHint": "Lines in these categories. None ticked: every line.",
+        "editTitle": "Edit {{name}}",
+        "ends": "Ends",
+        "itemsKept_one": "Also covers {{count}} item, kept as it was.",
+        "itemsKept_other": "Also covers {{count}} items, kept as they were.",
+        "kind": "Kind",
+        "minimum": "Only over",
+        "name": "Name",
+        "noCategories": "No pricebook categories yet.",
+        "noMinimum": "No minimum",
+        "percent": "Percent",
+        "percentOff": "% off",
+        "starts": "Starts"
+      },
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "loadFailed": "Couldn’t load promotions",
+      "over": "over {{amount}}",
+      "saveFailed": "Couldn’t save the promotion",
+      "saved": "{{name}} saved",
+      "status": {
+        "notInWindow": "Not running",
+        "off": "Off",
+        "onOffer": "On offer"
+      },
+      "title": "Promotions"
+    },
     "resetDefaults": "Reset to defaults",
     "saveChanges": "Save changes",
     "searchPlaceholder": "Search settings",
     "sections": {
       "access": "Access",
+      "billing": "Billing",
       "dispatch": "{{dispatch}}",
       "equipment": "{{equipment}}",
       "organization": "Organization",
+      "pricing": "Pricing",
       "workOrders": "{{workOrders}}"
     },
     "showingCount": "Showing {{count}} {{noun}}",
@@ -1711,29 +3170,29 @@
       "errorReorder": "Failed to reorder {{entity}}"
     },
     "divisions": {
-      "codeChangedWarning": "Changing the code may break integrations and reports that reference this division.",
+      "codeChangedWarning": "Changing the code may break integrations and reports that reference this {{division, lowercase}}.",
       "codeHint": "Stable identifier. UPPERCASE_WITH_UNDERSCORES. Auto-generated from name.",
       "codeImmutable": "Editing the code may break integrations and reports.",
       "colCode": "Code",
       "colName": "Name",
-      "couldNotLoad": "Couldn't load divisions",
+      "couldNotLoad": "Couldn't load {{divisions, lowercase}}",
       "deleteConfirm": "Delete \"{{name}}\"?",
-      "deleteWarning": "Customers, technicians, and work orders assigned to this division will become unassigned.",
+      "deleteWarning": "{{customers}}, {{technicians, lowercase}}, and {{workOrders, lowercase}} assigned to this {{division, lowercase}} will become unassigned.",
       "description": "Operating units (e.g., HVAC, Electrical, Plumbing) used to organize {{divisions}} and route work.",
-      "emptyDescription": "Add a division to split your dispatch board view by team, region, or service line.",
-      "emptyTitle": "No divisions yet",
-      "errorCreate": "Failed to create division",
-      "errorUpdate": "Failed to update division",
+      "emptyDescription": "Add a {{division, lowercase}} to split your {{dispatch, lowercase}} board view by team, {{region, lowercase}}, or service line.",
+      "emptyTitle": "No {{divisions, lowercase}} yet",
+      "errorCreate": "Failed to create {{division, lowercase}}",
+      "errorUpdate": "Failed to update {{division, lowercase}}",
       "form": {
-        "create": "Create division",
+        "create": "Create {{division, lowercase}}",
         "save": "Save changes",
-        "titleAdd": "Add Division",
+        "titleAdd": "Add {{division}}",
         "titleEdit": "Edit {{name}}"
       },
-      "noMatches": "No divisions match your search.",
+      "noMatches": "No {{divisions, lowercase}} match your search.",
       "rowsCount": "{{count}} {{noun}}",
-      "searchPlaceholder": "Search divisions…",
-      "subtitle": "{{count}} divisions · split the dispatch board view and segment reports"
+      "searchPlaceholder": "Search {{divisions, lowercase}}…",
+      "subtitle": "{{count}} {{divisions, lowercase}} · split the {{dispatch, lowercase}} board view and segment reports"
     },
     "workOrderTypes": {
       "addColorless": "Set up the {{count}} {{accents}} after adding the type.",
@@ -1744,7 +3203,7 @@
       "colCode": "Code",
       "colName": "Name",
       "colorConflict": "This color is already used by {{typeName}}. Pick a different color.",
-      "colorHint": "Shown on {{workOrder, lowercase}} lists, the dispatch board, and reports.",
+      "colorHint": "Shown on {{workOrder, lowercase}} lists, the {{dispatch, lowercase}} board, and reports.",
       "colorLabel": "Color",
       "colorTakenBy": "Used by {{name}}",
       "couldNotLoad": "Couldn't load {{workOrder, lowercase}} types",
@@ -1765,7 +3224,7 @@
       "rowsCount": "{{count}} {{noun}}",
       "searchPlaceholder": "Search types…",
       "singular": "Type",
-      "subtitle": "{{count}} types · used to classify {{workOrder, lowercase}}s in lists, the dispatch board, and reports"
+      "subtitle": "{{count}} types · used to classify {{workOrders, lowercase}} in lists, the {{dispatch, lowercase}} board, and reports"
     },
     "workflows": {
       "backToList": "Workflows",
@@ -1778,9 +3237,9 @@
       "couldNotLoad": "Couldn't load workflows",
       "editor": {
         "noStatuses": "No statuses available. Create item statuses first to define a workflow.",
-        "subtitle": "Click a cell to toggle whether items in the row status can transition to the column status. System actions (dispatch creation, completion, cancellation) also drive automatic changes — those don't appear in the matrix."
+        "subtitle": "Click a cell to toggle whether items in the row status can transition to the column status. System actions ({{dispatch, lowercase}} creation, completion, cancellation) also drive automatic changes — those don't appear in the matrix."
       },
-      "emptyDescription": "Workflows are created automatically when you add a work order type.",
+      "emptyDescription": "Workflows are created automatically when you add a {{workOrder, lowercase}} type.",
       "emptyTitle": "No workflows yet",
       "enforcement": {
         "open": "Open",
@@ -1788,7 +3247,7 @@
         "saved": "Enforcement mode updated",
         "saveError": "Couldn't update enforcement mode",
         "strict": "Strict",
-        "strictDescription": "Items can only transition along defined paths. Undefined transitions return an error. System actions (dispatch events) bypass enforcement.",
+        "strictDescription": "Items can only transition along defined paths. Undefined transitions return an error. System actions ({{dispatch, lowercase}} events) bypass enforcement.",
         "title": "Enforcement"
       },
       "legend": {
@@ -1832,11 +3291,544 @@
         "transitionCount_one": "{{count}} transition",
         "transitionCount_other": "{{count}} transitions"
       },
-      "subtitle": "One workflow per work order type · defines the allowed status transitions",
+      "subtitle": "One workflow per {{workOrder, lowercase}} type · defines the allowed status transitions",
       "title": "Workflows",
       "transitionSummary_one": "1 transition · {{approvals}} approval gates",
       "transitionSummary_other": "{{count}} transitions · {{approvals}} approval gates",
       "transitionSummary_zero": "No transitions defined"
+    },
+    "revenueTargets": {
+      "cardTitle": "{{year}} targets",
+      "changed": "Changed",
+      "closed": "Closed",
+      "closedWarning_one": "You changed {{months}}, which has already closed. Home will re-score it against the new target.",
+      "closedWarning_other": "You changed {{months}}, which have already closed. Home will re-score them against the new targets.",
+      "cols": {
+        "actual": "{{year}} actual",
+        "month": "Month",
+        "result": "Result",
+        "target": "Target",
+        "vs": "vs {{year}}"
+      },
+      "editHint": "Leave a month blank for no target. A blank month is not the same as $0.",
+      "empty": {
+        "body": "Start from {{prev}} and adjust. Months you leave blank show no target line on Home.",
+        "pastBody": "You can still add them. Home will then show which {{year}} months hit target.",
+        "pastTitle": "No targets were set for {{year}}",
+        "start": "Set {{year}} targets",
+        "title": "No targets for {{year}} yet"
+      },
+      "errors": {
+        "tooLarge": "At most $1,000,000,000",
+        "zero": "Leave it blank for no target"
+      },
+      "fill": {
+        "apply": "Fill months",
+        "fromYear": "From {{year}}",
+        "gapsActual": "{{year}} has no actuals for {{months}}. Those months are left as they are.",
+        "gapsTargets": "{{year}} has no targets for {{months}}. Those months are left as they are.",
+        "growth": "Growth percent",
+        "label": "Quick fill",
+        "onlyOpen": "Only months that haven't closed",
+        "plus": "plus",
+        "shape": "Shape",
+        "shapeEven": "Split evenly",
+        "shapeLast": "Shaped like {{year}}'s seasons",
+        "source": "Fill from",
+        "sourceActual": "{{year}} actual revenue",
+        "sourceTargets": "{{year}} targets",
+        "sourceTargetsNone": "{{year}} targets (none set)",
+        "spread": "Spread a yearly total",
+        "total": "Yearly total"
+      },
+      "footer": "{{count}} of 12 months set · {{amount}} for the year",
+      "formerUser": "Former user",
+      "hit": "Hit",
+      "inProgress": "In progress",
+      "inputLabel": "{{month}} target",
+      "lastChanged": "Last changed by {{name}} · {{date}}",
+      "loadFailed": "Couldn't load the targets",
+      "missed": "Missed",
+      "monthsSet": "{{count}} of 12 months set",
+      "noTarget": "No target",
+      "notSet": "Not set",
+      "pctSoFar": "{{pct}}% so far",
+      "save": "Save targets",
+      "saveFailed": "Couldn't save the targets",
+      "saved": "{{year}} targets saved",
+      "soFar": "so far",
+      "sub": "Monthly goals for invoiced revenue, the same number as Revenue on Home. They draw the target line on Home's revenue chart, and they're company-wide.",
+      "thisMonth": "This month",
+      "title": "Revenue Targets",
+      "toDate": "to date",
+      "yearLabel": "Year",
+      "yearRow": "Year"
+    },
+    "tax": {
+      "actionsFor": "Actions for {{name}}",
+      "activate": "Activate",
+      "add": "Add jurisdiction",
+      "allUnassigned": "+ all unassigned",
+      "cardTitle": "Jurisdictions",
+      "class": {
+        "EQUIPMENT": "Equipment",
+        "FEE": "Fees",
+        "LABOR": "Labor",
+        "MATERIALS": "Materials"
+      },
+      "classNotTaxed": "{{name}} is not taxed",
+      "classTaxed": "{{name}} is taxed",
+      "col": {
+        "locations": "{{locations}}",
+        "name": "Jurisdiction",
+        "rate": "Rate",
+        "status": "Status",
+        "taxes": "Taxes"
+      },
+      "deactivate": "Deactivate",
+      "default": "Default",
+      "defaultCantDeactivate": "Make another jurisdiction the default first",
+      "description": "Each {{location, lowercase}} uses a jurisdiction; {{locations, lowercase}} without one use the default. A jurisdiction’s rate applies only to the tax classes it taxes. Tax-exempt accounts are never taxed.",
+      "emptyDescription": "Add where you collect tax and its rate. Until then, no tax is charged and drafts warn.",
+      "emptyTitle": "No tax jurisdictions yet",
+      "errors": {
+        "DEFAULT_MUST_BE_ACTIVE": "The default jurisdiction has to be active.",
+        "DEFAULT_REQUIRED": "There has to be a default. Make another jurisdiction the default instead.",
+        "JURISDICTION_IN_USE": "{{locations}} are assigned to it. Move them to another jurisdiction first.",
+        "NAME_TAKEN": "A jurisdiction with that name already exists.",
+        "generic": "Something went wrong. Try again."
+      },
+      "form": {
+        "default": "Default jurisdiction",
+        "defaultHint": "Used by every {{location, lowercase}} without one. Replaces {{name}}.",
+        "defaultHintFirst": "Used by every {{location, lowercase}} without one.",
+        "defaultLocked": "To change the default, make another jurisdiction the default.",
+        "description": "The rate applies to the kinds of line checked below. {{customers}} marked tax-exempt aren't charged.",
+        "editTitle": "Edit {{name}}",
+        "name": "Name",
+        "namePlaceholder": "Phoenix, AZ",
+        "rate": "Rate (%)",
+        "rateHint": "Leave the rate blank if you don't know it yet. Nothing is taxed until it's set, and drafts warn.",
+        "ratePlaceholder": "Not set",
+        "taxes": "Taxes these lines",
+        "taxesHint": "Only lines in a checked class are taxed here."
+      },
+      "issueNoRate": "{{name}} has no rate. {{locations}} using it are charged no tax.",
+      "issueNoRateCount_one": "{{name}} has no rate. {{count}} {{location, lowercase}} using it is charged no tax.",
+      "issueNoRateCount_other": "{{name}} has no rate. {{count}} {{locations, lowercase}} using it are charged no tax.",
+      "issueNoRateDefault": "{{name}} is the default and has no rate. {{locations}} without their own jurisdiction are charged no tax.",
+      "issueNoRateUnused": "{{name}} has no rate. No {{locations, lowercase}} use it yet.",
+      "lineSource": {
+        "agreement": "{{agreement}} installments",
+        "agreementLabel": "Tax class for {{agreement}} installments",
+        "agreementNote": "Applies to the next installment billed",
+        "col": {
+          "class": "Tax class",
+          "notes": "Notes",
+          "source": "Line source"
+        },
+        "fixed": "Fixed",
+        "labor": "Labor lines",
+        "perItem": "Set on each item",
+        "pricebook": "Pricebook items",
+        "pricebookNote": "Defaults from item type",
+        "saved": "{{agreement}} installment tax class saved",
+        "title": "Tax class by line source"
+      },
+      "loadFailed": "Couldn't load tax jurisdictions",
+      "loading": "Loading tax jurisdictions…",
+      "makeDefault": "Make default",
+      "notTaxedPrefix": "Not taxed:",
+      "rateNotSet": "Not set",
+      "setRate": "Set rate",
+      "taxedPrefix": "Taxed:",
+      "title": "Tax",
+      "toast": {
+        "saveFailed": "Couldn't save",
+        "saved": "Saved"
+      }
+    },
+    "laborRates": {
+      "actionsFor": "Actions for {{name}}",
+      "activate": "Activate",
+      "add": "Add rate",
+      "cardTitle": "Rates",
+      "col": {
+        "billRate": "Bill rate",
+        "costRate": "Cost",
+        "margin": "Margin",
+        "name": "Rate",
+        "overrides": "Plan overrides",
+        "status": "Status"
+      },
+      "deactivate": "Deactivate",
+      "defaultRate": "Default rate",
+      "description": "Hourly bill rates for labor lines, and the rate behind computed pricebook items. Rate plans can override these per account.",
+      "dragToReorder": "Drag to reorder",
+      "emptyDescription": "Rate types appear here once your workspace is set up.",
+      "emptyTitle": "No labor rate types",
+      "errors": {
+        "NAME_TAKEN": "Another rate type already has that name.",
+        "REGULAR_REQUIRED": "Regular can’t be deactivated. Labor and computed pricebook items are priced from it.",
+        "generic": "Something went wrong. Try again.",
+        "staleOrder": "The list was out of date and has been reloaded. Try again."
+      },
+      "form": {
+        "addTitle": "Add labor rate",
+        "billHint": "What the {{customer, lowercase}} pays per hour. Leave blank if it isn’t decided yet.",
+        "billRate": "Bill rate ($/hr)",
+        "costHint": "Loaded cost per hour. Internal only.",
+        "costRate": "Cost ($/hr)",
+        "editTitle": "Edit {{name}}",
+        "margin": "Margin",
+        "name": "Name",
+        "namePlaceholder": "e.g. Emergency",
+        "optional": "Optional",
+        "regularWarning": "Changing the Regular rate reprices every computed pricebook item. {{quotes}} and {{invoices, lowercase}} already created keep their prices.",
+        "regularWarningCount_one": "Changing the Regular rate reprices {{count}} computed pricebook item. {{quotes}} and {{invoices, lowercase}} already created keep their prices.",
+        "regularWarningCount_other": "Changing the Regular rate reprices {{count}} computed pricebook items. {{quotes}} and {{invoices, lowercase}} already created keep their prices."
+      },
+      "hourSuffix": "/hr",
+      "internal": "Internal",
+      "issueNoBillRate": "{{name}} has no bill rate, so labor lines can’t use it until one is set.",
+      "loadFailed": "Couldn’t load labor rates",
+      "loading": "Loading labor rates…",
+      "notSet": "Not set",
+      "orderNote": "Order here is the order rate types appear when adding a labor line.",
+      "perHour": "{{amount}}/hr",
+      "planCount_one": "{{count}} plan",
+      "planCount_other": "{{count}} plans",
+      "regularCantDeactivate": "The default rate can’t be deactivated",
+      "setRate": "Set rate",
+      "title": "Labor rates",
+      "toast": {
+        "reorderFailed": "Couldn’t reorder the rate types",
+        "saveFailed": "Couldn’t save the rate type",
+        "saved": "Rate type saved"
+      },
+      "usedFor": {
+        "AFTER_HOURS": "Used for after-hours work",
+        "HOLIDAY": "Used for holiday hours",
+        "OVERTIME": "Used for overtime hours",
+        "REGULAR": "Used for regular hours",
+        "custom": "Custom · picked by hand"
+      }
+    },
+    "pricing": {
+      "hideInactive": "Hide inactive ({{count}})",
+      "showInactive": "Show inactive ({{count}})",
+      "viewOnly": "View only. Changing pricing needs the Manage pricing permission."
+    },
+    "pricebook": {
+      "actionsFor": "Actions for {{name}}",
+      "activate": "Activate",
+      "add": "Add item",
+      "allItems": "All items",
+      "allTypes": "All",
+      "categories": {
+        "add": "Add a category",
+        "addButton": "Add",
+        "manageDescription": "Group items so they’re easier to find. Rate plans can also price a category differently. Categories with active items can’t be deactivated.",
+        "manageTitle": "Categories",
+        "name": "Name",
+        "none": "No categories yet.",
+        "parent": "Inside",
+        "saveFailed": "Couldn’t save the category",
+        "saved": "{{name}} saved",
+        "title": "Categories",
+        "topLevel": "Top level"
+      },
+      "col": {
+        "cost": "Cost",
+        "item": "Item",
+        "margin": "Margin",
+        "price": "Price",
+        "pricing": "Pricing",
+        "taxClass": "Tax class"
+      },
+      "computedDetail": "{{hours}} hr Regular + {{cost}} parts +{{markup}}%",
+      "computedLaborOnly": "{{hours}} hr Regular",
+      "deactivate": "Deactivate",
+      "description": "Services, parts, equipment and fees you put on {{quotes, lowercase}} and {{invoices, lowercase}}. Prices here are list prices; rate plans adjust them per account.",
+      "duplicate": "Duplicate",
+      "emptyDescription": "Add the services, parts and fees you bill most, so they’re one search away on {{quotes, lowercase}}.",
+      "emptyFilteredTitle": "No items here",
+      "emptyTitle": "No items yet",
+      "errors": {
+        "CATEGORY_IN_USE": "It still holds active items or subcategories. Move or deactivate them first.",
+        "NAME_TAKEN": "That name is already taken.",
+        "SKU_TAKEN": "Another item already has that SKU.",
+        "STALE_VERSION": "Someone else changed this item. It’s been reloaded; make your change again.",
+        "generic": "Something went wrong. Try again."
+      },
+      "feeRole": {
+        "AFTER_HOURS": "After-hours",
+        "DIAGNOSTIC": "Diagnostic",
+        "DISPOSAL": "Disposal",
+        "OTHER": "Other",
+        "TRIP": "Trip"
+      },
+      "form": {
+        "activeHint": "Inactive items can’t be added to new documents. Existing lines keep them.",
+        "calcLabor": "{{hours}} hr × {{rate}}",
+        "calcParts": "{{cost}} parts + {{markup}}%",
+        "category": "Category",
+        "computedUnpriced": "The Regular labor rate isn’t set, so this item has no price and can’t be billed yet.",
+        "cost": "Cost",
+        "costOptional": "Optional.",
+        "costUnknown": "cost unknown",
+        "create": "Create item",
+        "feeRole": "Fee role",
+        "feeRoleHint": "Says which fee this is, so member benefits like a waived trip charge find it.",
+        "feeRolePick": "Pick one",
+        "itemSection": "Item",
+        "itemSectionHint": "Type sets the tax class default and how the item can be priced.",
+        "keepPrices": "Existing {{quotes, lowercase}} and {{invoices, lowercase}} keep the price they were created with.",
+        "laborHours": "Labor hours",
+        "margin": "Margin",
+        "markup": "Markup (%)",
+        "mode": {
+          "goods": {
+            "FIXED": "List price",
+            "MARKUP": "Cost + markup"
+          },
+          "service": {
+            "COMPUTED": "Computed from labor + parts",
+            "FIXED": "Fixed price"
+          }
+        },
+        "name": "Name",
+        "nameHint": "Shown on {{quotes, lowercase}} and {{invoices, lowercase}}.",
+        "newTitle": "New item",
+        "noCategory": "None",
+        "partsCost": "Parts cost",
+        "partsMarkup": "Parts markup (%)",
+        "price": "Price",
+        "priceUnit": "Price (per {{unit}})",
+        "pricingHintGoods": "A list price, or the cost marked up. Rate plans can still re-price materials from cost.",
+        "pricingHintService": "Computed prices follow the Regular labor rate and update when it changes.",
+        "pricingSection": "Pricing",
+        "rate": "Rate",
+        "regularNotSet": "Regular rate not set",
+        "regularRate": "{{name}} · {{rate}}/hr",
+        "setRegular": "Set the Regular rate",
+        "sku": "SKU / code",
+        "statusSection": "Status",
+        "taxClass": "Tax class",
+        "taxDefault": "Default for {{type}} items.",
+        "taxOverride": "Overrides the {{type}} default ({{class}}).",
+        "taxSection": "Tax",
+        "type": "Type",
+        "typeLocked": "Type can’t change after creation. Duplicate the item to make one of a different type.",
+        "unit": "Unit"
+      },
+      "internal": "Internal",
+      "loadFailed": "Couldn’t load the pricebook",
+      "loadItemFailed": "Couldn’t load this item",
+      "loading": "Loading the pricebook…",
+      "loadingItem": "Loading item…",
+      "markupDetail": "{{cost}} cost +{{markup}}%",
+      "mode": {
+        "COMPUTED": "Computed",
+        "FIXED": "Fixed",
+        "MARKUP": "Cost + markup"
+      },
+      "needsRegularRate": "Needs Regular rate",
+      "noMatchDescription": "Try a different name or SKU.",
+      "noMatchTitle": "No items match “{{q}}”",
+      "presentation": {
+        "add": "Add photos & description",
+        "addHighlight": "+ Add highlight",
+        "addPhoto": "Add photo",
+        "collapse": "Collapse",
+        "customerName": "{{customer}}-facing name",
+        "customerNameHint": "Leave blank to use the item name.",
+        "description": "Description",
+        "descriptionPlaceholder": "What it is and why it matters, in plain words.",
+        "hasDescription": "description",
+        "highlightCount_one": "{{count}} highlight",
+        "highlightCount_other": "{{count}} highlights",
+        "highlightN": "Highlight {{n}}",
+        "highlights": "Highlights",
+        "highlightsHint": "3–5 short bullets work best.",
+        "main": "Main",
+        "mainPhoto": "Main photo",
+        "makeMain": "Make main",
+        "optional": "Optional",
+        "photoCount_one": "{{count}} photo",
+        "photoCount_other": "{{count}} photos",
+        "photoN": "Photo {{n}}",
+        "photos": "Photos",
+        "photosHint": "The first photo is the main one. JPEG, PNG or WebP, up to 20 MB each.",
+        "pitch": "Photos and a {{customer, lowercase}}-friendly description for public {{quotes, lowercase}}.",
+        "remove": "Remove presentation",
+        "removeHighlight": "Remove highlight {{n}}",
+        "removePhoto": "Remove photo {{n}}",
+        "skip": "Skip this if you send standard {{quotes, lowercase}}. Items without it show their name only.",
+        "title": "{{customer}} presentation",
+        "tooLarge": "Images can be up to 20 MB.",
+        "unreadable": "That file isn’t an image we can use, or it’s over 50 megapixels.",
+        "uploadFailed": "Couldn’t add {{name}}",
+        "uploadRetry": "The upload didn’t finish. Try again.",
+        "uploading": "Uploading…",
+        "view": "View",
+        "where": "Shown on public {{quotes, lowercase}}. {{invoices}} show the item name only.",
+        "wrongType": "Use a JPEG, PNG or WebP image. iPhone HEIC photos need converting first."
+      },
+      "searchPlaceholder": "Name or SKU…",
+      "showing": "Showing {{count}} of {{total}}",
+      "title": "Pricebook",
+      "toast": {
+        "saveFailed": "Couldn’t save the item",
+        "saved": "{{name}} saved"
+      },
+      "type": {
+        "EQUIPMENT": "Equipment",
+        "FEE": "Fee",
+        "MATERIAL": "Material",
+        "SERVICE": "Service"
+      },
+      "typeFilter": "Item type"
+    },
+    "ratePlans": {
+      "accountCount_one": "{{count}} account",
+      "accountCount_other": "{{count}} accounts",
+      "accounts": {
+        "account": "Account",
+        "assign": "+ Assign account",
+        "assignButton": "Assign",
+        "assignDescription": "If the account is on another plan, it moves to this one. New lines billed to it are priced under this plan.",
+        "assignTitle": "Assign an account to {{plan}}",
+        "assigned": "Account moved to {{plan}}",
+        "failed": "Couldn’t change the account’s plan",
+        "loading": "Loading accounts…",
+        "none": "No accounts yet. You can also set a plan from the account’s page.",
+        "since": "since {{date}}",
+        "unassign": "Unassign",
+        "unassignName": "Unassign {{name}}",
+        "unassigned": "Account now uses the default plan",
+        "unnamed": "Unnamed account"
+      },
+      "actionsFor": "Actions for {{name}}",
+      "activate": "Activate",
+      "add": "New rate plan",
+      "adjustmentValue": "{{value}} on everything else",
+      "cardTitle": "Plans",
+      "col": {
+        "adjustment": "Adjustment",
+        "assigned": "Assigned to",
+        "labor": "Labor",
+        "members": "Member discounts",
+        "parts": "Parts",
+        "plan": "Plan",
+        "status": "Status"
+      },
+      "deactivate": "Deactivate",
+      "default": "Default",
+      "defaultCantDeactivate": "Make another plan the default first",
+      "description": "A rate plan sets prices for the accounts on it: labor rates, how parts are marked up, and an overall adjustment. Accounts without a plan use the default. Member discounts from {{agreements, lowercase}} are added on top unless a plan turns them off.",
+      "duplicate": "Duplicate",
+      "emptyTitle": "No rate plans",
+      "errors": {
+        "DEFAULT_MUST_BE_ACTIVE": "The default plan has to be active.",
+        "DEFAULT_REQUIRED": "There has to be a default plan. Make another plan the default instead.",
+        "NAME_TAKEN": "Another plan already has that name.",
+        "RATE_PLAN_IN_USE": "Accounts are still on this plan. Move them to another plan first.",
+        "generic": "Something went wrong. Try again."
+      },
+      "everyoneElse": "Everyone else",
+      "form": {
+        "accounts": "Assigned accounts",
+        "accountsHint": "The plan prices {{quotes, lowercase}} and {{invoices, lowercase}} billed to these accounts. An account is on one plan at a time. Changes here save right away.",
+        "addTier": "+ Add tier",
+        "adjustment": "Adjustment",
+        "adjustmentExample": "A {{price}} price becomes",
+        "adjustmentHint": "Raise or lower prices on this plan by a percent. It applies to anything the labor rates and parts pricing above don’t price.",
+        "adjustmentLabel": "Percent",
+        "adjustmentNegative": "Use a negative number for a discount.",
+        "andUp": "and up",
+        "create": "Create plan",
+        "custom": "Custom",
+        "customRate": "{{name}} rate on this plan",
+        "defaultNote": "The default plan. Every account without its own plan uses it.",
+        "description": "Description",
+        "descriptionHint": "Internal. Shown on the plan list only.",
+        "details": "Details",
+        "example": "Example",
+        "keepPrices": "Changes apply to new lines. Existing {{quotes, lowercase}} and {{invoices, lowercase}} keep their prices.",
+        "labor": "Labor rates",
+        "laborHint": "Leave a rate on Standard to follow the company rate, including future changes.",
+        "markup": "Markup (%)",
+        "members": "Member discounts",
+        "membersHint": "{{agreement}} discounts (labor %, parts %, trip fee waived) are separate from the plan.",
+        "membersStack": "Apply member discounts on top of this plan",
+        "membersStackHint": "Turn off for contracts where member pricing was negotiated into the rates.",
+        "name": "Name",
+        "namePlaceholder": "e.g. Property managers",
+        "newTitle": "New rate plan",
+        "notSet": "Not set",
+        "optional": "Optional",
+        "parts": "Parts",
+        "partsCatalog": "Catalog price",
+        "partsCatalogHint": "Each part’s pricebook price.",
+        "partsHint": "How materials are priced on this plan’s {{quotes, lowercase}} and {{invoices, lowercase}}.",
+        "partsTiers": "Cost + markup by cost range",
+        "partsTiersHint": "Each part is priced from its cost, even when it has a list price. Common for commercial T&M. Parts with no cost keep their list price.",
+        "rate": "Rate",
+        "rateChoice": "{{name}} on this plan",
+        "removeTier": "Remove tier {{n}}",
+        "standard": "Standard",
+        "thisPlan": "This plan",
+        "tierMarkup": "Tier {{n}} markup",
+        "tiersInvalid": "Each range has to end above where it starts, and every markup needs a number.",
+        "unitCost": "Unit cost",
+        "upTo": "Tier {{n}} up to"
+      },
+      "laborOverridden_one": "{{count}} rate overridden",
+      "laborOverridden_other": "{{count}} rates overridden",
+      "laborStandard": "Standard rates",
+      "loadFailed": "Couldn’t load rate plans",
+      "loadPlanFailed": "Couldn’t load this plan",
+      "loading": "Loading rate plans…",
+      "loadingPlan": "Loading plan…",
+      "makeDefault": "Make default",
+      "membersOff": "Not applied",
+      "membersOnTop": "Added on top",
+      "partsCatalog": "Catalog prices",
+      "partsTiers_one": "Cost + markup · {{count}} tier",
+      "partsTiers_other": "Cost + markup · {{count}} tiers",
+      "title": "Rate plans",
+      "toast": {
+        "saveFailed": "Couldn’t save the plan",
+        "saved": "{{name}} saved"
+      }
+    },
+    "documents": {
+      "days": "days",
+      "description": "Defaults for documents you send. You can change dates on any single {{quote, lowercase}} or {{invoice, lowercase}} when you send it.",
+      "invalid": "Enter 1 to 365 days.",
+      "invoices": "{{invoices}}",
+      "invoicesBody": "Due dates follow each account’s payment terms (Net 30, Due on receipt, and so on). Set terms on the {{customer, lowercase}} or {{payer, lowercase}}.",
+      "loading": "Loading…",
+      "marginFloor": {
+        "hint": "Proposal options whose margin after savings falls below this are flagged to the advisor. Blank for no floor.",
+        "invalid": "Enter a percent above 0 and below 100.",
+        "label": "Margin floor",
+        "none": "No floor set. Options aren’t flagged.",
+        "preview": "Options under {{pct}} margin after savings are flagged.",
+        "saveFailed": "Couldn’t save the margin floor",
+        "saved": "Margin floor saved",
+        "title": "Proposals"
+      },
+      "presets": "Common lengths",
+      "previewAfter": ". Those already sent keep their date.",
+      "previewBefore": "{{quotes}} sent today expire",
+      "quotes": "{{quotes}}",
+      "saveFailed": "Couldn’t save {{quote, lowercase}} validity",
+      "saved": "{{quote}} validity saved",
+      "title": "{{quotes}} & {{invoices, lowercase}}",
+      "validFor": "Valid for",
+      "validForHint": "Counted from the day each {{quote, lowercase}} is sent. {{customers}} can’t approve after it expires."
     }
   },
   "tags": {
@@ -1927,32 +3919,45 @@
   },
   "users": {
     "actions": {
-      "deleteWarning": "This action cannot be undone. All user data and history will be permanently removed.",
+      "deleteConfirm": "Delete {{name}}'s membership in {{company}}?",
+      "deleteFailed": "Couldn't delete membership",
+      "deleteWarning": "Permanently deletes their access, roles and {{regions, lowercase}} here. Work they created stays. Use Remove access instead if you might restore them.",
+      "deleteWarningEndsSignIn": "Permanently deletes their access, roles and {{regions, lowercase}} — and their sign-in. Work they created stays.",
+      "deleteWarningKeepsSignIn": "Permanently deletes their access, roles and {{regions, lowercase}} here. Work they created stays; their sign-in is unaffected.",
+      "deletedToast": "{{name}} deleted from {{company}}",
       "disableConfirm": "Remove {{name}} from {{company}}?",
-      "disableNotAffected": "Their sign-in, password and two-factor setup. If they belong to other workspaces, those are unaffected.",
+      "disableNotAffected": "Their password and two-factor setup.",
+      "disableNotAffectedKeepsSignIn": "Their sign-in, password and two-factor setup.",
       "disableNotAffectedLabel": "Not affected",
-      "disableWarning": "They lose access to this workspace immediately, including any open session. Their work history here is kept.",
-      "enableConfirm": "Enable {{name}}?",
-      "enableWarning": "They'll regain sign-in access immediately. Roles and regions are kept as-is."
+      "disableWarning": "Ends their access now, including any open session. Work history is kept. This may also disable their sign-in.",
+      "disableWarningEndsSignIn": "Ends their access and disables their sign-in. Any open session ends now; work history is kept.",
+      "disableWarningKeepsSignIn": "Ends their access now, including any open session. Work history is kept.",
+      "enableConfirm": "Restore {{name}}'s access to {{company}}?",
+      "enableWarning": "They regain access to this workspace immediately, with their previous roles and {{regions, lowercase}} kept as-is. No email is sent.",
+      "removeAccessLabel": "Remove access",
+      "removeFailed": "Couldn't remove access",
+      "removeTitle": "Remove {{name}} from {{company}}",
+      "removedToast": "{{name}} removed from {{company}}",
+      "restoreFailed": "Couldn't restore access",
+      "restoreTitle": "Restore {{name}}'s access to {{company}}",
+      "restoredToast": "{{name}} restored to {{company}}"
     },
     "breakdown": {
-      "disabled": "{{count}} disabled",
-      "invited": "{{count}} invited"
+      "invited": "{{count}} invited",
+      "removed": "{{count}} removed"
     },
     "description": "People who can sign in to the app. Assign each user a role — roles determine which screens and actions they can access. Manage role permissions under Access › Roles.",
-    "empty": {
-      "noUsersDescription": "Invite your team to get started."
-    },
     "detail": {
+      "accountActivated": "Account activated",
       "accountActivity": "Account activity",
       "accountActivityHelper": "Sign-ins, access changes, security events. Record edits appear on each record.",
-      "accountActivated": "Account activated",
       "accountCreated": "Account created",
       "accountDeactivated": "Account deactivated",
       "accountRemoved": "Account removed",
       "active": "Active",
       "activityComingSoon": "Activity history coming soon",
       "activityHelper": "Will show login history, actions performed, etc.",
+      "allDivisions": "Offered for all work",
       "allUsers": "All users",
       "auditChanges": "Changes",
       "auditComingSoon": "Audit trail coming soon",
@@ -1969,8 +3974,8 @@
       "cognitoSub": "Cognito Sub",
       "created": "Created",
       "deactivate": "Deactivate",
-      "deactivateName": "Deactivate {{name}}",
       "deactivateHelper": "Revokes sign-in immediately. Audit history is preserved.",
+      "deactivateName": "Deactivate {{name}}",
       "disabled": "Disabled",
       "editAccess": "Edit access",
       "editUser": "Edit user",
@@ -1983,20 +3988,20 @@
       "moreOptions": "More options",
       "noActivityYet": "No activity recorded yet.",
       "noCapabilities": "No capabilities assigned",
-      "noRegionsAssigned": "No regions assigned",
+      "noRegionsAssigned": "No {{regions, lowercase}} assigned",
       "noRolesAssigned": "No roles assigned",
       "passwordLabel": "Password",
       "passwordValue": "Managed via reset link",
       "profileUpdated": "Profile updated",
       "reactivate": "Reactivate",
-      "reactivateName": "Reactivate {{name}}",
       "reactivateHelper": "Restores sign-in access. Existing roles and regions are kept as-is.",
+      "reactivateName": "Reactivate {{name}}",
       "recentActivity": "Recent Activity",
       "regions": "Regions",
       "regionsUpdated": "Regions updated",
       "resetTwoFactor": "Reset 2FA",
-      "roles": "Roles",
       "rolePermissions": "Role & Permissions",
+      "roles": "Roles",
       "rolesUpdated": "Roles updated",
       "security": "Security",
       "sendResetLink": "Send reset link",
@@ -2013,17 +4018,24 @@
       "twoFactorValue": "Managed in Cognito",
       "userId": "User ID"
     },
+    "empty": {
+      "noUsersDescription": "Invite your team to get started."
+    },
     "filter": {
+      "active": "Active",
       "all": "All",
+      "allAssignment": "Any assignment",
       "allInvitationStatuses": "Any invitation",
       "allRoles": "All roles",
+      "assignable": "Assignable",
+      "assignment": "Assignment",
       "clearFilters": "Clear filters",
-      "disabled": "Disabled",
-      "enabled": "Enabled",
       "invitationActive": "Active",
       "invitationExpired": "Invitation expired",
       "invitationInvited": "Invited",
       "invitationStatus": "Invitation",
+      "not-assignable": "Not assignable",
+      "removed": "Removed",
       "role": "Role",
       "status": "Status"
     },
@@ -2046,12 +4058,15 @@
       "firstName": "First name",
       "hideDetails": "Hide details",
       "identity": "Identity",
-      "inviteHelper": "An invitation email goes out on save. Link is valid 7 days.",
       "inviteTitle": "Invite user",
       "lastName": "Last name",
       "loadingCapabilities": "Loading capabilities…",
       "manageRegions": "Manage regions →",
       "manageRoles": "Manage roles →",
+      "memberAdded": "{{name}} was added to this workspace",
+      "memberAddedDetail": "We've emailed {{email}} with what they need to sign in.",
+      "memberAddedInvitation": "We've emailed {{email}} a temporary password to sign in with.",
+      "memberAddedLinked": "They can sign in with their existing password — {{company}} will appear in their workspace list.",
       "noActiveRegions": "No active dispatch regions configured.",
       "noRolesMatch": "No roles match \"{{query}}\".",
       "phone": "Phone",
@@ -2062,29 +4077,35 @@
       "rolePlaceholder": "Select a role...",
       "roleRequired": "Please select at least one role",
       "roles": "Roles",
+      "rolesFailed": "Couldn't update roles",
       "rolesHelper": "Pick one role for most users. Multiple roles combine their capabilities.",
       "saveChanges": "Save changes",
       "searchRoles": "Search {{count}} roles…",
       "sendInvitation": "Send invitation",
-      "sendInvite": "Send invitation email",
-      "sendInviteTo": "Send invitation email to <0>{{email}}</0> on save",
-      "sendInviteToPlaceholder": "their address",
       "showDetails": "Show details"
+    },
+    "guard": {
+      "changeRoles": "Manage roles",
+      "lastManagerBody": "This workspace needs at least one enabled member who can invite or edit users. Removing the last one would leave nobody — including you — able to add it back.",
+      "lastManagerTitle": "This would leave no one able to manage members",
+      "selfBody": "Removing yourself would end your access to {{company}} immediately, and you couldn't restore it — only another administrator can. Ask one of them to remove you.",
+      "selfTitle": "You can't remove your own access",
+      "viewAdministrators": "View administrators"
     },
     "search": {
       "noMatch": "No users match \"{{query}}\"",
       "placeholder": "Search by name or email..."
     },
     "status": {
-      "disabled": "Disabled",
-      "enabled": "Enabled"
+      "removed": "Removed"
     },
     "table": {
       "actions": "Actions",
       "auditLog": "Audit Log",
-      "disable": "Disable",
-      "enable": "Enable",
+      "deleteMembership": "Delete membership",
       "lastUpdated": "Last Updated",
+      "removeFromWorkspace": "Remove from this workspace",
+      "restoreAccess": "Restore access",
       "you": "You"
     }
   },
@@ -2095,12 +4116,12 @@
       "archived": "Archived",
       "archiveError": "Failed to archive {{entity, lowercase}}",
       "cancel": "Cancel {{entity}}",
-      "cancelButton": "Cancel work order",
+      "cancelButton": "Cancel {{workOrder, lowercase}}",
       "cancelDescription": "Cancelling marks this {{entity, lowercase}} as no longer in scope. The reason is recorded and shown in the audit trail.",
       "cancelError": "Failed to cancel {{entity, lowercase}}",
       "cancelledBadge": "Cancelled",
       "cancelReasonLabel": "Reason for cancelling",
-      "cancelReasonPlaceholder": "e.g., Customer called to cancel",
+      "cancelReasonPlaceholder": "e.g., {{customer}} called to cancel",
       "cancelReasonRequired": "A reason is required to cancel.",
       "cancelTitle": "Cancel {{entity}}?",
       "charactersRemaining": "{{count}} characters remaining",
@@ -2129,25 +4150,15 @@
     "activity": {
       "activeDispatches": "Active {{entities}}",
       "byline": "by {{actor}} · {{time}}",
-      "composer": {
-        "ariaLabel": "Add a note to this work order",
-        "error": "Couldn't save note",
-        "hint": "Press N to focus, Cmd+Enter to save",
-        "placeholder": "Add a note…",
-        "save": "Save",
-        "saving": "Saving…"
-      },
       "day": {
         "thisWeek": "This week",
         "today": "Today",
         "yesterday": "Yesterday"
       },
-      "empty": "No activity yet.",
-      "emptyForFilter": "No matching events for this filter.",
       "errorLoading": "Couldn't load activity.",
       "fieldLabel": {
         "completedDate": "Completed Date",
-        "customerOrderNumber": "Customer PO",
+        "customerOrderNumber": "{{customer}} PO",
         "description": "Description",
         "notes": "Notes",
         "priority": "Priority",
@@ -2155,30 +4166,46 @@
         "summary": "Summary",
         "workOrderTypeId": "Type"
       },
-      "filter": {
-        "all": "All",
-        "dispatches": "Dispatches",
-        "financial": "$",
-        "notes": "Notes",
-        "status": "Status"
-      },
       "heading": "Activity",
       "kind": {
+        "callbackChanged": "Callback changed from {{fromWorkOrderNumber}} to {{toWorkOrderNumber}}",
+        "callbackLinked": "Linked as a callback of {{toWorkOrderNumber}}",
+        "callbackUnlinked": "Unlinked as a callback of {{fromWorkOrderNumber}}",
         "dispatchArrived": "{{assignedUserName}} arrived",
         "dispatchAssigned": "{{entity}} assigned to {{assignedUserName}}",
         "dispatchCancelled": "{{entity}} cancelled",
         "dispatchCheckedOut": "{{assignedUserName}} checked out",
         "dispatchDeparted": "{{assignedUserName}} departed",
+        "dispatchEnRoute": "{{assignedUserName}} en route",
         "dispatchNoShow": "{{assignedUserName}} no-show",
+        "dispatchReassigned": "Reassigned from {{fromAssignedUserName}} to {{assignedUserName}}",
+        "dispatchRescheduled": "Rescheduled to {{window}}",
+        "filesUploaded": "{{count}} {{what}} uploaded",
         "invoiceIssued": "{{entity}} {{invoiceNumber}} issued for {{amount}}",
-        "invoicePaid": "{{entity}} {{invoiceNumber}} paid",
+        "invoiceMarkedSent": "{{invoice}} marked sent · {{amount}}",
+        "invoicePaid": "{{invoice}} paid in full · {{amount}}",
+        "invoiceSent": "{{invoice}} sent{{via}} · {{amount}}",
+        "invoiceVoided": "{{invoice}} voided · {{amount}}",
         "noteAdded": "{{bodyExcerpt}}",
         "noteDeleted": "Note deleted: {{bodyExcerpt}}",
-        "paymentReceived": "{{entity}} received: {{amount}}",
-        "poCreated": "Purchase order {{poNumber}} created",
-        "quoteAccepted": "{{entity}} {{quoteNumber}} accepted",
-        "quoteDeclined": "{{entity}} {{quoteNumber}} declined",
-        "quoteSent": "{{entity}} {{quoteNumber}} sent for {{amount}}",
+        "paymentReceived": "{{payment}} {{paymentNumber}} received · {{amount}}{{method}}",
+        "poCreated": "Purchase order created{{vendor}} · {{amount}}",
+        "poStatusChanged": "Marked {{status}}{{reason}}",
+        "quoteAccepted": "{{quote}} approved · {{amount}}",
+        "quoteChoiceAdded": "added {{list}}",
+        "quoteChoiceOn": "Looked at {{last}}",
+        "quoteChoicePath": "Looked at {{seen}}, then switched to {{last}}",
+        "quoteChoiceRemoved": "removed {{list}}",
+        "quoteChoiceSame": "Browsed and ended on {{last}}",
+        "quoteDeclined": "{{quote}} declined · {{amount}}",
+        "quoteDeleted": "Draft {{quote, lowercase}} deleted · {{amount}}",
+        "quoteMarkedSent": "{{quote}} marked sent{{rev}} · {{amount}}",
+        "quoteMembershipSignup": "Joined {{plan}} when signing: set up the agreement",
+        "quotePriceApproved": "Price approved{{why}}",
+        "quotePriceRejected": "Price rejected{{why}}",
+        "quotePriceRequested": "Price approval asked · {{margin}} margin, under the {{floor}} floor{{why}}",
+        "quoteSent": "{{quote}} sent{{via}}{{rev}} · {{amount}}",
+        "quoteViewed": "Viewed by the {{customer, lowercase}}{{rev}}",
         "unknown": "Unrecognized activity",
         "workItemCreated": "Added {{entity, lowercase}}",
         "workItemDeleted": "Removed {{entity, lowercase}}",
@@ -2194,17 +4221,25 @@
       },
       "loadMore": "Load more",
       "loading": "Loading activity…",
+      "message": {
+        "bounced": "{{base}} · bounced",
+        "delivered": "{{base}} · delivered",
+        "emailed": "{{what}} emailed to {{recipient}}",
+        "failed": "{{base}} · failed",
+        "fallback": "Message",
+        "suppressed": "{{base}} · not sent, notifications are off",
+        "texted": "{{what}} texted to {{recipient}}"
+      },
       "systemActor": "System"
     },
     "detail": {
       "actionPending": "Available in a future phase",
       "addNote": "Add Note",
       "callSite": "Call site",
-      "completed": "Completed",
+      "completedAt": "Completed {{time}}",
       "copied": "Copied",
       "copyAddress": "Click to copy address",
       "copyPhone": "Click to copy phone",
-      "created": "Created",
       "directions": "Directions",
       "openedAt": "Opened {{time}}",
       "customerContact": "Customer Contact",
@@ -2212,9 +4247,10 @@
       "eta": "ETA {{date}}",
       "etaLabel": "ETA",
       "notScheduled": "Not scheduled",
+      "nte": "NTE {{amount}}",
+      "po": "PO",
       "siteContact": "Site Contact",
       "frozen": "Cancelled or archived — actions are disabled",
-      "info": "{{entity}} Info",
       "lastUpdated": "Updated {{time}}",
       "money": {
         "balance": "Balance",
@@ -2226,8 +4262,9 @@
         "quoted": "quoted"
       },
       "overview": {
+        "acceptedQuotes": "Accepted {{quotes, lowercase}}",
         "access": "Access",
-        "attachEquipment": "Attach equipment on site",
+        "attachEquipment": "Attach {{equipment, lowercase}} on site",
         "attnLive": "{{name}} on site",
         "balanceDue": "Balance due · {{amount}}",
         "billsTo": "Bills to",
@@ -2238,7 +4275,7 @@
         "docsLink": "{{invoices}} & {{quotes, lowercase}} →",
         "money": "Money",
         "needsAttention": "Needs attention",
-        "noEquipment": "No equipment",
+        "noEquipment": "No {{equipment, lowercase}}",
         "notYetDiagnosed": "Not yet diagnosed",
         "openLocation": "Open {{entity, lowercase}} →",
         "pinned": "Pinned",
@@ -2259,169 +4296,20 @@
       "setNte": "Set NTE",
       "tabs": {
         "activity": "Activity",
-        "documents": "Quotes & invoices",
+        "documents": "{{quotes}} & {{invoices, lowercase}}",
         "files": "Files",
         "overview": "Overview",
         "purchasing": "Purchasing"
       }
     },
     "financialDrawer": {
-      "comingSoon": "Coming soon",
-      "invoicesTab": {
-        "actions": {
-          "extend": "Extend link expiry",
-          "markPaid": "Mark paid",
-          "reissue": "Reissue link",
-          "resend": "Resend",
-          "send": "Send",
-          "void": "Void",
-          "voidPayment": "Void {{entity, lowercase}}"
-        },
-        "addPayment": "{{entity}}",
-        "changeStatus": "Change status (currently {{current}})",
-        "collapseRow": "Hide line items",
-        "columns": {
-          "balance": "Balance",
-          "date": "Date",
-          "due": "Due",
-          "invoiceNumber": "{{entity}} #",
-          "paid": "Paid",
-          "status": "Status",
-          "total": "Total"
-        },
-        "empty": "No {{entities, lowercase}} on this {{workOrder, lowercase}} yet.",
-        "errorLoading": "Failed to load {{entities, lowercase}}.",
-        "expandRow": "Show line items",
-        "lineColumns": {
-          "description": "Description",
-          "lineTotal": "Total",
-          "quantity": "Qty",
-          "unitPrice": "Unit price"
-        },
-        "lineItemsHeading": "Line items",
-        "loading": "Loading {{entities, lowercase}}…",
-        "newInvoice": "New {{entity}}",
-        "noLineItems": "No line items.",
-        "noPayments": "No {{entities, lowercase}} recorded against this {{parent, lowercase}}.",
-        "notesHeading": "Notes",
-        "paymentColumns": {
-          "amount": "Amount",
-          "date": "Date",
-          "method": "Method",
-          "paymentNumber": "{{entity}} #",
-          "reference": "Reference"
-        },
-        "paymentsHeading": "{{entities}}",
-        "recordPayment": "Record {{entity}}",
-        "statuses": {
-          "cancelled": "Cancelled",
-          "draft": "Draft",
-          "overdue": "Overdue",
-          "paid": "Paid",
-          "sent": "Sent",
-          "void": "Void"
-        },
-        "extendConfirm": "Extend the customer-facing link for {{entity, lowercase}} {{number}} by another year? The existing link keeps working.",
-        "extendSuccess": "Link expiry extended.",
-        "lastSentTo": "Last sent {{date}} to {{email}}",
-        "reissueConfirm": "Reissue the customer-facing link for {{entity, lowercase}} {{number}}? The previous link will stop working — the customer will need a new email to view this {{entity, lowercase}}.",
-        "reissueSuccess": "Link reissued. The previous link no longer works.",
-        "sendError": "Failed to send {{entity, lowercase}}.",
-        "sendErrorNoRecipient": "Add an email to the bill-to {{customer, lowercase}} first.",
-        "sendSuccess": "{{entity}} sent.",
-        "voidConfirm": "Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.",
-        "voidPaymentConfirm": "Void {{entity, lowercase}} {{number}} ({{amount}} applied to this {{parent, lowercase}})? This reverses the full {{entity, lowercase}} from every {{parent, lowercase}} it applies to. Cannot be undone."
-      },
-      "invoiceDialog": {
-        "amount": "Amount",
-        "billTo": "Bill to",
-        "contextStrip": "{{workOrder}} #{{number}} · {{customer}}",
-        "customerRequired": "A bill-to {{entity, lowercase}} is required.",
-        "datesRequired": "Both dates are required.",
-        "description": "Description",
-        "descriptionPlaceholder": "What is this {{entity, lowercase}} for?",
-        "descriptionRequired": "Description is required.",
-        "dueDate": "Due date",
-        "errorCreate": "Failed to create {{entity, lowercase}}.",
-        "errorNoRecipient": "Add an email to the bill-to customer first, then try Send again. The {{entity, lowercase}} was created as a draft.",
-        "invalidAmount": "Amount must be a positive number.",
-        "invoiceDate": "{{entity}} date",
-        "saveAndSend": "Save & Send",
-        "saveAsDraft": "Save as Draft",
-        "title": "New {{entity}}"
-      },
-      "quotesTab": {
-        "actions": {
-          "extend": "Extend link expiry",
-          "markAccepted": "Mark accepted",
-          "markDeclined": "Mark declined",
-          "reissue": "Reissue link",
-          "resend": "Resend",
-          "send": "Send"
-        },
-        "changeStatus": "Change status (currently {{current}})",
-        "collapseRow": "Hide line items",
-        "columns": {
-          "date": "Date",
-          "expires": "Expires",
-          "quoteNumber": "{{entity}} #",
-          "status": "Status",
-          "total": "Total"
-        },
-        "empty": "No {{entities, lowercase}} on this {{workOrder, lowercase}} yet.",
-        "errorLoading": "Failed to load {{entities, lowercase}}.",
-        "expandRow": "Show line items",
-        "lineColumns": {
-          "description": "Description",
-          "lineTotal": "Total",
-          "quantity": "Qty",
-          "unitPrice": "Unit price"
-        },
-        "lineItemsHeading": "Line items",
-        "loading": "Loading {{entities, lowercase}}…",
-        "newQuote": "New {{entity}}",
-        "extendConfirm": "Extend the customer-facing link for {{entity, lowercase}} {{number}} by another year? The existing link keeps working.",
-        "extendSuccess": "Link expiry extended.",
-        "lastSentTo": "Last sent {{date}} to {{email}}",
-        "noLineItems": "No line items.",
-        "notesHeading": "Notes",
-        "reissueConfirm": "Reissue the customer-facing link for {{entity, lowercase}} {{number}}? The previous link will stop working — the customer will need a new email to view this {{entity, lowercase}}.",
-        "reissueSuccess": "Link reissued. The previous link no longer works.",
-        "sendError": "Failed to send {{entity, lowercase}}.",
-        "sendErrorNoRecipient": "Add an email to the bill-to {{customer, lowercase}} first.",
-        "sendSuccess": "{{entity}} sent.",
-        "statuses": {
-          "accepted": "Accepted",
-          "declined": "Declined",
-          "draft": "Draft",
-          "expired": "Expired",
-          "sent": "Sent"
-        }
-      },
-      "quoteDialog": {
-        "amount": "Amount",
-        "billTo": "Bill to",
-        "contextStrip": "{{workOrder}} #{{number}} · {{customer}}",
-        "customerRequired": "A bill-to {{entity, lowercase}} is required.",
-        "datesRequired": "Both dates are required.",
-        "description": "Description",
-        "descriptionPlaceholder": "What is this {{entity, lowercase}} for?",
-        "descriptionRequired": "Description is required.",
-        "errorCreate": "Failed to create {{entity, lowercase}}.",
-        "expirationDate": "Expires",
-        "invalidAmount": "Amount must be a positive number.",
-        "quoteDate": "{{entity}} date",
-        "saveAndSend": "Save & Send",
-        "saveAsDraft": "Save as Draft",
-        "title": "New {{entity}}"
-      },
       "voidDialog": {
         "body": {
           "invoice": "Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.",
           "quote": "Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone."
         },
         "confirm": "Void {{entity, lowercase}}",
-        "revokeDescription": "The customer who received this link will see a 404 if they revisit it.",
+        "revokeDescription": "The {{customer, lowercase}} who received this link will see a 404 if they revisit it.",
         "revokeLabel": "Revoke the share link so the original recipient can no longer view this.",
         "revokeRetryError": "Voided, but couldn't revoke the share link — try again from the row's Reissue action.",
         "title": "Void {{entity}}"
@@ -2450,33 +4338,25 @@
         "referencePlaceholder": "Check number, transaction id, etc.",
         "submit": "Record {{entity}}",
         "title": "Record {{entity}}"
-      },
-      "stubBlockers": {
-        "purchaseOrders": "Deferred to phase 7c — no backend entity yet.",
-        "quotes": "Quotes ship in phase 7b — waiting on backend asks #7–#10."
-      },
-      "tabs": {
-        "purchaseOrders": "POs"
-      },
-      "title": "Financials · {{workOrder}} #{{number}}"
+      }
     },
     "dispatches": {
       "assign": "Assign",
       "assignDescription": "The window is the customer commitment; duration is optional.",
-      "assignTechnician": "Assign technician",
+      "assignTechnician": "Assign {{technician, lowercase}}",
       "completedAt": "Completed {{time}}",
-      "deleteConfirm": "Delete this dispatch? The technician assignment will be removed.",
-      "deleteError": "Failed to delete dispatch",
+      "deleteConfirm": "Delete this {{dispatch, lowercase}}? The {{technician, lowercase}} assignment will be removed.",
+      "deleteError": "Failed to delete {{dispatch, lowercase}}",
       "drawer": {
         "addNote": "Add note",
         "addNotePlaceholder": "Add a note to this visit…",
-        "assignedTech": "Assigned technician",
-        "audienceCustomer": "Customer",
-        "audienceTech": "Tech",
+        "assignedTech": "Assigned {{technician, lowercase}}",
+        "audienceCustomer": "{{customer}}",
+        "audienceTech": "{{technician}}",
         "call": "Call",
         "captureAfter": "After",
         "captureBefore": "Before",
-        "captureHint": "Capture or upload here today — the tech app will feed the same place later.",
+        "captureHint": "Capture or upload here today — the {{technician, lowercase}} app will feed the same place later.",
         "captured": "Captured this {{entity, lowercase}}",
         "completeVisit": "Complete {{entity, lowercase}}",
         "markArrived": "Mark arrived",
@@ -2489,10 +4369,10 @@
         "notificationsEmpty": "No notifications sent yet.",
         "notificationsError": "Couldn't load notification history.",
         "notificationsLoading": "Loading notifications...",
-        "notifyCustomer": "Notify customer",
+        "notifyCustomer": "Notify {{customer, lowercase}}",
         "notifyNow": "Notify now →",
-        "notifyTech": "Notify tech",
-        "officeNoteHint": "Office note · tech records the rest on site",
+        "notifyTech": "Notify {{technician, lowercase}}",
+        "officeNoteHint": "Office note · {{technician, lowercase}} records the rest on site",
         "reassign": "Reassign",
         "statusError": "Couldn't update the {{entity, lowercase}}.",
         "text": "Text",
@@ -2500,10 +4380,10 @@
         "timelineArrived": "Arrived on site",
         "timelineDeparted": "Departed",
         "timelineEnRoute": "En route",
-        "timelineNotified": "Customer notified",
+        "timelineNotified": "{{customer}} notified",
         "timelineNotRecorded": "Not recorded",
         "timelineScheduled": "Scheduled",
-        "timelineTechNotified": "Tech notified",
+        "timelineTechNotified": "{{technician}} notified",
         "uploadMedia": "Upload media",
         "workAddressed": "Work addressed"
       },
@@ -2517,13 +4397,14 @@
         "notifyNowDescription": "Off by default — send manually from the row when you're ready to confirm.",
         "status": "Status",
         "technician": "Technician",
-        "windowEndAfterStart": "Window end must be after window start."
+        "windowEndAfterStart": "Window end must be after window start.",
+        "versionConflict": "Someone else changed this {{entity, lowercase}} while you had it open. Your changes weren't saved — reopen it to see theirs."
       },
       "markArrived": "Mark arrived",
       "markCompleted": "Mark completed",
       "notify": "Notify",
       "notifyError": "Failed to send notification",
-      "notifyMissingPhone": "Technician has no phone number on file. SMS will fail.",
+      "notifyMissingPhone": "{{technician}} has no phone number on file. SMS will fail.",
       "notifySent": "Sent",
       "onSitePast": "On site {{start}}–{{end}} ({{duration}})",
       "onSiteSince": "On site since {{time}}",
@@ -2540,7 +4421,7 @@
       "videoCount_one": "{{count}} video",
       "videoCount_other": "{{count}} videos",
       "viewDetails": "View details",
-      "viewInvoice": "View invoice",
+      "viewInvoice": "View {{invoice, lowercase}}",
       "status": {
         "CANCELLED": "Cancelled",
         "COMPLETED": "Completed",
@@ -2549,16 +4430,16 @@
         "NO_SHOW": "No-show",
         "SCHEDULED": "Scheduled"
       },
-      "statusUpdateError": "Failed to update dispatch status"
+      "statusUpdateError": "Failed to update {{dispatch, lowercase}} status"
     },
     "filters": {
       "all": "All",
       "any": "Any {{entity, lowercase}}",
       "anyDivision": "Any division",
       "anyItemStatus": "Any item status",
-      "anyone": "Anyone",
       "anyRegion": "Any region",
       "anyType": "Any type",
+      "anyone": "Anyone",
       "archived": "Archived",
       "archivedHidden": "hidden",
       "archivedOnly": "only",
@@ -2568,15 +4449,17 @@
       "cancelled": "Cancelled",
       "clearAll": "Clear all",
       "completed": "Completed",
+      "completedBetween": "Completed {{range}}",
       "inProgress": "In Progress",
       "itemStatus": "Item status",
       "itemStatusHint": "contains an item",
       "live": "Live",
       "more": "More filters",
       "nSelected": "{{count}} selected",
+      "notInvoiced": "Not invoiced",
       "notStarted": "Not Started",
       "open": "Open",
-      "region": "Region",
+      "region": "{{region}}",
       "scheduled": "Scheduled",
       "searchPlaceholder": "Search by WO#, {{customer, lowercase}}, or address…",
       "showArchived": "Show archived",
@@ -2594,7 +4477,7 @@
       "mineHint": "Showing only work assigned to you"
     },
     "form": {
-      "customerOrderNumber": "Customer PO",
+      "customerOrderNumber": "{{customer}} PO",
       "customerOrderNumberPlaceholder": "e.g., PO-12345",
       "customerPlaceholder": "Select a customer...",
       "customerRequired": "Please select a customer",
@@ -2605,9 +4488,10 @@
       "firstWorkItemRequired": "Please describe the first work item.",
       "newCustomer": "New {{entity, lowercase}}",
       "newCustomerDetails": "New {{entity}} Details",
-      "notToExceed": "NTE",
-      "notToExceedInvalid": "NTE must be a non-negative number.",
-      "notToExceedPlaceholder": "e.g., 1500.00",
+      "notToExceed": "Not-to-exceed ($)",
+      "notToExceedHint": "Warns on {{quotes, lowercase}} and {{invoices, lowercase}} that go over.",
+      "notToExceedInvalid": "Not-to-exceed must be a positive amount.",
+      "notToExceedPlaceholder": "No limit",
       "priority": "Priority",
       "progressLabel": "Progress",
       "progressHelper": "Derived automatically from work item statuses.",
@@ -2654,73 +4538,216 @@
     },
     "workItems": {
       "addEquipmentOnSite": "Add new {{entity, lowercase}} on site",
-      "addParts": "Add parts",
+      "addFindings": "Add findings",
+      "addLaborEstimate": "+ Labor estimate",
+      "addNewEquipment": "Add new {{entity}}",
+      "addToQuote": "Add to {{number}}",
+      "atThisLocation": "At this {{location, lowercase}} · {{count}}",
       "attach": "Attach",
-      "attachEquipment": "Attach equipment",
+      "attachEquipment": "Attach {{equipment, lowercase}}",
+      "attachEquipmentTitle": "Attach {{entity, lowercase}}",
       "attachHint": "pick what's installed — surfaces its history",
       "backToEntity": "Back to {{entity}}",
+      "billedOn": "Billed on",
       "capture": "Capture",
       "change": "Change",
+      "changeEquipment": "Change {{entity, lowercase}}",
+      "changeEquipmentWarning": "Photos stay with {{name}}; findings move to this item only.",
       "changeStatus": "Change status (currently {{current}})",
       "collapseRow": "Hide details",
       "complaint": "Complaint",
-      "complaintPlaceholder": "What's the customer reporting?",
+      "complaintPlaceholder": "What's the {{customer, lowercase}} reporting?",
       "complaintSummary": "Complaint / summary",
+      "completeWithPartsMessage": "{{pos}} hasn't been received yet. Mark this item complete anyway?",
+      "completeWithPartsTitle": "Parts are still on order",
+      "composerHint": "Attach {{equipment, lowercase}} and schedule after saving.",
+      "current": "Current",
+      "deleteBlockedTitle": "This {{entity}} can't be deleted",
+      "deleteBlockedVisit": "A completed {{dispatch}} already worked this {{entity}}, so it stays on the record. Mark it complete instead.",
       "deleteConfirm": "Delete this {{entity, lowercase}}? This cannot be undone.",
+      "deleteItem": "Delete {{entity}}",
       "deleteMessage": "This can't be undone.",
+      "deletePhotoFailed": "Couldn't delete the file",
+      "deletePhotoTitle": "Delete this file?",
+      "deleteRefused": {
+        "LAST_WORK_ITEM": "It's the only {{entity}} on this {{workOrder}}.",
+        "WORK_ITEM_HAS_COMPLETED_VISIT": "A completed {{dispatch}} already worked this {{entity}}. Mark it complete instead.",
+        "WORK_ORDER_CANCELLED": "This {{workOrder}} is cancelled."
+      },
       "deleteTitle": "Delete {{entity, lowercase}}?",
       "descriptionRequired": "Description is required",
       "diagnosis": "Diagnosis",
-      "diagnosisPlaceholder": "The tech's on-site assessment — cause, findings, and fix.",
+      "dispatchStatus": {
+        "completed": "Completed",
+        "enRoute": "En route",
+        "inProgress": "On site",
+        "scheduled": "Scheduled"
+      },
+      "docStatus": {
+        "INVOICE": {
+          "CANCELLED": "Cancelled",
+          "DRAFT": "Draft",
+          "OVERDUE": "Overdue",
+          "PAID": "Paid",
+          "SENT": "Sent",
+          "VOID": "Void"
+        },
+        "QUOTE": {
+          "ACCEPTED": "Accepted",
+          "DECLINED": "Declined",
+          "DRAFT": "Draft",
+          "EXPIRED": "Expired",
+          "SENT": "Sent"
+        }
+      },
+      "doneGroup": "Done · {{count}}",
+      "draftChoiceMessage": "{{number}} is a draft {{quote}} for this job. Add this item's labor to it, or start a new {{quote}}?",
+      "draftChoiceTitle": "Add to the draft {{quote}}?",
       "duplicate": "Duplicate {{entity, lowercase}}",
       "editAll": "Edit all",
       "editDescription": "Edit description",
       "editItem": "Edit item",
+      "editLabor": "Edit labor estimate",
+      "edited": "edited",
       "empty": "No {{children, lowercase}} on this {{entity, lowercase}} yet.",
+      "emptyShort": "No {{entities}} yet",
+      "equipmentHistory": "{{equipment}} history",
+      "equipmentNotAttached": "{{entity}} not attached",
+      "equipmentSearchPlaceholder": "Name, model or serial",
+      "estHours": "est. {{hours}} h",
       "expandRow": "Show details",
+      "facts": {
+        "age": "{{count}} yr",
+        "assetTag": "Asset tag",
+        "filters": "Filters",
+        "installed": "Installed",
+        "location": "Location",
+        "model": "Model",
+        "serial": "Serial"
+      },
+      "fileCount": "{{count}} on file",
+      "findings": "Findings",
+      "findingsPlaceholder": "What's wrong, what caused it, what you did",
+      "firstVisit": "First visit for this {{equipment, lowercase}}.",
+      "forThisItem": "{{amount}} for this item",
       "frozenHelper": "This {{entity, lowercase}} is cancelled — item statuses are read-only.",
+      "fullHistory": "Full history →",
+      "history": "History",
       "historyArrow": "History →",
+      "historyHint": "edits to this item",
+      "hours": "{{hours}} h",
+      "hoursUnit": "h",
+      "inWarranty": "In warranty",
       "installedShort": "installed",
+      "labor": "Labor",
+      "laborHint": "Estimate · actual comes from dispatch time",
+      "laborHours": "Labor hours estimate",
+      "laborSaveFailed": "Couldn't save the labor estimate",
+      "lastService": "Last service {{date}}",
       "lastShort": "last",
       "lastUpdated": "Last updated",
+      "loggedBy": "logged by {{name}}",
+      "markComplete": "Mark complete",
+      "markCompleteInstead": "Mark complete instead",
+      "nameplate": "Nameplate",
       "newItem": "New {{entity}}",
-      "noEquipmentAttached": "No {{entity, lowercase}} attached",
+      "newQuote": "New {{quote}}",
+      "noEquipmentAtLocation": "No {{entity, lowercase}} on file here yet.",
       "noEquipmentLinked": "No {{entity, lowercase}} linked.",
-      "noEquipmentNeeded": "No equipment needed",
+      "noEquipmentNeeded": "No {{equipment, lowercase}} needed",
+      "noEquipmentNeededAction": "No {{entity}} needed",
       "noEquipmentNeededSet": "This {{entity, lowercase}} doesn't need {{equipmentEntity, lowercase}}",
-      "noPartsShort": "No parts yet",
+      "noEquipmentShort": "No {{entity, lowercase}}",
+      "noFindings": "No findings yet. The {{technician, lowercase}} adds them on site, or you can add them here.",
+      "noPartsOnOrder": "No parts on order for this item.",
       "noPartsYet": "No parts identified yet — add them after diagnosis, or record a field purchase.",
       "noPhotosYet": "No photos on file",
       "noPriorService": "No prior service",
-      "notDiagnosed": "Not yet diagnosed — tech will assess on site and add findings.",
+      "noneOnFile": "None on file yet.",
+      "noneYet": "None yet.",
+      "notAttachedHint": "Not attached. Attaching shows the {{entity}}'s history and warranty.",
+      "notDiagnosed": "Not yet diagnosed — {{technician, lowercase}} will assess on site and add findings.",
+      "notOnQuote": "Not on a {{quote}} yet",
+      "notScheduledYet": "Not scheduled yet.",
+      "notSold": "Not sold",
       "note": "Note",
       "noteCount": "{{count}} notes",
       "noteCountOne": "{{count}} note",
       "notePlaceholder": "e.g. Disconnect box corroded — flag on next visit",
-      "noteScopeHint": "Saved with this equipment — follows the unit to every work order, not just this job.",
+      "noteScopeHint": "Saved with this {{equipment, lowercase}} — follows the unit to every {{workOrder, lowercase}}, not just this one.",
+      "notes": "Notes",
+      "nothingMatches": "Nothing matches “{{q}}”.",
+      "onDocument": "On",
+      "onSite": "{{duration}} on site",
+      "onSiteSince": "On site since {{time}}",
+      "oneOnJob": "1 {{entity}} on this {{job}}",
+      "openEquipmentRecord": "Open {{entity}} record →",
       "openPage": "Open page",
       "openRecord": "Open record",
       "openRecordArrow": "Open record →",
       "openTotalCount": "{{open}} open · {{total}} total",
+      "orderParts": "Order parts",
+      "partsAndLabor": "Parts & labor",
+      "partsArrived": "Parts arrived",
       "partsReadiness": "Parts & readiness",
-      "pickerEmpty": "No {{entities, lowercase}} on file at this location.",
+      "pastJobs": "Past {{workOrders, lowercase}}",
+      "photos": "Photos",
+      "pickerEmpty": "No {{entities, lowercase}} on file at this {{location, lowercase}}.",
+      "poLineCount_one": "{{count}} line",
+      "poLineCount_other": "{{count}} lines",
+      "poStatus": {
+        "BILLED": "Billed",
+        "CANCELLED": "Cancelled",
+        "DRAFT": "Draft",
+        "ORDERED": "On order",
+        "PARTIALLY_RECEIVED": "Partly received",
+        "RECEIVED": "Received"
+      },
       "priorCount": "{{count}} prior",
       "priorVisits": "{{count}} prior visits",
       "qtyHeader": "Qty",
+      "quoteFailed": "Couldn't create the {{quote}}",
+      "quoteNeedsCustomer": "This job has no customer to bill.",
+      "quoteNeedsLabor": "Add a labor estimate first — it becomes the {{quote}} line for this item.",
+      "quoteNeedsRate": "No priced labor rate is set up.",
+      "quoteThisWork": "Quote this work",
       "recordFieldPurchase": "Record field purchase",
+      "reopen": "Reopen",
+      "reopenFailed": "Couldn't reopen the item",
+      "reportedOn": "Reported {{date}}",
+      "schedule": "Schedule",
+      "scheduleEntity": "Schedule {{entity}}",
       "serialAbbrev": "SN",
-      "sortAttention": "Needs attention",
-      "sortByEntity": "By {{entity, lowercase}}",
-      "sortLabel": "Sort",
-      "sortNewest": "Newest first",
-      "sortReported": "Reported order",
+      "showAll": "Show all {{count}}",
+      "showLess": "Show less",
       "statusUpdateError": "Failed to update item status",
+      "steps": {
+        "approved": "Approved",
+        "cancelled": "Cancelled",
+        "complete": "Complete",
+        "declinedOn": "Declined · {{number}}",
+        "diagnosed": "Diagnosed",
+        "done": "Done",
+        "eta": "ETA {{date}}",
+        "expiredOn": "Expired · {{number}}",
+        "partsReady": "Parts ready",
+        "received": "Received",
+        "reported": "Reported"
+      },
       "subUnits": "{{entities}} ({{count}}):",
       "subUnitsMore": "+{{count}} more →",
       "totalHeader": "Total",
       "trip": "Trip",
       "trips": "Trips",
-      "unitHeader": "Unit"
+      "unitHeader": "Unit",
+      "uploadFailed": "Couldn't upload {{name}}",
+      "uploadMedia": "Upload photo or video",
+      "uploading": "Uploading…",
+      "waitingOnParts": "Waiting on parts",
+      "warrantyExpired": "Out of warranty",
+      "warrantyLabor": "Labor to {{date}}",
+      "warrantyParts": "Parts to {{date}}",
+      "warrantyUntil": "Warranty to {{date}}"
     }
   },
   "account": {
@@ -2753,6 +4780,8 @@
       "emailHint": "contact your admin to change",
       "errorGeneric": "Could not save your profile.",
       "firstName": "First name",
+      "jobTitle": "Job title",
+      "jobTitlePlaceholder": "e.g. Comfort Advisor",
       "lastName": "Last name",
       "phone": "Phone",
       "phonePlaceholder": "(555) 555-5555",
@@ -2891,31 +4920,32 @@
     },
     "continueIn": "Continue in",
     "error": {
-      "body": "Something went wrong reaching the server. Your account is fine \u2014 this is a connection problem, not a change to your access.",
-      "title": "Couldn\u2019t load your workspaces"
+      "body": "Something went wrong reaching the server. Your account is fine — this is a connection problem, not a change to your access.",
+      "title": "Couldn’t load your workspaces"
     },
-    "loading": "Loading your workspaces\u2026",
+    "loading": "Loading your workspaces…",
     "none": {
-      "body": "Your sign-in worked, but this account isn\u2019t an active member of any workspace right now. An administrator may have removed or paused your access.",
+      "body": "Your sign-in worked, but this account isn’t an active member of any workspace right now. An administrator may have removed or paused your access.",
       "title": "No workspaces available"
     },
     "removed": {
-      "body": "An administrator removed or disabled your membership. Anything unsaved there is gone \u2014 your sign-in and your other workspaces are unaffected.",
+      "body": "An administrator removed or disabled your membership. Anything unsaved there is gone — your sign-in and your other workspaces are unaffected.",
       "title": "Your access to {{company}} ended",
       "titleGeneric": "Your access to that workspace ended"
     },
     "menuLabel": "Workspaces",
     "signOut": "Sign out",
+    "signOutScope": "Signs you out of all workspaces",
     "signedInAs": "Signed in as {{email}}",
     "switchAria": "Switch workspace",
     "switching": {
-      "body": "Loading this workspace\u2019s jobs and customers",
-      "title": "Switching to {{company}}\u2026"
+      "body": "Loading this workspace’s {{workOrders, lowercase}} and {{customers, lowercase}}",
+      "title": "Switching to {{company}}…"
     },
     "tryAgain": "Try again",
     "unknown": {
-      "body": "This address is for a workspace your account doesn\u2019t have access to.",
-      "title": "You\u2019re not a member of this workspace",
+      "body": "This address is for a workspace your account doesn’t have access to.",
+      "title": "You’re not a member of this workspace",
       "yours": "Your workspaces"
     }
   },
@@ -2936,5 +4966,330 @@
     "profile": "Profile",
     "schedule": "Schedule",
     "today": "Today"
+  },
+  "dispatchBoard": {
+    "backTarget": "the board",
+    "chips": {
+      "cancelled": "Cancelled",
+      "changed": "Changed, not sent",
+      "longdrive": "Drive > 30m",
+      "noshow": "No-show",
+      "offtech": "{{tech}} is off",
+      "recurring": "{{agreement}}",
+      "unreleased": "Not released",
+      "urgent": "Urgent"
+    },
+    "dateNav": {
+      "next": "Next day",
+      "nextWeek": "Next week",
+      "pick": "Pick a date",
+      "previous": "Previous day",
+      "previousWeek": "Previous week",
+      "today": "Today"
+    },
+    "density": {
+      "auto": "Density · auto ({{mode, lowercase}})",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "dense": "Dense"
+    },
+    "drag": {
+      "assignFailed": "Couldn't schedule",
+      "assigned": "{{workOrder}} → {{tech}}, {{window}} · held on deck",
+      "cancelled": "{{workOrder}} cancelled → unscheduled",
+      "cancelledNotSent": "{{workOrder}} cancelled → unscheduled · still on {{tech}}'s schedule, not sent",
+      "conflict": "Someone else changed this while you were looking. Reloading the board.",
+      "moveFailed": "Couldn't move",
+      "moved": "{{workOrder}} → {{tech}}, {{window}}",
+      "movedNotSent": "{{workOrder}} → {{tech}}, {{window}} · not sent yet",
+      "offOverlap": "{{tech}} is off {{off}} · {{window}} overlaps it",
+      "removeFailed": "Couldn't remove",
+      "removed": "{{workOrder}} → unscheduled",
+      "undoFailed": "Couldn't undo — reloading the board",
+      "windowLocked": "The {{tech}} has arrived, so the arrival window can't change now.",
+      "windowLockedHint": "Fixed: the {{tech}} has arrived."
+    },
+    "drawer": {
+      "changedPill": "Changed · not sent",
+      "onDay": "on {{day}}",
+      "reassignWarning": " — sending tells them it's off their schedule",
+      "stillHas": "Released {{sent}} · {{name}} still has {{window}}"
+    },
+    "filter": {
+      "allDivisions": "All {{entity, lowercase}}",
+      "allRegions": "All {{entity, lowercase}}",
+      "density": "Density",
+      "division": "{{entity}}",
+      "hiddenByDivision_one": "{{count}} more could take it",
+      "hiddenByDivision_other": "{{count}} more could take it",
+      "hideEmpty": "Hide unscheduled {{entity}}",
+      "hideEmptySuggestion_one": "{{count}} row is empty under this filter",
+      "hideEmptySuggestion_other": "{{count}} rows are empty under this filter",
+      "region": "{{entity}}",
+      "showHidden": "show"
+    },
+    "grid": {
+      "blockHint": "Right-click for actions · ⌘-click to open the {{entity, lowercase}}",
+      "cellOfCommitted": "{{inScope}} of {{committed}}",
+      "committedBreakdown": "{{inScope}} in scope · {{elsewhere}} committed elsewhere",
+      "committedElsewhere": "Committed elsewhere",
+      "driveMinutes": "{{minutes}}m drive",
+      "estimate": "est {{hours}}h",
+      "noEstimate": "no est.",
+      "offNotDroppable": "{{label}} — not droppable"
+    },
+    "hint": {
+      "rightClick": "Right-click a block to open its {{entity}}"
+    },
+    "job": {
+      "allVisits": "All {{entity, lowercase}}",
+      "balance": "{{amount}} outstanding",
+      "contact": "Contact",
+      "heading": "{{entity}}",
+      "moreNotes_one": "{{count}} more note",
+      "moreNotes_other": "{{count}} more notes",
+      "note": "{{entity}} note",
+      "open": "Open {{number}}",
+      "opened": "Opened",
+      "priorVisits": "Prior visits",
+      "priorVisitsValue_one": "{{count}} at this site · 12 mo",
+      "priorVisitsValue_other": "{{count}} at this site · 12 mo",
+      "thisVisit": "this visit"
+    },
+    "legend": {
+      "completed": "Completed",
+      "live": "En route / on site",
+      "noEstimate": "No estimate",
+      "noShow": "No-show",
+      "onSiteNow": "On site now",
+      "scheduled": "Scheduled",
+      "unreleased": "Not released"
+    },
+    "map": {
+      "attribution": "© OpenStreetMap contributors · Protomaps",
+      "clearFocus": "Clear focus",
+      "fit": "Fit to work",
+      "label": "Map",
+      "loading": "Loading the map…",
+      "missingCoordinates_one": "1 {{workOrder, lowercase}} has no location",
+      "missingCoordinates_other": "{{count}} {{workOrders, lowercase}} have no location",
+      "noSignalNeeded": "Stops and routes need no location signal.",
+      "notConfiguredBody": "No basemap is configured for this environment, so there is nothing to draw pins on. Every other view of the board works normally. Setting a basemap URL fills this in — nothing else has to change.",
+      "notConfiguredTitle": "The map isn't configured yet",
+      "prefilledTech": "Prefilled from the map",
+      "railCapped": "Showing {{shown}} of {{total}} unassigned",
+      "routes": "Routes",
+      "routesAll": "All",
+      "routesOff": "Off",
+      "routesSelected": "Selected",
+      "unassigned": "Unassigned",
+      "unassignedUnlocated_one": "1 unassigned {{workOrder, lowercase}} has no location",
+      "unassignedUnlocated_other": "{{count}} unassigned {{workOrders, lowercase}} have no location",
+      "windowUnset": "A map drop carries a person, not a time — so the arrival window is the one thing it cannot infer. Nothing is promised to the {{customer, lowercase}} until you choose one."
+    },
+    "menu": {
+      "label": "{{entity}} actions",
+      "openWorkOrder": "Open {{entity}}",
+      "details": "{{entity}} details…",
+      "release": "Release to {{tech, lowercase}}",
+      "reassign": "Reassign or reschedule…",
+      "unschedule": "Unschedule"
+    },
+    "move": {
+      "confirmAction": "Move to {{day}}",
+      "confirmBody": "{{customer}} was told {{from}}, {{window}}. Moving it to {{to}} keeps the same window but breaks that date.",
+      "confirmBodyEarlier": "{{customer}} hasn't been told about {{from}}, {{window}} — their last notice was about an earlier date. Moving it to {{to}} keeps the same window.",
+      "confirmTitle": "Move a visit the {{customer, lowercase}} already knows about?",
+      "drawerAction": "Move to…",
+      "drawerHeading": "Move to · keeps the window",
+      "failed": "Couldn't move",
+      "go": "Move",
+      "heading": "Move to · keeps {{window}}",
+      "hint": "Not sure when? Drag it to the rail instead.",
+      "keep": "Keep {{day}}",
+      "moved": "{{workOrder}} → {{day}}, {{window}}",
+      "movedCustomerStale": "{{workOrder}} → {{day}}, {{window}} · {{customer, lowercase}} and {{tech}} not told yet",
+      "movedNotSent": "{{workOrder}} → {{day}}, {{window}} · not sent to {{tech}} yet",
+      "movedReassignedNotSent": "{{workOrder}} → {{day}}, {{window}} · not sent yet",
+      "nextBusinessDay": "Next business day",
+      "notified": "{{customer}} notified · {{workOrder}} → {{day}}, {{window}} · not sent to {{tech}} yet",
+      "notifyCustomer": "Notify {{customer}} of the new date",
+      "notifyFailed": "{{workOrder}} moved to {{day}}, but the {{customer, lowercase}} text didn't send — notify them from the drawer",
+      "pickDate": "Pick a date…",
+      "staleWarning": "The {{customer, lowercase}} will still expect {{day}} until someone tells them.",
+      "staleWarningEarlier": "The {{customer, lowercase}} still won't know the date until someone tells them.",
+      "techDay": "{{tech}}, {{day}}",
+      "tomorrow": "Tomorrow"
+    },
+    "rail": {
+      "emptyBody": "The whole board is assigned.",
+      "emptyTitle": "Nothing unscheduled",
+      "heading": "Unscheduled",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items",
+      "itemsShort": "×{{count}}",
+      "nearest": "Nearest",
+      "nearestDistance": "{{miles}} mi · {{at}}",
+      "openWorkOrder": "Open {{number}}",
+      "recurring": "{{agreement}} / recurring work",
+      "stillWith": "Still on {{names}}'s schedule · not sent",
+      "theTech": "the {{technician, lowercase}}",
+      "urgent": "Urgent"
+    },
+    "release": {
+      "action_one": "Release {{count}}",
+      "action_other": "Release {{count}}",
+      "confirmAction": "Release",
+      "confirmBody_one": "This sends {{parts}} to the {{technicians, lowercase}} on this board. It can't be undone.",
+      "confirmBody_other": "This sends {{parts}} to the {{technicians, lowercase}} on this board. It can't be undone.",
+      "confirmTitle_one": "Release {{count}} change?",
+      "confirmTitle_other": "Release {{count}} changes?",
+      "doneSplit_one": "Released {{parts}}",
+      "doneSplit_other": "Released {{parts}}",
+      "failed": "Couldn't release",
+      "nothingPending": "Nothing pending to send",
+      "one": "{{workOrder}} released — the {{tech, lowercase}} has been notified",
+      "oneFailed": "Couldn't release that {{entity, lowercase}}",
+      "partChanged": "{{count}} changed",
+      "partNew": "{{count}} new",
+      "partRemoved": "{{count}} removed",
+      "reassignedSent": "{{workOrder}} sent to {{tech}} · {{previous}} told it's off their schedule",
+      "removalSent": "{{workOrder}} · {{tech}} told it's off their schedule",
+      "sendUpdate": "Send update",
+      "tooltip": "{{parts}} — every {{technician, lowercase}} row showing",
+      "updateSent": "{{workOrder}} · update sent to {{tech}}"
+    },
+    "rowCount_one": "{{count}} row",
+    "rowCount_other": "{{count}} rows",
+    "scheduledRelease": {
+      "alreadyReleased": "That release already went out",
+      "alreadySending": "That release has already started sending",
+      "beforeEvening": "Evening-before releases start at 5p.",
+      "boardTime": "Board time · {{zone}}",
+      "byHand": "· released by hand · due {{time}}",
+      "cancelFailed": "Couldn't cancel the scheduled release",
+      "cancelMine": "Cancel my scheduled release",
+      "cancelTheirs": "Cancel {{name}}’s scheduled release",
+      "cancelled": "Scheduled release cancelled · nothing was sent",
+      "changeTime": "Change time…",
+      "clockLabel": "Release at a scheduled time",
+      "clockTitle": "Release at…",
+      "due": "· due {{time}}",
+      "eveningBefore": "{{day}} evening",
+      "moveTo": "Move to {{when}}",
+      "moved": "Moved your release to {{when}} · sends what’s pending then",
+      "note": "Sends whatever is pending at that time — edits you make before then go out with it.",
+      "nothingSent": "nothing left to send",
+      "otherTime": "Other time",
+      "overdue": "Scheduled for {{when}} · not sent",
+      "overdueBy": "Set by {{name}}.",
+      "overdueNoRetry": "It won't retry on its own.",
+      "overduePending_one": "{{count}} change is still pending — that {{technician, lowercase}} may not have their schedule.",
+      "overduePending_other": "{{count}} changes are still pending — those {{technicians, lowercase}} may not have their schedule.",
+      "overdueTitle": "The {{when}} scheduled release didn't send.",
+      "partialScope": "It sends only your {{regions, lowercase}}; the rest stays not sent.",
+      "passed": "That time has already passed.",
+      "pickTime": "Pick a time",
+      "picks": "Common release times",
+      "releaseNow": "Release now · {{count}}",
+      "scheduleFailed": "Couldn't schedule the release",
+      "scheduleFor": "Schedule for {{when}}",
+      "scheduled": "Releases {{when}} · {{who}}",
+      "scheduledToast": "Release scheduled for {{when}} · sends what’s pending then",
+      "scope": "Scope:",
+      "scopeAll": "every {{technician, lowercase}} row showing",
+      "scopeRegions_one": "{{count}} {{region, lowercase}}",
+      "scopeRegions_other": "{{count}} {{regions, lowercase}}",
+      "sending": "Sending the {{when}} release…",
+      "sent": "Released at {{time}} · {{parts}}",
+      "setBy": "Set by {{name}} · sends what’s pending then",
+      "time": "Time",
+      "title": "Release {{day}} at…",
+      "titleMove": "Move your scheduled release",
+      "whichDay": "Which day",
+      "you": "You",
+      "youLower": "you"
+    },
+    "search": {
+      "placeholder": "Find a {{entity, lowercase}}…"
+    },
+    "states": {
+      "loading": "Loading board…",
+      "errorTitle": "Couldn't load the board",
+      "errorBody": "The board data didn't come back. Retry, or reload the page.",
+      "emptyFilteredTitle": "No {{entity, lowercase}} match these filters",
+      "emptyFilteredBody": "Clear a filter to widen the board.",
+      "emptyTitle": "Nothing scheduled",
+      "emptyBody": "No {{entity, lowercase}} are scheduled for this day.",
+      "noTechsTitle": "No {{entity, lowercase}} on this board",
+      "noTechsBody": "A user appears here when one of their roles is marked “{{setting}}”.",
+      "noTechsAction": "Review roles",
+      "clearFilters": "Clear filters"
+    },
+    "subtitleCount_one": "{{count}} {{entity, lowercase}} in scope",
+    "subtitleCount_other": "{{count}} {{entity, lowercase}} in scope",
+    "subtitleDispatches_one": "{{count}} {{entity}}",
+    "subtitleDispatches_other": "{{count}} {{entity}}",
+    "subtitleNow": "now {{time}}",
+    "timeOff": {
+      "action": "Mark time off…",
+      "allDay": "All day",
+      "allDayOn": "All day, {{day}}",
+      "between": "Between",
+      "clearAction": "Clear time off",
+      "clearFailed": "Couldn't clear that time off",
+      "cleared": "{{name}} is back on the board",
+      "clearedRange": "{{name}}'s time off cleared · {{range}}",
+      "failed": "Couldn't save that time off",
+      "from": "From",
+      "howLong": "How long",
+      "liveWork_one": "{{count}} {{entity}} stays assigned to {{name}} — nothing is moved automatically. It'll appear under {{chip}} for you to reassign.",
+      "liveWork_other": "{{count}} {{entity}} stay assigned to {{name}} — nothing is moved automatically. They'll appear under {{chip}} for you to reassign.",
+      "openProfile": "Open profile",
+      "partOfDay": "Part of day",
+      "partOneDay": "Part-day absences are one day at a time — set Through back to the same day to use it.",
+      "reason": "Reason",
+      "reasons": {
+        "OTHER": "Other",
+        "SICK": "Sick",
+        "TIME_OFF": "Time off",
+        "TRAINING": "Training"
+      },
+      "rowMenu": "Actions for {{name}}",
+      "save": "Mark off",
+      "saved": "{{name}} marked off",
+      "savedWithWork_one": "{{name}} marked off · {{count}} {{entity}} still assigned — reassign it from {{chip}}",
+      "savedWithWork_other": "{{name}} marked off · {{count}} {{entity}} still assigned — reassign them from {{chip}}",
+      "through": "Through",
+      "title": "Mark {{name}} off",
+      "to": "to",
+      "until": "Until"
+    },
+    "title": "{{entity}} Board",
+    "view": {
+      "day": "Day",
+      "label": "Time scope",
+      "week": "Week"
+    },
+    "week": {
+      "cellLabel": "{{name}}, {{day}} — {{count}} {{entity}}",
+      "notSent": "Not sent",
+      "notYet": "Not yet",
+      "openDay": "Open day →",
+      "openDayTitle": "Open {{day}} on the day board",
+      "pastTitle": "Past — read only",
+      "peekEmpty": "Nothing booked",
+      "peekHint": "Drag a stop onto another day",
+      "peekLoading": "Loading…",
+      "pendingTitle": "Has work not yet sent to the {{technician, lowercase}}",
+      "preview": "{{from}} → {{to}} of {{cap}}",
+      "previewOver": "{{from}} → {{to}} of {{cap}} · over",
+      "releaseConfirmBody_one": "Sends {{count}} {{entity}} — {{parts}} — for {{day}} only. Other days are untouched. Anything you move on {{day}} after this goes out as a change with the next release.",
+      "releaseConfirmBody_other": "Sends {{count}} {{entity}} — {{parts}} — for {{day}} only. Other days are untouched. Anything you move on {{day}} after this goes out as a change with the next release.",
+      "releaseConfirmTitle_one": "Release {{day}} to {{count}} {{techs}}?",
+      "releaseConfirmTitle_other": "Release {{day}} to {{count}} {{techs}}?",
+      "releaseDayTitle_one": "Release {{day}} · {{count}} not sent",
+      "releaseDayTitle_other": "Release {{day}} · {{count}} not sent"
+    }
   }
 }

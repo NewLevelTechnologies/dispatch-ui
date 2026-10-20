@@ -35,6 +35,8 @@ export interface PurchaseOrderListItem {
   type: PurchaseOrderType;
   status: PurchaseOrderStatus;
   workOrderId: string | null;
+  // The work item the PO was raised for; null for a whole-job or stock PO.
+  workItemId?: string | null;
   workOrderNumber?: string | null;
   serviceLocationName?: string | null;
   createdByName?: string | null;
@@ -111,8 +113,12 @@ export interface PurchaseOrderResponse {
   cancellationReason?: string | null;
 }
 
-// A line on create/patch. Omit id for new lines; PATCH `lines` replaces the set.
+// A line on create/patch. On PATCH, send `id` for every existing line: it's
+// updated in place and keeps its id, so invoice lines billed from it
+// (`sourcePoLineId`) stay linked. A line without an id is new; existing
+// lines left out are removed.
 export interface PurchaseOrderLineInput {
+  id?: string;
   name: string;
   sku?: string | null;
   quantityOrdered: number;
@@ -224,12 +230,16 @@ interface ListPurchaseOrdersParams {
   // Case-insensitive substring across PO#, vendor, WO#, and site (WO#/site
   // depend on the work-order cache being populated).
   q?: string;
+  // Still-expected POs (ORDERED / PARTIALLY_RECEIVED) whose eta is before the
+  // tenant's today. On `summary`, `openCount` is then the past-ETA count.
+  overdue?: boolean;
   page?: number;
   size?: number;
+  sort?: string; // poNumber | vendorName | createdAt | totalCost, e.g. 'totalCost,desc'
 }
 
 // Summary takes the list's filters, minus paging.
-type PurchaseOrderSummaryParams = Omit<ListPurchaseOrdersParams, 'page' | 'size'>;
+type PurchaseOrderSummaryParams = Omit<ListPurchaseOrdersParams, 'page' | 'size' | 'sort'>;
 
 export const purchaseOrderApi = {
   list: async (params: ListPurchaseOrdersParams = {}): Promise<Page<PurchaseOrderListItem>> => {

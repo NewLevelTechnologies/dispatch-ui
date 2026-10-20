@@ -72,8 +72,13 @@ describe('ServiceLocationDetailPage', () => {
     equipment: unknown[] = [],
     workOrders: unknown[] = [],
     locationTech: unknown = { onSiteTech: null, techByWorkOrder: {} },
-    invoices: unknown[] = [],
-    invoiceSummary: unknown = { billedYtd: 0, openCount: 0, openAmount: 0, aged91: 0, currency: 'USD' },
+    documents: unknown[] = [],
+    documentViews: unknown = {
+      counts: { open: 0, all: 0, quote: 0, invoice: 0 },
+      openQuotes: { count: 0, amount: 0 },
+      due: 0,
+      overdue: 0,
+    },
     dispatches: unknown[] = []
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url, config) => {
@@ -219,26 +224,25 @@ describe('ServiceLocationDetailPage', () => {
           data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, first: true, last: true },
         });
       }
-      // Order matters: the summary path is more specific than the list path.
-      if (url.includes('/financial/invoices/summary')) {
-        return Promise.resolve({ data: invoiceSummary });
+      // Quotes & invoices tab: counts, then the paged list (custom PageResponse
+      // envelope: `page`, not `number`). Honors page/size so paging tests see
+      // real slices; view and q are asserted as request params.
+      if (url === '/financial/documents/views') {
+        return Promise.resolve({ data: documentViews });
       }
-      // Paged list — serves both the tab body's filtered query and the size-1
-      // count query (custom PageResponse envelope: `page`, not `number`).
-      // Honors page/size so paging tests see real slices.
-      if (url.includes('/financial/invoices')) {
+      if (url === '/financial/documents') {
         const params = (config?.params ?? {}) as { page?: number; size?: number };
         const size = params.size ?? 25;
         const page = params.page ?? 0;
         return Promise.resolve({
           data: {
-            content: invoices.slice(page * size, page * size + size),
+            content: documents.slice(page * size, page * size + size),
             page,
             size,
-            totalElements: invoices.length,
-            totalPages: Math.ceil(invoices.length / size),
+            totalElements: documents.length,
+            totalPages: Math.ceil(documents.length / size),
             first: page === 0,
-            last: (page + 1) * size >= invoices.length,
+            last: (page + 1) * size >= documents.length,
           },
         });
       }
@@ -405,7 +409,7 @@ describe('ServiceLocationDetailPage', () => {
     it('derives the urgent open-jobs row from the loaded work orders', async () => {
       mockApiResponses(techLocation, [], [], workOrders, locationTech);
       renderDetailPage();
-      await waitFor(() => expect(screen.getByText(/1 urgent job/)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/1 urgent work order/)).toBeInTheDocument());
     });
 
     it('renders embedded assigned users per work-order row (name, +N, null fallback)', async () => {
@@ -576,6 +580,15 @@ describe('ServiceLocationDetailPage', () => {
     });
     const backLink = screen.getByRole('link', { name: /← Work Orders/i });
     expect(backLink).toHaveAttribute('href', '/work-orders');
+  });
+
+  it('back-link returns to the quote it was opened from', async () => {
+    mockApiResponses();
+    renderDetailPage('location-1?from=quote&docId=q-1&docNo=QTE-00025');
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /← QTE-00025/ })).toHaveAttribute('href', '/quotes/q-1');
   });
 
   it('back-link restores the filters the Locations list was carrying', async () => {
@@ -940,7 +953,7 @@ describe('ServiceLocationDetailPage', () => {
       const user = await openDispatchesTab([makeDispatch()]);
       await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
 
-      await user.type(screen.getByPlaceholderText(/search by tech or work order/i), 'jane');
+      await user.type(screen.getByPlaceholderText(/search by technician or work order/i), 'jane');
       await waitFor(() => expect(dispatchCallWith((p) => p.q === 'jane' && p.when === 'upcoming')).toBe(true));
       expect(dispatchCallWith((p) => p.q === 'jane' && p.when === 'past')).toBe(true);
       // Jane Tech matches — the row survives the server-side filter.
@@ -1009,7 +1022,7 @@ describe('ServiceLocationDetailPage', () => {
       ]);
       await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
 
-      await user.type(screen.getByPlaceholderText(/search by tech or work order/i), 'zzz');
+      await user.type(screen.getByPlaceholderText(/search by technician or work order/i), 'zzz');
       await waitFor(() => expect(screen.getByText(/no matching dispatches/i)).toBeInTheDocument());
 
       await user.click(screen.getByRole('button', { name: 'Clear filters' }));
@@ -1040,28 +1053,62 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   // ── Invoices tab (FIN-1) ────────────────────────────────────────────────
-  describe('invoices tab', () => {
+  describe('quotes & invoices tab', () => {
     const makeInvoice = (over: Record<string, unknown> = {}) => ({
-      id: 'inv-1',
-      customerId: 'customer-1',
-      workOrderId: 'wo-1',
-      invoiceNumber: 'INV-1001',
-      status: 'SENT',
-      invoiceDate: '2026-01-15T00:00:00Z',
-      dueDate: '2026-02-15T00:00:00Z',
-      subtotal: 500,
-      taxRate: 0,
-      taxAmount: 0,
-      totalAmount: 500,
-      amountPaid: 0,
-      balanceDue: 500,
-      overdue: false,
-      createdAt: '2026-01-15T00:00:00Z',
-      updatedAt: '2026-01-15T00:00:00Z',
-      ...over,
+      kind: 'INVOICE',
+      id: (over.id as string) ?? 'inv-1',
+      invoice: {
+        id: 'inv-1',
+        customerId: 'customer-1',
+        customerName: 'Test Customer',
+        workOrderId: 'wo-1',
+        workOrderNumber: 'WO-5000',
+        invoiceNumber: 'INV-1001',
+        status: 'SENT',
+        invoiceDate: '2026-01-15',
+        dueDate: '2026-02-15',
+        subtotal: 500,
+        taxAmount: 0,
+        totalAmount: 500,
+        amountPaid: 0,
+        balanceDue: 500,
+        overdue: false,
+        createdAt: '2026-01-15T00:00:00Z',
+        updatedAt: '2026-01-15T00:00:00Z',
+        ...over,
+      },
     });
-
-    const summary = { billedYtd: 1234.56, openCount: 2, openAmount: 890, aged91: 150, currency: 'USD' };
+    const makeQuote = (over: Record<string, unknown> = {}) => ({
+      kind: 'QUOTE',
+      id: (over.id as string) ?? 'q-1',
+      quote: {
+        id: 'q-1',
+        quoteNumber: 'Q-2071',
+        title: 'RTU-3 compressor replacement',
+        status: 'SENT',
+        customerId: 'customer-1',
+        customerName: 'Test Customer',
+        workOrderId: 'wo-1',
+        workOrderNumber: 'WO-5000',
+        quoteDate: '2026-01-10',
+        expirationDate: '2026-02-09',
+        subtotal: 8420,
+        taxAmount: 0,
+        totalAmount: 8420,
+        revision: 2,
+        firstSentAt: '2026-01-10T00:00:00Z',
+        firstViewedAt: '2026-01-11T00:00:00Z',
+        createdAt: '2026-01-10T00:00:00Z',
+        updatedAt: '2026-01-10T00:00:00Z',
+        ...over,
+      },
+    });
+    const views = {
+      counts: { open: 2, all: 5, quote: 3, invoice: 2 },
+      openQuotes: { count: 3, amount: 10270 },
+      due: 2054,
+      overdue: 1240,
+    };
     const workOrders = [
       {
         id: 'wo-1',
@@ -1078,153 +1125,137 @@ describe('ServiceLocationDetailPage', () => {
       },
     ];
 
-    const openInvoicesTab = async () => {
-      const user = userEvent.setup();
-      renderDetailPage();
-      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(screen.getByRole('tab', { name: /invoice/i }));
-      return user;
-    };
-
-    it('renders the summary strip and invoice rows', async () => {
-      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
-      await openInvoicesTab();
-
-      // Summary strip — server-computed billed YTD, open, aged.
-      await waitFor(() => expect(screen.getByText('$1,234.56')).toBeInTheDocument());
-      expect(screen.getByText('Billed YTD')).toBeInTheDocument();
-      expect(screen.getByText('2 open')).toBeInTheDocument();
-      expect(screen.getByText('past due')).toBeInTheDocument();
-
-      // Row: number, resolved WO #, bill-to, amount + balance (both $500 here).
-      expect(screen.getByText('INV-1001')).toBeInTheDocument();
-      expect(screen.getByText('WO-5000')).toBeInTheDocument();
-      expect(screen.getAllByText('$500.00')).toHaveLength(2);
-    });
-
-    it('drills through to the owning work order on row click', async () => {
-      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
-      const user = userEvent.setup();
-      // No standalone invoice route — navigation targets the WO (financial
-      // drawer lives there). Render with a stub WO route to observe the nav.
-      const routes: RouteObject[] = [
-        { path: '/service-locations/:id', element: <ServiceLocationDetailPage /> },
-        // eslint-disable-next-line i18next/no-literal-string
-        { path: '/work-orders/:id', element: <div>Work order stub</div> },
-      ];
-      renderWithProviders(<ServiceLocationDetailPage />, {
-        routes,
-        initialPath: '/service-locations/location-1',
-      });
-      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(screen.getByRole('tab', { name: /invoice/i }));
-
-      const row = (await screen.findByText('INV-1001')).closest('tr')!;
-      await user.click(row);
-      await waitFor(() => expect(screen.getByText('Work order stub')).toBeInTheDocument());
-    });
-
-    it('strikes through and mutes the amount on a void invoice', async () => {
-      const voided = makeInvoice({ id: 'inv-2', invoiceNumber: 'INV-2002', status: 'VOID', totalAmount: 100 });
-      mockApiResponses(mockLocation, [], [], workOrders, undefined, [voided], summary);
-      await openInvoicesTab();
-
-      const amount = await screen.findByText('$100.00');
-      expect(amount.className).toContain('line-through');
-      expect(amount.className).toContain('text-fg-muted');
-    });
-
-    it('shows an empty state when the location has no invoices', async () => {
-      mockApiResponses(mockLocation, [], [], [], undefined, [], summary);
-      await openInvoicesTab();
-      await waitFor(() =>
-        expect(screen.getByText(/for work at this site will appear here/i)).toBeInTheDocument()
-      );
-    });
-
-    it('renders the server-derived overdue flag as the status pill', async () => {
-      // status still SENT but `overdue: true` (open + strictly past due) —
-      // the row badge follows the server flag, not the stored status.
-      const lagging = makeInvoice({ overdue: true, status: 'SENT' });
-      mockApiResponses(mockLocation, [], [], workOrders, undefined, [lagging], summary);
-      await openInvoicesTab();
-      await waitFor(() => expect(screen.getByText('Overdue')).toBeInTheDocument());
-      expect(screen.queryByText('Sent')).not.toBeInTheDocument();
-    });
-
-    it('searches the location’s invoices via the q param', async () => {
-      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
-      const user = await openInvoicesTab();
-      await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
-
-      await user.type(screen.getByPlaceholderText(/search invoice/i), '1001');
-      await waitFor(() => {
-        const sentQ = vi
-          .mocked(apiClient.get)
-          .mock.calls.some(
-            ([u, cfg]) =>
-              u === '/financial/invoices' &&
-              (cfg as { params?: { q?: string; serviceLocationId?: string } } | undefined)?.params?.q === '1001' &&
-              (cfg as { params?: { serviceLocationId?: string } } | undefined)?.params?.serviceLocationId === 'location-1',
-          );
-        expect(sentQ).toBe(true);
-      });
-    });
-
-    const invoiceCallWith = (match: (params: Record<string, unknown>) => boolean) =>
+    const documentCallWith = (match: (params: Record<string, unknown>) => boolean) =>
       vi
         .mocked(apiClient.get)
         .mock.calls.some(
           ([u, cfg]) =>
-            u === '/financial/invoices' &&
-            match(((cfg as { params?: Record<string, unknown> } | undefined)?.params ?? {})),
+            u === '/financial/documents' && match((cfg as { params?: Record<string, unknown> } | undefined)?.params ?? {}),
         );
 
-    it('filters by status and issued-date preset, then clears the toolbar', async () => {
-      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
-      const user = await openInvoicesTab();
-      await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
+    const openDocumentsTab = async () => {
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /quotes & invoices/i }));
+      return user;
+    };
 
-      // Search ×-clear resets the q param.
-      await user.type(screen.getByPlaceholderText(/search invoice/i), 'zzz');
-      await user.click(screen.getByRole('button', { name: '×' }));
-      expect(screen.getByPlaceholderText(/search invoice/i)).toHaveValue('');
-
-      // Status chip → Paid rides the server-side status param.
-      await user.click(screen.getByRole('button', { name: 'Status' }));
-      await user.click(await screen.findByRole('option', { name: 'Paid' }));
-      await waitFor(() => expect(invoiceCallWith((p) => p.status === 'PAID')).toBe(true));
-
-      // Issued chip → a popover preset resolves to a from/to range.
-      await user.click(screen.getByRole('button', { name: 'Issued date' }));
-      await user.click(await screen.findByRole('button', { name: 'Last 30 days' }));
-      await waitFor(() => expect(invoiceCallWith((p) => Boolean(p.from) && Boolean(p.to))).toBe(true));
-
-      // Clear resets every filter — the button itself disappears with them.
-      await user.click(screen.getByRole('button', { name: 'Clear' }));
-      await waitFor(() => expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument());
+    it('badges the tab with every document and opens on the Open view', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeQuote()], views);
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByRole('tab', { name: /quotes & invoices\s*5/i })).toBeInTheDocument());
+      await userEvent.setup().click(screen.getByRole('tab', { name: /quotes & invoices/i }));
       await waitFor(() =>
-        expect(invoiceCallWith((p) => p.status === undefined && p.from === undefined && p.q === undefined)).toBe(true),
+        expect(documentCallWith((p) => p.serviceLocationId === 'location-1' && p.view === 'open')).toBe(true),
       );
     });
 
-    it('pages the invoice list', async () => {
+    it('lists quotes and invoices together with the header figures', async () => {
+      const overdue = makeInvoice({ overdue: true, quoteNumber: 'Q-2052', balanceDue: 1240, totalAmount: 1240 });
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeQuote(), overdue], views);
+      await openDocumentsTab();
+
+      await waitFor(() => expect(screen.getByText('Q-2071')).toBeInTheDocument());
+      expect(screen.getByText('Rev 2')).toBeInTheDocument();
+      expect(screen.getByText('RTU-3 compressor replacement')).toBeInTheDocument();
+      expect(screen.getByText('Viewed')).toBeInTheDocument();
+      expect(screen.getByText(/viewed · expires/)).toBeInTheDocument();
+
+      // The invoice carries no title, so its job's description stands in.
+      expect(screen.getByText('INV-1001')).toBeInTheDocument();
+      expect(screen.getByText('Q-2052')).toBeInTheDocument();
+      expect(screen.getByText('Overdue')).toBeInTheDocument();
+
+      expect(screen.getByText(/open quotes · \$10,270/)).toBeInTheDocument();
+      expect(screen.getByText('$2,054')).toBeInTheDocument();
+      expect(screen.getByText('$1,240 overdue')).toBeInTheDocument();
+    });
+
+    it('opens a quote or an invoice from its row', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeQuote(), makeInvoice()], views);
+      const user = userEvent.setup();
+      const routes: RouteObject[] = [
+        { path: '/service-locations/:id', element: <ServiceLocationDetailPage /> },
+        // eslint-disable-next-line i18next/no-literal-string
+        { path: '/invoices/:id', element: <div>Invoice stub</div> },
+        // eslint-disable-next-line i18next/no-literal-string
+        { path: '/quotes/:id', element: <div>Quote stub</div> },
+      ];
+      renderWithProviders(<ServiceLocationDetailPage />, { routes, initialPath: '/service-locations/location-1' });
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /quotes & invoices/i }));
+
+      await user.click((await screen.findByText('Q-2071')).closest('tr')!);
+      await waitFor(() => expect(screen.getByText('Quote stub')).toBeInTheDocument());
+    });
+
+    it('opens the invoice from its row and the job from its number', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], views);
+      const user = userEvent.setup();
+      const routes: RouteObject[] = [
+        { path: '/service-locations/:id', element: <ServiceLocationDetailPage /> },
+        // eslint-disable-next-line i18next/no-literal-string
+        { path: '/work-orders/:id', element: <div>Work order stub</div> },
+        // eslint-disable-next-line i18next/no-literal-string
+        { path: '/invoices/:id', element: <div>Invoice stub</div> },
+      ];
+      renderWithProviders(<ServiceLocationDetailPage />, { routes, initialPath: '/service-locations/location-1' });
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /quotes & invoices/i }));
+
+      await user.click(await screen.findByRole('link', { name: 'WO-5000' }));
+      await waitFor(() => expect(screen.getByText('Work order stub')).toBeInTheDocument());
+      expect(screen.queryByText('Invoice stub')).not.toBeInTheDocument();
+    });
+
+    it('switches views and searches on the server', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeQuote()], views);
+      const user = await openDocumentsTab();
+      await waitFor(() => expect(screen.getByText('Q-2071')).toBeInTheDocument());
+
+      await user.click(screen.getByRole('radio', { name: /^Quotes/ }));
+      await waitFor(() => expect(documentCallWith((p) => p.view === 'quote')).toBe(true));
+      expect(screen.getByRole('columnheader', { name: 'Invoiced' })).toBeInTheDocument();
+
+      await user.type(screen.getByRole('textbox', { name: /search quotes and invoices/i }), '2071');
+      await waitFor(() => expect(documentCallWith((p) => p.view === 'quote' && p.q === '2071')).toBe(true));
+    });
+
+    it('says nothing is open when the Open view is empty', async () => {
+      mockApiResponses(mockLocation, [], [], [], undefined, [], views);
+      await openDocumentsTab();
+      await waitFor(() => expect(screen.getByText('Nothing open')).toBeInTheDocument());
+      expect(screen.getByText(/no open quotes or unpaid invoices/i)).toBeInTheDocument();
+    });
+
+    it('links the footer to the bill-to account', async () => {
+      mockApiResponses(mockLocation, [], [], [], undefined, [], views);
+      await openDocumentsTab();
+      const link = await screen.findByRole('link', { name: 'Test Customer' });
+      expect(link).toHaveAttribute('href', '/customers/customer-1');
+    });
+
+    it('starts a new quote at this location', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [], views);
+      const user = await openDocumentsTab();
+      await user.click(await screen.findByRole('button', { name: 'New quote' }));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('pages the list', async () => {
       const many = Array.from({ length: 30 }, (_, i) =>
         makeInvoice({ id: `inv-${i}`, invoiceNumber: `INV-${2000 + i}` }),
       );
-      mockApiResponses(mockLocation, [], [], workOrders, undefined, many, summary);
-      const user = await openInvoicesTab();
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, many, views);
+      const user = await openDocumentsTab();
 
       await waitFor(() => expect(screen.getByText('INV-2000')).toBeInTheDocument());
       expect(screen.queryByText('INV-2029')).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Page 2' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('link', { name: 'Next page' }));
       await waitFor(() => expect(screen.getByText('INV-2029')).toBeInTheDocument());
       expect(screen.queryByText('INV-2000')).not.toBeInTheDocument();
-
-      await user.click(screen.getByRole('link', { name: 'Previous page' }));
-      await waitFor(() => expect(screen.getByText('INV-2000')).toBeInTheDocument());
     });
   });
 

@@ -78,6 +78,9 @@ interface ToggleGroupOptionProps<T extends string> {
   // the same way elsewhere (WO priority → the tone its pill gets on a list
   // row). Don't reach for it to decorate an ordinary preference toggle.
   tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+  // Not selectable right now. Say why next to the group — a greyed option
+  // with no reason reads as a bug.
+  disabled?: boolean;
 }
 
 export function ToggleGroupOption<T extends string>({
@@ -87,6 +90,7 @@ export function ToggleGroupOption<T extends string>({
   'aria-label': ariaLabel,
   title,
   tone,
+  disabled,
 }: ToggleGroupOptionProps<T>) {
   return (
     <Headless.Radio
@@ -94,6 +98,7 @@ export function ToggleGroupOption<T extends string>({
       aria-label={ariaLabel}
       title={title}
       data-tone={tone}
+      disabled={disabled}
       className={clsx('toggle-group-option', className)}
     >
       {children}

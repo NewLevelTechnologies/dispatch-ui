@@ -263,7 +263,7 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
                       type="button"
                       onClick={handleSetProfile}
                       disabled={setProfileMutation.isPending}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 !text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <StarIconOutline className="size-4" />
                       {t('equipment.images.setAsProfile')}
@@ -278,8 +278,8 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
                     disabled={setNameplateMutation.isPending}
                     className={
                       current.image.isNameplate
-                        ? 'inline-flex items-center gap-1.5 rounded-full bg-accent-500/25 px-3 py-1.5 text-sm font-medium text-white ring-1 ring-inset ring-accent-400/40 hover:bg-accent-500/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50'
-                        : 'inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50'
+                        ? 'inline-flex items-center gap-1.5 rounded-full bg-accent-500/25 px-3 py-1.5 !text-sm !font-medium text-white ring-1 ring-inset ring-accent-400/40 hover:bg-accent-500/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50'
+                        : 'inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 !text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50'
                     }
                   >
                     <TagIcon className="size-4" />
@@ -293,7 +293,7 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
                   onClick={handleDelete}
                   disabled={deletePending}
                   aria-label={t('common.delete')}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 !text-sm text-white hover:bg-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <TrashIcon className="size-4" />
                   {t('common.delete')}
@@ -368,14 +368,14 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
                 }}
                 placeholder={t('equipment.images.captionPlaceholder')}
                 aria-label={t('equipment.images.editCaption')}
-                className="w-full max-w-md rounded border border-white/40 bg-black/50 px-3 py-1.5 text-center text-sm text-white placeholder-white/60 focus:border-white/70 focus:outline-none"
+                className="w-full max-w-md rounded border border-white/40 bg-black/50 px-3 py-1.5 text-center !text-sm text-white placeholder-white/60 focus:border-white/70 focus:outline-none"
               />
             ) : caption ? (
               <button
                 type="button"
                 onClick={startCaptionEdit}
                 disabled={readOnly}
-                className="rounded px-2 py-0.5 text-sm text-white [text-shadow:0_1px_2px_rgb(0_0_0_/_60%)] hover:bg-white/10 disabled:cursor-default disabled:hover:bg-transparent"
+                className="rounded px-2 py-0.5 !text-sm text-white [text-shadow:0_1px_2px_rgb(0_0_0_/_60%)] hover:bg-white/10 disabled:cursor-default disabled:hover:bg-transparent"
               >
                 {caption}
               </button>
@@ -384,7 +384,7 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
                 <button
                   type="button"
                   onClick={startCaptionEdit}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-sm text-white ring-1 ring-inset ring-white/20 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 !text-sm text-white ring-1 ring-inset ring-white/20 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
                   <PlusIcon className="size-4" />
                   {t('equipment.images.addCaption')}

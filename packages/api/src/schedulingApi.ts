@@ -54,6 +54,13 @@ export interface Dispatch {
   // Empty/absent = unscoped (the visit covers the whole work order); a populated
   // list is the specific items. Never an auto-expanded snapshot.
   addressedWorkItemIds?: string[];
+  // Optimistic-concurrency token. Round-trip it on PUT and a mismatch is a
+  // 409 DISPATCH_VERSION_CONFLICT rather than a silent overwrite.
+  version?: number;
+  // When a PUT last actually changed the arrival window. Null = unchanged
+  // since create. "Customer notified" means a CUSTOMER notice sent AFTER this
+  // — a notice about the old date says nothing about the new one.
+  windowChangedAt?: string | null;
 }
 
 export interface CreateDispatchRequest {
@@ -86,6 +93,17 @@ export interface UpdateDispatchRequest {
   label?: string;
   // Replace the addressed-work-item set. omit = unchanged; [] = clear (unscoped).
   addressedWorkItemIds?: string[];
+  /**
+   * The version the caller last read — an optimistic precondition, not a
+   * field to write. A mismatch returns 409 DISPATCH_VERSION_CONFLICT instead
+   * of quietly overwriting whoever got there first.
+   *
+   * Optional on the wire only because making it required would break callers
+   * that don't send it yet. Always send it when you have it: omitting it
+   * turns off stale-read detection, and "someone else changed this" is
+   * precisely the case two dispatchers on one board produce.
+   */
+  version?: number;
 }
 
 // ---- Resolved technician view (location detail) ----
@@ -314,6 +332,19 @@ export const dispatchesApi = {
     await apiClient.delete(`/scheduling/dispatches/${id}`);
   },
 
+  // Release one dispatch: sends whatever brings the tech's copy back in line —
+  // a new assignment, a "schedule change", or (reassigned) a removal to the old
+  // tech and an assignment to the new one. Release is the ONE hand-over verb:
+  // editing never contacts anyone. Safe to repeat — nothing is sent when the
+  // copy already matches. This is also the drawer's and toast's Send update.
+  //
+  // Null for a 204: the dispatch was deleted and this sent its tech the
+  // removal. The bulk, scope-based sibling lives on dispatchBoardApi.
+  release: async (id: string): Promise<Dispatch | null> => {
+    const response = await apiClient.post<Dispatch>(`/scheduling/dispatches/${id}/release`);
+    return response.status === 204 ? null : response.data;
+  },
+
   // Trigger a dispatch SMS. `audience` picks who: TECH (default — the assigned
   // technician, back-compat), CUSTOMER (their arrival window, respecting the
   // customer's per-type opt-in), or BOTH. Explicit + logged, not a side effect
@@ -371,141 +402,22 @@ export const dispatchNotesApi = {
   },
 };
 
-// ========== AVAILABILITY ==========
-
-export interface Availability {
-  id: string;
-  tenantId: string;
-  userId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status: string;
-  reason?: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateAvailabilityRequest {
-  userId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status?: string;
-  reason?: string;
-  notes?: string;
-}
-
-export interface UpdateAvailabilityRequest {
-  date?: string;
-  startTime?: string;
-  endTime?: string;
-  status?: string;
-  reason?: string;
-  notes?: string;
-}
-
-export const availabilityApi = {
-  getAll: async (params?: {
-    userId?: string;
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<Availability[]> => {
-    const response = await apiClient.get<Availability[]>('/scheduling/availability', { params });
-    return response.data;
-  },
-
-  getById: async (id: string): Promise<Availability> => {
-    const response = await apiClient.get<Availability>(`/scheduling/availability/${id}`);
-    return response.data;
-  },
-
-  create: async (request: CreateAvailabilityRequest): Promise<Availability> => {
-    const response = await apiClient.post<Availability>('/scheduling/availability', request);
-    return response.data;
-  },
-
-  update: async (id: string, request: UpdateAvailabilityRequest): Promise<Availability> => {
-    const response = await apiClient.put<Availability>(`/scheduling/availability/${id}`, request);
-    return response.data;
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/scheduling/availability/${id}`);
-  },
-};
-
-// ========== RECURRING ORDERS ==========
-
-export interface RecurringOrder {
-  id: string;
-  tenantId: string;
-  customerId: string;
-  equipmentId?: string | null;
-  frequency: string;
-  nextScheduledDate: string;
-  description?: string;
-  status: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateRecurringOrderRequest {
-  customerId: string;
-  equipmentId?: string | null;
-  frequency: string;
-  nextScheduledDate: string;
-  description?: string;
-  notes?: string;
-}
-
-export interface UpdateRecurringOrderRequest {
-  frequency?: string;
-  nextScheduledDate?: string;
-  description?: string;
-  status?: string;
-  notes?: string;
-}
-
-export const recurringOrdersApi = {
-  getAll: async (params?: {
-    customerId?: string;
-    equipmentId?: string;
-    status?: string;
-    dueBefore?: string;
-  }): Promise<RecurringOrder[]> => {
-    const response = await apiClient.get<RecurringOrder[]>('/scheduling/recurring-orders', { params });
-    return response.data;
-  },
-
-  getById: async (id: string): Promise<RecurringOrder> => {
-    const response = await apiClient.get<RecurringOrder>(`/scheduling/recurring-orders/${id}`);
-    return response.data;
-  },
-
-  create: async (request: CreateRecurringOrderRequest): Promise<RecurringOrder> => {
-    const response = await apiClient.post<RecurringOrder>('/scheduling/recurring-orders', request);
-    return response.data;
-  },
-
-  update: async (id: string, request: UpdateRecurringOrderRequest): Promise<RecurringOrder> => {
-    const response = await apiClient.put<RecurringOrder>(`/scheduling/recurring-orders/${id}`, request);
-    return response.data;
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/scheduling/recurring-orders/${id}`);
-  },
-};
+// AVAILABILITY: the client was deleted, not left stale.
+//
+// The §0b reshape landed — the entity is now startsAt / endsAt / allDay /
+// label, the date + startTime + endTime triple is gone, the list is paginated,
+// and from/to means OVERLAP rather than containment. The old client described
+// none of that. Nothing called it, and its test cast with `as never` so it
+// still compiled, which is exactly what makes a stale client dangerous: it
+// looks usable.
+//
+// The board reads time off through GET /scheduling/board (`techs[].timeOff`).
+// Rebuild a client here only when a time-off SURFACE needs one, against the
+// shape in FE_HANDOFF_dispatch_board_reads.md.
 
 // Export combined API
 export const allSchedulingApis = {
   dispatches: dispatchesApi,
-  availability: availabilityApi,
-  recurringOrders: recurringOrdersApi,
 };
 
 export default allSchedulingApis;

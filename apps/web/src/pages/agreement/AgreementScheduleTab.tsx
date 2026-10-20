@@ -62,7 +62,7 @@ export default function AgreementScheduleTab({
                 <th>{getName('work_order')}</th>
                 <th>{getName('service_location')}</th>
                 <th>Date</th>
-                <th>Tech</th>
+                <th>{getName('technician')}</th>
                 <th>Status</th>
               </tr>
             </DenseTHead>

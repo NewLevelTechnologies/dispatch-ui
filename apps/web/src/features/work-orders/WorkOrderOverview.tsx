@@ -49,7 +49,7 @@ import { formatPhone, titleCaseAddress, tripsByWorkItem, workItemLabel } from '@
 import { Avatar } from '../../components/ui/Avatar';
 import NotesCard from '../../components/NotesCard';
 import EquipmentThumbnail from '../../components/EquipmentThumbnail';
-import { ActivityRow } from '../../components/ActivityStream';
+import { ActivityRow } from '../../components/ActivityRow';
 import { PROGRESS_TONE } from '../../lib/workItemProgress';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
@@ -638,7 +638,7 @@ function LocationCard({
 }
 
 // ── Money card — derived rollup over the job's documents (the WO owns no line
-// items). "Bills to" surfaces the payer; Quoted / Collected / Balance read off
+// items). "Bills to" surfaces the payer; Accepted / Collected / Balance read off
 // financialSummary. Membership badge + document list land with BE asks #2/#4.
 function MoneyCard({
   workOrder,
@@ -654,7 +654,7 @@ function MoneyCard({
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const customer = workOrder.customer;
-  const quoted = num(summary?.quoted);
+  const accepted = num(summary?.quotedAccepted);
   const collected = num(summary?.paid);
   const balance = num(summary?.balance);
 
@@ -681,7 +681,11 @@ function MoneyCard({
         </div>
       )}
       <div className="grid grid-cols-3 gap-2">
-        <RollupStat label={getName('quote')} value={money(quoted)} onClick={quoted > 0 ? onOpenQuotes : undefined} />
+        <RollupStat
+          label={t('workOrders.detail.overview.acceptedQuotes', { quotes: getName('quote', true) })}
+          value={money(accepted)}
+          onClick={accepted > 0 ? onOpenQuotes : undefined}
+        />
         <RollupStat label={t('workOrders.detail.overview.collected')} value={money(collected)} tone="success" />
         <RollupStat label={t('workOrders.detail.money.balance')} value={money(balance)} emphasis onClick={onOpenInvoices} />
       </div>
@@ -801,9 +805,13 @@ export default function WorkOrderOverview({
     });
     return m;
   }, [workOrder.workItems, getAbbrev]);
-  // For each work item, which positional trip numbers address it (shared util,
-  // also used by the Work items tab so the two surfaces never drift).
-  const wiTripsById = useMemo(() => tripsByWorkItem(dispatches), [dispatches]);
+  // For each work item, the positional numbers of the trips that cover it —
+  // unscoped trips cover every item (shared util, also used by the Work items
+  // tab so the two surfaces never drift).
+  const wiTripsById = useMemo(
+    () => tripsByWorkItem(dispatches, (workOrder.workItems ?? []).map((wi) => wi.id)),
+    [dispatches, workOrder.workItems],
+  );
   const attention = deriveAttention({
     workOrder,
     dispatches,

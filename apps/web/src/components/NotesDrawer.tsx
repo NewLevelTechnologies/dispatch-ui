@@ -128,14 +128,14 @@ export default function NotesDrawer({
             }}
             placeholder={t('notes.searchPlaceholder')}
             aria-label={t('notes.searchPlaceholder')}
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
               aria-label={t('common.clear')}
-              className="px-1 text-[13px] leading-none text-fg-dim hover:text-fg-strong"
+              className="px-1 !text-[13px] leading-none text-fg-dim hover:text-fg-strong"
             >
               ×
             </button>

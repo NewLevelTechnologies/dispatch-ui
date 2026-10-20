@@ -148,7 +148,7 @@ export default function MultiLocationsTab({
               key={c.id}
               type="button"
               onClick={() => setStatus(active ? null : c.id)}
-              className={`inline-flex h-[30px] items-center rounded-md border px-2.5 text-[12px] font-medium ${
+              className={`inline-flex h-[30px] items-center rounded-md border px-2.5 !text-[12px] !font-medium ${
                 active
                   ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent'
                   : 'border-border bg-bg-elev text-fg hover:bg-bg-hover'
@@ -163,7 +163,7 @@ export default function MultiLocationsTab({
           <button
             type="button"
             onClick={() => setOpenJobsOnly((v) => !v)}
-            className={`inline-flex h-[30px] items-center rounded-md border px-2.5 text-[12px] font-medium ${
+            className={`inline-flex h-[30px] items-center rounded-md border px-2.5 !text-[12px] !font-medium ${
               openJobsOnly
                 ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent'
                 : 'border-border bg-bg-elev text-fg hover:bg-bg-hover'
@@ -177,7 +177,7 @@ export default function MultiLocationsTab({
           <button
             type="button"
             onClick={() => setVisitOverdueOnly((v) => !v)}
-            className={`inline-flex h-[30px] items-center rounded-md border px-2.5 text-[12px] font-medium ${
+            className={`inline-flex h-[30px] items-center rounded-md border px-2.5 !text-[12px] !font-medium ${
               visitOverdueOnly
                 ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent'
                 : 'border-border bg-bg-elev text-fg hover:bg-bg-hover'

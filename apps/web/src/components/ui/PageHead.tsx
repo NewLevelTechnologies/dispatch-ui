@@ -29,6 +29,8 @@ export function PageHead({
   // The action container is `w-full` below sm — consumers can mark a
   // primary action with `flex-1` to claim that full width as a thumb
   // target while siblings (e.g. a kebab) stay at their natural width.
+  // From sm the actions never shrink: a long sub-line wraps instead of
+  // squeezing a button label onto two lines.
   return (
     <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
@@ -37,7 +39,7 @@ export function PageHead({
         {sub && <Text size="sm" tone="muted" className="mt-0.5">{sub}</Text>}
       </div>
       {actions && (
-        <div className="flex items-center gap-2 max-sm:w-full sm:w-auto">
+        <div className="flex shrink-0 items-center gap-2 max-sm:w-full sm:w-auto">
           {actions}
         </div>
       )}

@@ -47,6 +47,8 @@ import {
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 
 // ─── Filter constants ────────────────────────────────────────────────────────
 
@@ -83,6 +85,15 @@ function resolveStatusSelection(next: string[], prev: string[]): string[] {
 
 const PAGE_SIZE = 50;
 
+// BE sort whitelist (WorkOrderController): scheduledDate, completedDate,
+// createdAt, workOrderNumber, priority, locationName. Only the ones with a
+// matching column are headers (priority is a chip inside the WO cell, not a
+// column). locationName orders by what the location cell shows (location name,
+// else customer name). Default createdAt,desc has no column — it's the "no sort
+// param" state, so no header shows active until one is clicked.
+const DEFAULT_SORT: SortState = { key: 'createdAt', dir: 'desc' };
+const SORT_KEYS = ['createdAt', 'workOrderNumber', 'locationName', 'scheduledDate'] as const;
+
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 
 const PROGRESS_TONES: Record<ProgressCategory, PillTone> = {
@@ -117,6 +128,19 @@ function formatDate(dateString?: string | null) {
     month: 'short',
     day: 'numeric',
   });
+}
+
+/** "Sep 1 – Sep 30, 2026", or one day. */
+function formatCompletedRange(from: string, to: string): string {
+  const fmt = (d: string, year: boolean) =>
+    new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      ...(year ? { year: 'numeric' } : {}),
+      timeZone: 'UTC',
+    });
+  if (!from || !to) return fmt(from || to, true);
+  return from === to ? fmt(from, true) : `${fmt(from, false)} – ${fmt(to, true)}`;
 }
 
 function isCancelled(wo: WorkOrderSummary): boolean {
@@ -212,7 +236,17 @@ export default function WorkOrdersPage() {
   const priorityIds = useMemo(() => searchParams.getAll('priority'), [searchParams]);
   const onSiteOnly = searchParams.get('onSite') === 'true';
   const unassignedOnly = searchParams.get('unassigned') === 'true';
+  // The home dashboard's billing queue lands here with status=COMPLETED.
+  const unbilledOnly = searchParams.get('unbilled') === 'true';
+  // The Jobs completed report lands here on its completion dates.
+  const completedFrom = searchParams.get('completedFrom') ?? '';
+  const completedTo = searchParams.get('completedTo') ?? '';
   const pageNumber = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['scheduledDate'],
+    allowed: SORT_KEYS,
+  });
 
   // Local search input state — mirrors URL for instant feedback. Written to the
   // URL synchronously on each keystroke (with replace so we don't flood history),
@@ -271,9 +305,10 @@ export default function WorkOrdersPage() {
     queryKey: ['work-item-statuses'],
     queryFn: () => workItemStatusesApi.getAll(),
   });
-  // Assigned-user filter options. Same source as AssignTechnicianDialog: every
-  // enabled user is assignable (techs, sales, estimators) until role-based
-  // filtering exists.
+  // Assigned-user filter options — every enabled user, NOT just field workers,
+  // and deliberately not the picker's `getFieldWorkers`. A filter searches what
+  // was assigned, not what is assignable: narrowing it would make the work of
+  // anyone since moved off field work unreachable from this page.
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: () => userApi.getAll(),
@@ -325,13 +360,18 @@ export default function WorkOrdersPage() {
       priority: priorityIds.length > 0 ? (priorityIds as WorkOrderPriority[]) : undefined,
       unassigned: unassignedOnly || undefined,
       onSite: onSiteOnly || undefined,
+      unbilled: unbilledOnly || undefined,
+      completedDateFrom: completedFrom || undefined,
+      completedDateTo: completedTo || undefined,
       scheduledDateFrom: dateRange.from || undefined,
       scheduledDateTo: dateRange.to || undefined,
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
+      // Omitted → BE default createdAt,desc (newest first).
+      sort: sortParam as ListWorkOrdersParams['sort'],
     }),
-    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, dateRange, includeArchived, pageNumber]
+    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, unbilledOnly, completedFrom, completedTo, dateRange, includeArchived, pageNumber, sortParam]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -530,7 +570,7 @@ export default function WorkOrdersPage() {
   // `activeChips` summary), but they still count as "a filter is on" for the
   // clear-all affordance and the empty-state copy. WO status counts only when
   // it's off its "Open" default.
-  const hasQuickFilter = onSiteOnly || unassignedOnly || priorityIds.length > 0;
+  const hasQuickFilter = onSiteOnly || unassignedOnly || unbilledOnly || !!completedFrom || !!completedTo || priorityIds.length > 0;
   const statusChanged = !isOpenDefault(statusIds);
   const anyFilter = activeChips.length > 0 || hasQuickFilter || statusChanged;
 
@@ -609,7 +649,7 @@ export default function WorkOrdersPage() {
                 onClick={() => updateParams({ assigned: myId, page: null })}
                 aria-pressed={scopeMine}
                 className={clsx(
-                  'flex items-center px-3 text-[12px] font-semibold',
+                  'flex items-center px-3 !text-[12px] !font-semibold',
                   scopeMine ? 'bg-accent-500/10 text-fg-accent' : 'bg-bg-elev text-fg-muted'
                 )}
               >
@@ -620,7 +660,7 @@ export default function WorkOrdersPage() {
                 onClick={() => updateParams({ assigned: null, page: null })}
                 aria-pressed={!scopeMine}
                 className={clsx(
-                  'flex items-center border-l border-border px-3 text-[12px] font-semibold',
+                  'flex items-center border-l border-border px-3 !text-[12px] !font-semibold',
                   !scopeMine ? 'bg-accent-500/10 text-fg-accent' : 'bg-bg-elev text-fg-muted'
                 )}
               >
@@ -811,13 +851,34 @@ export default function WorkOrdersPage() {
                     updateParams({ priority: priorityIds.length > 0 ? [] : ['URGENT', 'HIGH'], page: null })
                   }
                 />
+                {/* Only reachable from the home dashboard's billing queue and
+                    the Jobs completed report, so it shows only while on — a
+                    way to see and drop it, not a new triage bucket. */}
+                {unbilledOnly && (
+                  <FilterChip
+                    label={t('workOrders.filters.notInvoiced')}
+                    active
+                    onToggle={() => updateParams({ unbilled: null, page: null })}
+                  />
+                )}
+                {/* Only reachable from the Jobs completed report, so it shows
+                    only while on. */}
+                {(completedFrom || completedTo) && (
+                  <FilterChip
+                    label={t('workOrders.filters.completedBetween', {
+                      range: formatCompletedRange(completedFrom, completedTo),
+                    })}
+                    active
+                    onToggle={() => updateParams({ completedFrom: null, completedTo: null, page: null })}
+                  />
+                )}
               </FilterChipRow>
 
               {anyFilter && (
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="ml-1 text-[11.5px] font-medium text-fg-muted underline-offset-2 hover:underline hover:text-fg-strong"
+                  className="ml-1 !text-[11.5px] !font-medium text-fg-muted underline-offset-2 hover:underline hover:text-fg-strong"
                 >
                   {t('workOrders.filters.clearAll')}
                 </button>
@@ -904,11 +965,11 @@ export default function WorkOrdersPage() {
                 </colgroup>
                 <DenseTHead>
                   <tr>
-                    <th>{getName('work_order')}</th>
-                    <th>{getName('service_location')}</th>
+                    <SortHeader sortKey="workOrderNumber" label={getName('work_order')} current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="locationName" label={getName('service_location')} current={currentSort} onSort={onSort} />
                     <th>{t('workOrders.table.statusHeader')}</th>
                     <th>{t('workOrders.table.assigned')}</th>
-                    <th>{t('workOrders.table.scheduled')}</th>
+                    <SortHeader sortKey="scheduledDate" label={t('workOrders.table.scheduled')} current={currentSort} onSort={onSort} />
                     <th></th>
                   </tr>
                 </DenseTHead>

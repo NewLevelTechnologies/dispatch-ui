@@ -18,6 +18,8 @@ import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { sortRows, useUrlSort } from '../hooks/useUrlSort';
 
 // Vendors — Records list of the managed vendor set (who we buy from). A vendor
 // holds the account details a PO inherits. Backend returns all active vendors
@@ -31,6 +33,10 @@ const KIND_LABEL: Record<VendorKind, string> = {
 };
 const FILTER_KINDS: VendorKind[] = ['DISTRIBUTOR', 'MANUFACTURER', 'RETAIL'];
 
+// The whole set is loaded, so sort is client-side (URL-driven like the paged lists).
+const DEFAULT_SORT: SortState = { key: 'name', dir: 'asc' };
+const SORT_KEYS = ['name', 'openPOs', 'ytdSpend', 'lastOrder'] as const;
+
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const money = (n?: number | null) => currency.format(n ?? 0);
 
@@ -39,6 +45,11 @@ export default function VendorsPage() {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState<VendorKind | null>(null);
+  const { current: currentSort, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['openPOs', 'ytdSpend', 'lastOrder'],
+    allowed: SORT_KEYS,
+  });
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['vendors', 'list'],
@@ -48,12 +59,18 @@ export default function VendorsPage() {
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return vendors.filter(
+    const filtered = vendors.filter(
       (v) =>
         (!kind || v.kind === kind) &&
         (!q || v.name.toLowerCase().includes(q) || (v.accountNumber ?? '').toLowerCase().includes(q)),
     );
-  }, [vendors, search, kind]);
+    return sortRows(filtered, currentSort, {
+      name: (v) => v.name,
+      openPOs: (v) => v.openPOs ?? 0,
+      ytdSpend: (v) => v.ytdSpend ?? 0,
+      lastOrder: (v) => v.lastOrder,
+    });
+  }, [vendors, search, kind, currentSort]);
 
   const openTotal = vendors.reduce((s, v) => s + (v.openPOs ?? 0), 0);
   const spendTotal = vendors.reduce((s, v) => s + (v.ytdSpend ?? 0), 0);
@@ -133,12 +150,12 @@ export default function VendorsPage() {
                 <DenseTable className="dense-stack">
                   <DenseTHead>
                     <tr>
-                      <th>Vendor</th>
+                      <SortHeader sortKey="name" label="Vendor" current={currentSort} onSort={onSort} />
                       <th>Account</th>
                       <th>Terms</th>
-                      <th className="right">Open POs</th>
-                      <th className="right">YTD spend</th>
-                      <th>Last order</th>
+                      <SortHeader sortKey="openPOs" label="Open POs" align="right" current={currentSort} onSort={onSort} />
+                      <SortHeader sortKey="ytdSpend" label="YTD spend" align="right" current={currentSort} onSort={onSort} />
+                      <SortHeader sortKey="lastOrder" label="Last order" current={currentSort} onSort={onSort} />
                     </tr>
                   </DenseTHead>
                   <tbody>

@@ -313,7 +313,7 @@ export default function AddLocationPage() {
               {t('common.actions.add', { entity: getName('service_location') })}
             </Heading>
             <Text size="sm" tone="muted" className="mt-1">
-              Required: location name and service address. Contact and hours can be added later — anyone can fill them in as they learn the site.
+              {`Required: ${getName('service_location').toLowerCase()} name and service address. Contact and hours can be added later — anyone can fill them in as they learn the site.`}
             </Text>
           </div>
 
@@ -325,7 +325,7 @@ export default function AddLocationPage() {
             <div className="min-w-0 flex-1">
               <div className="truncate text-[12.5px] font-semibold text-fg-strong">{customer.name}</div>
               <div className="text-[11px] text-fg-muted">
-                Adding location #{nextLocationNumber}
+                {`Adding ${getName('service_location').toLowerCase()} #${nextLocationNumber}`}
               </div>
             </div>
           </div>
@@ -449,7 +449,7 @@ export default function AddLocationPage() {
             {/* Premise type — qualifies the address, so it follows it. */}
             <Card
               title="Premise type"
-              subtitle="What a tech is walking into. Defaulted from your company profile; change it per location anytime."
+              subtitle={`What a ${getName('technician').toLowerCase()} is walking into. Defaulted from your company profile; change it per ${getName('service_location').toLowerCase()} anytime.`}
               className="mb-3.5"
             >
               <ToggleGroup value={effectivePremise} onChange={(v) => { setPremiseTouched(true); set('premise', v); }} aria-label="Premise type">
@@ -462,7 +462,7 @@ export default function AddLocationPage() {
               </ToggleGroup>
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-fg-muted">
                 <BuildingOffice2Icon className="size-3" />
-                Default for new locations is{' '}
+                {`Default for new ${getName('service_location', true).toLowerCase()} is `}
                 <strong className="font-semibold text-fg">{defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'}</strong> · set in Company profile.
               </div>
             </Card>

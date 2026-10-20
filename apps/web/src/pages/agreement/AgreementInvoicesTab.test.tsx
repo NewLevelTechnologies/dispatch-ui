@@ -19,7 +19,7 @@ function row(over: Partial<InvoiceListItemRow>): InvoiceListItemRow {
     billingPeriodKey: '2026-Q3',
     invoiceDate: '2026-07-01',
     dueDate: '2026-07-31',
-    totalAmount: 300,
+    totalAmount: 300, subtotal: 300, taxAmount: 0, workOrderNumber: null, divisionId: null, workOrderTypeId: null, regionId: null,
     amountPaid: 0,
     balanceDue: 300,
     overdue: false,

@@ -56,6 +56,8 @@
 //     {types.map((t) => <ChipListboxOption key={t.id} value={t.id}>{t.name}</ChipListboxOption>)}
 //   </FilterChipListbox>
 //
+// GROUPED: wrap runs of options in <ChipListboxSection label="Month">.
+//
 // Use ChipListboxOption (exported below) — NOT Catalyst's ListboxOption.
 // Catalyst's option hardcodes a saturated blue focus pill that fights the
 // restrained chip aesthetic.
@@ -115,7 +117,7 @@ export function FilterChipListbox(props: Props) {
       >
         <Headless.ListboxButton
           aria-label={ariaLabel}
-          className="flex h-full items-center gap-1.5 px-2.5 font-medium text-fg outline-none focus:outline-none"
+          className="flex h-full items-center gap-1.5 px-2.5 !font-medium text-fg outline-none focus:outline-none"
         >
           <span className="text-fg-muted">{label}</span>
           {isSet ? (
@@ -204,6 +206,19 @@ export function ChipListboxOption<T>({ value, disabled, children }: ChipOptionPr
       <CheckMark />
       <span className="min-w-0 truncate">{children}</span>
     </Headless.ListboxOption>
+  );
+}
+
+// Section header for a grouped popover (e.g. Month / Quarter / Year). Not an
+// option — keyboard nav skips it — just a tiny uppercase label over its rows.
+export function ChipListboxSection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="[&+&]:mt-1 [&+&]:border-t [&+&]:border-border-soft [&+&]:pt-1">
+      <div className="label-tiny px-3 pt-1.5 pb-1" aria-hidden="true">
+        {label}
+      </div>
+      {children}
+    </div>
   );
 }
 

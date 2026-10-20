@@ -32,7 +32,8 @@ import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
-import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -41,6 +42,7 @@ import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 const PAGE_SIZE = 50;
 
@@ -89,21 +91,14 @@ function formatTagDisplayValue(
 const DEFAULT_SORT: SortState = { key: 'locationName', dir: 'asc' };
 // Date columns read best most-recent-first on the first click; text columns
 // default to asc.
-const DESC_FIRST = new Set(['lastServiceAt']);
-
-function parseSort(raw: string | null): SortState {
-  if (raw) {
-    const [key, dir] = raw.split(',');
-    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
-  }
-  return DEFAULT_SORT;
-}
+const DESC_FIRST = ['lastServiceAt'];
 
 export default function ServiceLocationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   // Holds the detail DTO fetched for editing; `notes` is omitted because it
@@ -127,8 +122,7 @@ export default function ServiceLocationsPage() {
   // Tag filter ids — URL writes repeated `?tag=uuid`; API serializes to
   // comma-separated `?tags=uuid1,uuid2` on the wire.
   const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
-  const sortParam = searchParams.get('sort');
-  const currentSort = parseSort(sortParam);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({ defaultSort: DEFAULT_SORT, descFirst: DESC_FIRST });
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
@@ -228,24 +222,6 @@ export default function ServiceLocationsPage() {
     else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
-  };
-
-  // Toggle dir when re-clicking the active column, else the column's default
-  // dir. Resets to page 1. Writing the default (customerName,asc) back is
-  // harmless — it equals the implicit default the BE applies when absent.
-  const onSort = (key: string) => {
-    const dir: SortDir =
-      key === currentSort.key
-        ? currentSort.dir === 'asc'
-          ? 'desc'
-          : 'asc'
-        : DESC_FIRST.has(key)
-          ? 'desc'
-          : 'asc';
-    const next = new URLSearchParams(searchParams);
-    next.set('sort', `${key},${dir}`);
-    next.delete('page');
-    setSearchParams(next, { replace: false });
   };
 
   const apiStatuses = useMemo<Array<'ACTIVE' | 'INACTIVE' | 'CLOSED'> | undefined>(() => {
@@ -409,7 +385,7 @@ export default function ServiceLocationsPage() {
         <ListToolbar
           search={
             <ListSearch
-              placeholder={t('serviceLocations.search.placeholder')}
+              placeholder={t('serviceLocations.search.placeholder', names)}
               value={searchQuery}
               onChange={(value) => {
                 setSearchQuery(value);
@@ -445,11 +421,11 @@ export default function ServiceLocationsPage() {
           )}
           {activeRegions.length > 0 && (
             <FilterChipListbox
-              label={t('serviceLocations.filter.region')}
-              ariaLabel={t('serviceLocations.filter.region')}
+              label={t('serviceLocations.filter.region', names)}
+              ariaLabel={t('serviceLocations.filter.region', names)}
               value={regionId || null}
               displayValue={regionId ? activeRegions.find((r) => r.id === regionId)?.name ?? null : null}
-              resetLabel={t('serviceLocations.filter.allRegions')}
+              resetLabel={t('serviceLocations.filter.allRegions', names)}
               onChange={(id) => updateFilters({ region: id ?? '' })}
               onClear={() => updateFilters({ region: '' })}
             >
@@ -460,14 +436,14 @@ export default function ServiceLocationsPage() {
           )}
           <FilterChipRow>
             <FilterChip
-              label={t('serviceLocations.filter.live')}
+              label={t('serviceLocations.filter.live', names)}
               count={counts?.live}
               tone="info"
               active={liveFilter}
               onToggle={() => updateFilters({ live: !liveFilter })}
             />
             <FilterChip
-              label={t('serviceLocations.filter.openJobs')}
+              label={t('serviceLocations.filter.openJobs', names)}
               count={counts?.openJobs}
               tone="info"
               active={openJobsFilter}
@@ -546,7 +522,7 @@ export default function ServiceLocationsPage() {
                   <DenseTHead>
                     <tr>
                       <SortHeader sortKey="locationName" label={getName('service_location')} current={currentSort} onSort={onSort} />
-                      <th>{t('serviceLocations.table.region')}</th>
+                      <th>{t('serviceLocations.table.region', names)}</th>
                       <SortHeader sortKey="status" label={t('common.form.status')} current={currentSort} onSort={onSort} />
                       <SortHeader sortKey="lastServiceAt" label={t('serviceLocations.table.lastService')} current={currentSort} onSort={onSort} />
                       <th>{t('serviceLocations.table.contact')}</th>
@@ -604,7 +580,7 @@ export default function ServiceLocationsPage() {
                           </td>
                           <td
                             className={clsx(!location.dispatchRegionName && 'dt-empty')}
-                            data-label={t('serviceLocations.table.region')}
+                            data-label={t('serviceLocations.table.region', names)}
                           >
                             {location.dispatchRegionName ? (
                               <span className="text-[11.5px] text-fg-muted">
@@ -622,7 +598,7 @@ export default function ServiceLocationsPage() {
                               <TimeAgo iso={location.lastServiceAt} className="text-[11.5px] text-fg-muted" />
                             ) : (
                               <span className="text-[11px] text-fg-dim">
-                                {t('serviceLocations.table.newCustomer')}
+                                {t('serviceLocations.table.newCustomer', names)}
                               </span>
                             )}
                           </td>
@@ -680,7 +656,7 @@ export default function ServiceLocationsPage() {
                                       <>
                                         {location.status !== 'CLOSED' && (
                                           <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
-                                            <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
+                                            <DropdownLabel>{t('serviceLocations.actions.close', names)}</DropdownLabel>
                                           </DropdownItem>
                                         )}
                                         <DropdownItem onClick={() => handleDelete(location.id, location.locationName || '', location.address.streetAddress)}>

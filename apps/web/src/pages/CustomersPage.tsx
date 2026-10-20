@@ -27,12 +27,14 @@ import { StatusPickerChip } from '../components/ui/StatusPickerChip';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
-import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 // Desktop-dense CSR layout — see CLAUDE.md. 50 per page keeps two pages
 // visible on a 1080p monitor without scrolling.
@@ -63,21 +65,14 @@ function readBool(raw: string | null): boolean {
 const DEFAULT_SORT: SortState = { key: 'name', dir: 'asc' };
 // Count columns read best most-first on the first click; text columns default
 // to asc.
-const DESC_FIRST = new Set(['openJobsCount']);
-
-function parseSort(raw: string | null): SortState {
-  if (raw) {
-    const [key, dir] = raw.split(',');
-    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
-  }
-  return DEFAULT_SORT;
-}
+const DESC_FIRST = ['openJobsCount'];
 
 export default function CustomersPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -93,8 +88,7 @@ export default function CustomersPage() {
   // to comma-separated `?tags=uuid1,uuid2` on the wire. getAll() returns a fresh
   // array each call, so memoize to keep the query key stable across renders.
   const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
-  const sortParam = searchParams.get('sort');
-  const currentSort = parseSort(sortParam);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({ defaultSort: DEFAULT_SORT, descFirst: DESC_FIRST });
 
   // Local input mirrors the URL but lets typing feel instant.
   const [searchQuery, setSearchQuery] = useState(urlSearch);
@@ -173,24 +167,6 @@ export default function CustomersPage() {
     else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
-  };
-
-  // Toggle dir when re-clicking the active column, else the column's default
-  // dir. Resets to page 1. Writing the default (name,asc) back is harmless — it
-  // equals the implicit default the BE applies when the param is absent.
-  const onSort = (key: string) => {
-    const dir: SortDir =
-      key === currentSort.key
-        ? currentSort.dir === 'asc'
-          ? 'desc'
-          : 'asc'
-        : DESC_FIRST.has(key)
-          ? 'desc'
-          : 'asc';
-    const next = new URLSearchParams(searchParams);
-    next.set('sort', `${key},${dir}`);
-    next.delete('page');
-    setSearchParams(next, { replace: false });
   };
 
   // Build the API status param: array of upper-case enum values, undefined
@@ -314,7 +290,7 @@ export default function CustomersPage() {
         <PageHead
           eyebrow={
             <EntityToggle
-              ariaLabel={t('customers.entityToggleAria')}
+              ariaLabel={t('customers.entityToggleAria', names)}
               items={[
                 { label: getName('customer', true), to: '/customers' },
                 { label: getName('payer', true), to: '/payers' },
@@ -377,7 +353,7 @@ export default function CustomersPage() {
               onToggle={() => updateFilters({ openBalance: !openBalanceFilter })}
             />
             <FilterChip
-              label={t('customers.filter.openJobs')}
+              label={t('customers.filter.openJobs', names)}
               count={counts?.openJobs}
               tone="info"
               active={openJobsFilter}
@@ -442,7 +418,7 @@ export default function CustomersPage() {
                       <SortHeader sortKey="name" label={getName('customer')} current={currentSort} onSort={onSort} />
                       <th>{t('customers.table.billingAddress')}</th>
                       <th>{t('customers.table.contact')}</th>
-                      <SortHeader sortKey="openJobsCount" label={t('customers.table.openJobs')} current={currentSort} onSort={onSort} />
+                      <SortHeader sortKey="openJobsCount" label={t('customers.table.openJobs', names)} current={currentSort} onSort={onSort} />
                       <th>{t('customers.table.tags')}</th>
                       <th style={{ width: 40 }}></th>
                     </tr>
@@ -468,7 +444,7 @@ export default function CustomersPage() {
                                   <Pill
                                     tone="warning"
                                     className="ml-1.5 align-middle text-[9.5px] font-bold uppercase tracking-[0.04em]"
-                                    title={t('customers.agedBadgeAria')}
+                                    title={t('customers.agedBadgeAria', names)}
                                   >
                                     {t('customers.agedBadge')}
                                   </Pill>
@@ -490,7 +466,7 @@ export default function CustomersPage() {
                                   <span className="text-fg-dim"> · </span>
                                 )}
                                 {customer.serviceLocationCount > 1
-                                  ? t('customers.table.locationsCount', { count: customer.serviceLocationCount })
+                                  ? t('customers.table.locationsCount', { ...names, count: customer.serviceLocationCount })
                                   : null}
                               </CellSub>
                             </CellStack>
@@ -535,11 +511,11 @@ export default function CustomersPage() {
                           </td>
                           <td
                             className={clsx(!(customer.openJobsCount && customer.openJobsCount > 0) && 'dt-empty')}
-                            data-label={t('customers.table.openJobs')}
+                            data-label={t('customers.table.openJobs', names)}
                           >
                             {customer.openJobsCount && customer.openJobsCount > 0 ? (
                               <Pill tone="info" dot>
-                                {t('customers.table.jobsCount', { count: customer.openJobsCount })}
+                                {t('customers.table.jobsCount', { ...names, count: customer.openJobsCount })}
                               </Pill>
                             ) : (
                               <span className="text-fg-dim">—</span>

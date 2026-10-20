@@ -128,6 +128,24 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('WO-00002')).toBeInTheDocument();
   });
 
+  it('sends no sort by default, then the column key when a header is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
+    renderWithProviders(<WorkOrdersPage />);
+    await screen.findByText('WO-00001');
+
+    const listCalls = () => vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === '/work-orders');
+    expect(listCalls()[0][1]).toEqual(expect.objectContaining({ params: expect.not.objectContaining({ sort: expect.anything() }) }));
+
+    await userEvent.click(screen.getByRole('button', { name: /sort by scheduled/i }));
+
+    await waitFor(() =>
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/work-orders',
+        expect.objectContaining({ params: expect.objectContaining({ sort: 'scheduledDate,desc' }) }),
+      ),
+    );
+  });
+
   it('displays progress badges with correct labels', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
 
@@ -590,6 +608,46 @@ describe('WorkOrdersPage', () => {
         });
         expect(listCall).toBeTruthy();
       });
+    });
+
+    it('reads ?unbilled=true (the home dashboard billing queue) and lets it be cleared', async () => {
+      mockGets(mockWorkOrders);
+      const user = userEvent.setup();
+      const { router } = renderWithProviders(<WorkOrdersPage />, { initialPath: '/?status=COMPLETED&unbilled=true' });
+
+      await waitFor(() => {
+        const listCall = vi.mocked(apiClient.get).mock.calls.find(([url, cfg]) => {
+          const p = cfg?.params as { unbilled?: boolean; progressCategory?: string[]; size?: number } | undefined;
+          return String(url) === '/work-orders' && p?.unbilled === true && p?.size !== 1;
+        });
+        expect(listCall).toBeTruthy();
+        expect((listCall![1]!.params as { progressCategory?: string[] }).progressCategory).toEqual(['COMPLETED']);
+      });
+
+      await user.click(await screen.findByRole('button', { name: /workOrders\.filters\.notInvoiced/ }));
+      await waitFor(() => expect(router.state.location.search).not.toContain('unbilled'));
+      expect(router.state.location.search).toContain('status=COMPLETED');
+    });
+
+    it('reads the Jobs completed report’s completion dates and lets them be cleared', async () => {
+      mockGets(mockWorkOrders);
+      const user = userEvent.setup();
+      const { router } = renderWithProviders(<WorkOrdersPage />, {
+        initialPath: '/?status=COMPLETED&completedFrom=2026-09-01&completedTo=2026-09-30&type=ty1',
+      });
+
+      await waitFor(() => {
+        const listCall = vi.mocked(apiClient.get).mock.calls.find(([url, cfg]) => {
+          const p = cfg?.params as { completedDateFrom?: string; size?: number } | undefined;
+          return String(url) === '/work-orders' && p?.completedDateFrom === '2026-09-01' && p?.size !== 1;
+        });
+        expect(listCall).toBeTruthy();
+        expect((listCall![1]!.params as { completedDateTo?: string }).completedDateTo).toBe('2026-09-30');
+      });
+
+      await user.click(await screen.findByRole('button', { name: /workOrders\.filters\.completedBetween/ }));
+      await waitFor(() => expect(router.state.location.search).not.toContain('completedFrom'));
+      expect(router.state.location.search).toContain('type=ty1');
     });
 
     it('the Urgent / High quick chip filters on priority=[URGENT,HIGH]', async () => {

@@ -8,33 +8,29 @@ import {
   HomeIcon,
   UserGroupIcon,
   ClipboardDocumentListIcon,
-  WrenchScrewdriverIcon,
   TruckIcon,
   ShoppingCartIcon,
   CalendarIcon,
   Cog6ToothIcon,
-  SunIcon,
-  MoonIcon,
   DocumentTextIcon,
   DocumentChartBarIcon,
   CreditCardIcon,
   CubeIcon,
   BuildingStorefrontIcon,
   ChartBarIcon,
-  ClockIcon,
-  ArrowPathIcon,
   MapPinIcon,
   EllipsisHorizontalIcon,
   LifebuoyIcon,
   ArrowRightStartOnRectangleIcon,
   BellIcon,
   CheckBadgeIcon,
+  ArrowPathRoundedSquareIcon,
 } from '@heroicons/react/24/outline';
-import { approvalsApi, type ApprovalsBellSummary } from '../api/setup';
+import { approvalsApi, quotePriceApprovalsApi, tenantSettingsApi, type ApprovalsBellSummary } from '../api/setup';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
-import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
+import { Dropdown, DropdownButton, DropdownDescription, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import WorkspaceBrand from './workspace/WorkspaceBrand';
 import { useTheme } from './ThemeProvider';
 import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
@@ -55,7 +51,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   const location = useLocation();
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const { mode, accent, setMode, setAccent } = useTheme();
+  const { mode, setMode } = useTheme();
   const { data: currentUser } = useCurrentUser();
 
   // Sidebar identity row: show full name + primary role once /me resolves.
@@ -79,6 +75,13 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
 
   const approvalsVisible = useApprovalsVisible();
 
+  // Parts and Warehouses show only for tenants who turned inventory on.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const inventoryOn = tenantSettings?.enableInventory ?? false;
+
   // Bell summary: pending-for-me (approver workload) + recently-resolved-
   // mine (24h server window, requester side). Drives both the sidebar
   // nav badge (pending-for-me only) and the topbar bell badge
@@ -99,7 +102,17 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     refetchOnWindowFocus: true,
   });
 
-  const pendingApprovalCount = bellSummary?.pendingForMe ?? 0;
+  // Quote price approvals wait on managers only (APPROVE_QUOTES); they count toward the same badge.
+  const canApproveQuotes = useHasAnyCapability('APPROVE_QUOTES');
+  const { data: priceApprovals } = useQuery({
+    queryKey: ['quote-price-approvals', 'count'],
+    queryFn: () => quotePriceApprovalsApi.count(),
+    enabled: authStatus === 'authenticated' && canApproveQuotes,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
+  const pendingApprovalCount = (bellSummary?.pendingForMe ?? 0) + (priceApprovals?.pending ?? 0);
   const recentlyResolvedMine = bellSummary?.recentlyResolvedMine ?? 0;
   const bellBadgeCount = pendingApprovalCount + recentlyResolvedMine;
 
@@ -115,56 +128,77 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   const isCurrent = (href: string) =>
     href === '/dashboard' ? location.pathname === href : location.pathname.startsWith(href);
 
-  type MainNavItem = { name: string; href: string; icon: typeof HomeIcon; badge?: number };
-  const mainNavigation: MainNavItem[] = [
-    { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
-    { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
-    { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
-    { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
-    ...(approvalsVisible
-      ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
+  type NavItem = { name: string; href: string; icon: typeof HomeIcon; badge?: number };
+  type NavGroup = { section?: string; items: NavItem[] };
+  const navGroups: NavGroup[] = [
+    {
+      items: [
+        { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
+        // "Dispatch Board", not "Dispatch": `dispatch` is itself a glossary entity,
+        // so the bare noun reads as the RECORD and sets up the wrong expectation
+        // for a board. Not "Scheduling" either — that can't follow the glossary,
+        // and it would overlap the `schedule` entity, work-order scheduling and
+        // agreement visit schedules. Shares the page-heading key so the sidebar
+        // and the <h1> can't drift; a tenant on "Trip" gets "Trip Board".
+        { name: t('dispatchBoard.title', { entity: getName('dispatch') }), href: '/dispatch', icon: CalendarIcon },
+        // Only when something waits on this user: an empty inbox in the nav is noise.
+        // The page stays reachable from the bell, and by link.
+        ...(pendingApprovalCount > 0
+          ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
+          : []),
+      ],
+    },
+    {
+      section: t('entities.work'),
+      items: [
+        { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
+        { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
+        { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
+        { name: getName('agreement', true), href: '/agreements', icon: ArrowPathRoundedSquareIcon },
+      ],
+    },
+    {
+      section: t('entities.financial'),
+      items: [
+        { name: getName('quote', true), href: '/quotes', icon: DocumentChartBarIcon },
+        { name: getName('invoice', true), href: '/invoices', icon: DocumentTextIcon },
+        { name: getName('payment', true), href: '/payments', icon: CreditCardIcon },
+      ],
+    },
+    {
+      section: t('entities.purchasing'),
+      items: [
+        { name: t('entities.purchasing'), href: '/purchasing', icon: ShoppingCartIcon },
+        { name: t('entities.vendors'), href: '/vendors', icon: TruckIcon },
+      ],
+    },
+    // Equipment has no nav item: it's reached from location and customer
+    // detail, search and the Filter Pull List report. Its route still works.
+    ...(inventoryOn
+      ? [
+          {
+            section: t('entities.inventory'),
+            items: [
+              { name: t('equipment.entities.parts'), href: '/parts-inventory', icon: CubeIcon },
+              { name: t('equipment.entities.warehouses'), href: '/warehouses', icon: BuildingStorefrontIcon },
+            ],
+          },
+        ]
       : []),
+    {
+      items: [
+        // Reports lives here as a role-restricted utility surface (alongside
+        // Settings). Not gated yet — when we wire capability checks, gate on
+        // "user has access to at least one report" via the registry's
+        // requiresCapability fields.
+        { name: t('reports.title'), href: '/reports', icon: ChartBarIcon },
+        ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
+      ],
+    },
   ];
 
-  const equipmentNavigation = [
-    { name: getName('equipment', true), href: '/equipment', icon: WrenchScrewdriverIcon },
-    { name: t('equipment.entities.parts'), href: '/parts-inventory', icon: CubeIcon },
-    { name: t('equipment.entities.warehouses'), href: '/warehouses', icon: BuildingStorefrontIcon },
-    { name: t('entities.vendors'), href: '/vendors', icon: TruckIcon },
-    { name: t('entities.purchasing'), href: '/purchasing', icon: ShoppingCartIcon },
-  ];
-
-  const financialNavigation = [
-    { name: getName('invoice', true), href: '/invoices', icon: DocumentTextIcon },
-    { name: getName('quote', true), href: '/quotes', icon: DocumentChartBarIcon },
-    { name: getName('payment', true), href: '/payments', icon: CreditCardIcon },
-  ];
-
-  const schedulingNavigation = [
-    { name: getName('dispatch', true), href: '/dispatches', icon: CalendarIcon },
-    { name: t('scheduling.entities.availability'), href: '/availability', icon: ClockIcon },
-    { name: t('scheduling.entities.recurringOrders'), href: '/recurring-orders', icon: ArrowPathIcon },
-  ];
-
-  const adminNavigation = [
-    // Reports lives here as a role-restricted utility surface (alongside
-    // Settings). Not gated yet — when we wire capability checks, gate on
-    // "user has access to at least one report" via the registry's
-    // requiresCapability fields.
-    { name: t('reports.title'), href: '/reports', icon: ChartBarIcon },
-    ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
-  ];
-
-  // Breadcrumbs: walk the nav groups to find which one the current route belongs
-  // to, then surface "Section / Page" in the topbar. mainNavigation and
-  // adminNavigation have no section heading, so those routes show just the page.
-  const navGroups: { section?: string; items: { name: string; href: string }[] }[] = [
-    { items: mainNavigation },
-    { section: t('entities.inventory'), items: equipmentNavigation },
-    { section: t('entities.financial'), items: financialNavigation },
-    { section: t('entities.scheduling'), items: schedulingNavigation },
-    { items: adminNavigation },
-  ];
+  // Breadcrumbs: find the nav group the current route belongs to, then surface
+  // "Section / Page" in the topbar. Unlabelled groups show just the page.
   const activeGroup = navGroups.find((g) => g.items.some((i) => isCurrent(i.href)));
   const activeItem = activeGroup?.items.find((i) => isCurrent(i.href));
   const breadcrumbs: string[] = [];
@@ -180,19 +214,15 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
             {/* The brand block is now the workspace: it already answers "where
                 am I", and the active workspace lives here and nowhere else. It
                 becomes a switcher only when there is more than one. */}
-            <WorkspaceBrand envBadge={envBadge} />
+            <WorkspaceBrand />
           </SidebarHeader>
 
           <SidebarBody className="[&>[data-slot=section]+[data-slot=section]]:mt-5">
-            <SidebarSection>
-              {mainNavigation.map((item) => {
-                const current = isCurrent(item.href);
-                return (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={current}
-                  >
+            {navGroups.map((group, gi) => (
+              <SidebarSection key={group.section ?? gi}>
+                {group.section && <SidebarHeading>{group.section}</SidebarHeading>}
+                {group.items.map((item) => (
+                  <SidebarItem key={item.href} href={item.href} current={isCurrent(item.href)}>
                     <item.icon data-slot="icon" />
                     <span>{item.name}</span>
                     {item.badge != null && item.badge > 0 && (
@@ -204,78 +234,9 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                       </span>
                     )}
                   </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            <SidebarSection>
-              <SidebarHeading>{t('entities.inventory')}</SidebarHeading>
-              {equipmentNavigation.map((item) => {
-                const current = isCurrent(item.href);
-                return (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={current}
-                  >
-                    <item.icon data-slot="icon" />
-                    <span>{item.name}</span>
-                  </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            <SidebarSection>
-              <SidebarHeading>{t('entities.financial')}</SidebarHeading>
-              {financialNavigation.map((item) => {
-                const current = isCurrent(item.href);
-                return (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={current}
-                  >
-                    <item.icon data-slot="icon" />
-                    <span>{item.name}</span>
-                  </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            <SidebarSection>
-              <SidebarHeading>{t('entities.scheduling')}</SidebarHeading>
-              {schedulingNavigation.map((item) => {
-                const current = isCurrent(item.href);
-                return (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={current}
-                  >
-                    <item.icon data-slot="icon" />
-                    <span>{item.name}</span>
-                  </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            {adminNavigation.length > 0 && (
-              <SidebarSection>
-                {adminNavigation.map((item) => {
-                  const current = isCurrent(item.href);
-                  return (
-                    <SidebarItem
-                      key={item.name}
-                      href={item.href}
-                      current={current}
-                    >
-                      <item.icon data-slot="icon" />
-                      <span>{item.name}</span>
-                    </SidebarItem>
-                  );
-                })}
+                ))}
               </SidebarSection>
-            )}
+            ))}
           </SidebarBody>
 
           <SidebarFooter>
@@ -320,62 +281,120 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                 </span>
                 <EllipsisHorizontalIcon className="size-4 shrink-0 text-sidebar-fg-dim" />
               </DropdownButton>
-              <DropdownMenu className="min-w-64" anchor="top start">
-                <div className="px-3 py-2">
-                  <div className="mb-2 text-sm font-medium text-fg-strong">{t('common.theme')}</div>
-                  <ToggleGroup value={mode} onChange={setMode} aria-label={t('common.theme')} className="w-full">
-                    <ToggleGroupOption value="light" aria-label="Light mode" className="flex-1 justify-center">
-                      <SunIcon className="h-4 w-4" />
+              <DropdownMenu className="account-menu min-w-64" anchor="top start">
+                {/* Identity leads. One login now spans workspaces, so the email
+                    is the fact that matters most here — and it was previously
+                    visible only on the trigger. */}
+                <div className="col-span-full flex items-center gap-2.5 px-3.5 py-2.5 sm:px-3">
+                  <span
+                    className="grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
+                    style={{ background: avatarBg }}
+                    aria-hidden="true"
+                  >
+                    {avatarInitials}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                    <span className="flex items-baseline gap-1.5">
+                      <span className="truncate text-[13px] font-semibold text-fg-strong">
+                        {fullName || loginEmail}
+                      </span>
+                      {primaryRole && (
+                        <span className="shrink-0 text-[10.5px] text-fg-muted">{primaryRole}</span>
+                      )}
+                    </span>
+                    {loginEmail && (
+                      <span className="truncate text-[11.5px] text-fg-muted">{loginEmail}</span>
+                    )}
+                  </span>
+                </div>
+                <DropdownDivider />
+                {/* Theme stays — it gets used constantly — but as one row with
+                    no section heading, and now including System.
+                    `col-span-full` is load-bearing: without it a raw child sits
+                    in the menu grid's leading `auto` column and widens that
+                    shared column to its own width, which pushes every
+                    DropdownItem label (col-start-2) a fifth of the panel away
+                    from its icon. That was the icon-stranding bug, and it was
+                    the missing span rather than the control itself.
+                    Accent is gone: a pick-once brand setting, and Account
+                    Settings already owns the canonical control. */}
+                <div className="col-span-full flex items-center gap-2 px-3.5 py-1.5 sm:px-3">
+                  <span className="text-[12px] text-fg">{t('account.preferences.theme')}</span>
+                  <span className="flex-1" />
+                  {/* `sm` is the documented inline variant — the default size
+                      is the standalone settings-row control, which is too tall
+                      for a menu row. */}
+                  <ToggleGroup
+                    value={mode}
+                    onChange={setMode}
+                    size="sm"
+                    aria-label={t('account.preferences.theme')}
+                  >
+                    <ToggleGroupOption value="light">
+                      {t('account.preferences.themeLight')}
                     </ToggleGroupOption>
-                    <ToggleGroupOption value="dark" aria-label="Dark mode" className="flex-1 justify-center">
-                      <MoonIcon className="h-4 w-4" />
+                    <ToggleGroupOption value="dark">
+                      {t('account.preferences.themeDark')}
                     </ToggleGroupOption>
-                  </ToggleGroup>
-                  <div className="mt-3 mb-2 text-sm font-medium text-fg-strong">{t('common.themeAccent')}</div>
-                  <ToggleGroup value={accent} onChange={setAccent} aria-label={t('common.themeAccent')} className="w-full">
-                    <ToggleGroupOption
-                      value="warm"
-                      aria-label={t('common.themeAccentWarm')}
-                      title={t('common.themeAccentWarm')}
-                      className="flex-1 justify-center"
-                    >
-                      <span
-                        className="size-4 rounded-full ring-1 ring-black/10"
-                        style={{ background: 'oklch(68% 0.185 50)' }}
-                      />
-                    </ToggleGroupOption>
-                    <ToggleGroupOption
-                      value="cool"
-                      aria-label={t('common.themeAccentCool')}
-                      title={t('common.themeAccentCool')}
-                      className="flex-1 justify-center"
-                    >
-                      <span
-                        className="size-4 rounded-full ring-1 ring-black/10"
-                        style={{ background: 'oklch(56% 0.125 215)' }}
-                      />
+                    {/* "System", not the mock's "Auto" — Account Settings
+                        already calls it System and one setting should not have
+                        two names. */}
+                    <ToggleGroupOption value="system">
+                      {t('account.preferences.themeSystem')}
                     </ToggleGroupOption>
                   </ToggleGroup>
                 </div>
                 <DropdownDivider />
                 <DropdownItem href="/account/settings">
                   <Cog6ToothIcon data-slot="icon" />
-                  <DropdownLabel>{t('account.settings')}</DropdownLabel>
+                  <DropdownLabel className="text-[12.5px]">{t('account.settings')}</DropdownLabel>
                 </DropdownItem>
                 <DropdownItem onClick={() => { /* Help & Support — placeholder until docs/widget ships */ }}>
                   <LifebuoyIcon data-slot="icon" />
-                  <DropdownLabel>{t('common.helpSupport')}</DropdownLabel>
+                  <DropdownLabel className="text-[12.5px]">{t('common.helpSupport')}</DropdownLabel>
                 </DropdownItem>
                 <DropdownDivider />
+                {/* Its own group, and it states its scope: with one identity
+                    across several workspaces, "sign out" is no longer
+                    self-evident. */}
                 <DropdownItem
                   onClick={() => signOut()}
-                  className="text-danger-500 data-focus:bg-danger-500/10 data-focus:text-danger-500 *:data-[slot=icon]:text-danger-500 data-focus:*:data-[slot=icon]:text-danger-500"
+                  className="menu-danger text-danger-500 *:data-[slot=icon]:text-danger-500"
                 >
                   <ArrowRightStartOnRectangleIcon data-slot="icon" />
-                  <DropdownLabel>{t('common.signOut')}</DropdownLabel>
+                  <DropdownLabel className="text-[12.5px]">{t('common.signOut')}</DropdownLabel>
+                  <DropdownDescription>{t('workspace.signOutScope')}</DropdownDescription>
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
+            {/* Product identity. The rail TOP answers "whose data am I in";
+                the bottom answers "what am I using, and who am I", so the
+                product name belongs here rather than back in the brand block
+                competing with the company for the anchor slot.
+                Deliberately smaller and dimmer than the person's own name —
+                it is orientation of last resort, the word you say to support.
+                Not a link.
+                The environment badge sits here too: DEV qualifies the SYSTEM,
+                not the page, so beside a page title in the topbar it was
+                labelling the wrong thing. */}
+            <div className="mt-1 flex items-center gap-[7px] px-2 pt-1.5 pb-1">
+              {/* A tracked uppercase wordmark, not sentence case. "Admin" sits
+                  directly above it in sentence case, so a sentence-case product
+                  name read as a third line of the person's details rather than
+                  as system chrome — and nobody writes a job title this way.
+                  Also holds up in production, where the env badge is absent and
+                  this is a single word alone on the line. */}
+              <span className="text-[10px] font-semibold uppercase tracking-[0.09em] text-sidebar-fg-dim">
+                {t('app.name')}
+              </span>
+              {envBadge && (
+                <span
+                  className={`inline-flex shrink-0 items-center rounded px-1.5 py-px text-[9px] font-bold tracking-wider ring-1 ring-inset ${envBadge.className}`}
+                >
+                  {envBadge.label}
+                </span>
+              )}
+            </div>
           </SidebarFooter>
         </Sidebar>
       }

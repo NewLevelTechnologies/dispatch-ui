@@ -58,7 +58,7 @@ describe('EquipmentServiceHistoryTab', () => {
 
   it('shows the empty state', async () => {
     renderWithProviders(<EquipmentServiceHistoryTab equipmentId="eq-1" />);
-    expect(await screen.findByText(/no work orders for this unit/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no work orders for this equipment/i)).toBeInTheDocument();
   });
 
   it('renders a row with tech, a "+N more" hint, a resolved type, and a status pill', async () => {

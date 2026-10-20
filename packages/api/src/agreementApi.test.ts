@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { agreementApi, agreementNotesApi } from './agreementApi';
+import { agreementApi, agreementNotesApi, agreementPlanApi } from './agreementApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -18,6 +18,52 @@ describe('agreementApi', () => {
     await agreementApi.list();
     expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements', {
       params: { classification: 'CONTRACT' },
+    });
+  });
+
+  it('listPage sends the filters, joins statuses and drops empty ones', async () => {
+    await agreementApi.listPage({
+      q: 'acme',
+      status: ['ACTIVE', 'SUSPENDED'],
+      regionIds: ['r1'],
+      renewingWithinDays: 30,
+      sort: 'monthlyValue,desc',
+      page: 1,
+      size: 50,
+    });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements', {
+      params: {
+        q: 'acme',
+        renewingWithinDays: 30,
+        sort: 'monthlyValue,desc',
+        page: 1,
+        size: 50,
+        status: 'ACTIVE,SUSPENDED',
+        regionIds: ['r1'],
+      },
+    });
+    await agreementApi.listPage({ q: '', status: [], regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements', { params: {} });
+  });
+
+  it('listPage joins plans and sends only the flags that are on', async () => {
+    await agreementApi.listPage({ planId: ['p1', 'p2'], noPlan: true, visitsBehind: false, noBilling: true });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements', {
+      params: { noPlan: true, noBilling: true, planId: 'p1,p2' },
+    });
+  });
+
+  it('facets sends the list filters without paging or sort', async () => {
+    await agreementApi.facets({ q: 'acme', status: ['ACTIVE'], sort: 'termEnd,asc', page: 2, size: 50 });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements/facets', {
+      params: { q: 'acme', status: 'ACTIVE' },
+    });
+  });
+
+  it('unscheduledVisits reads the queue in a scope', async () => {
+    await agreementApi.unscheduledVisits({ withinDays: 7, regionIds: ['r1'], page: 0, size: 25 });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements/visits/unscheduled', {
+      params: { withinDays: 7, page: 0, size: 25, regionIds: ['r1'] },
     });
   });
 
@@ -60,6 +106,19 @@ describe('agreementApi', () => {
   it('cancel POSTs to /cancel', async () => {
     await agreementApi.cancel('a-1');
     expect(apiClient.post).toHaveBeenCalledWith('/work-orders/agreements/a-1/cancel');
+  });
+
+  it('renew POSTs the new term end and price to /renew', async () => {
+    await agreementApi.renew('a-1', { termEnd: '2028-06-01', billingAmount: 330 });
+    expect(apiClient.post).toHaveBeenCalledWith('/work-orders/agreements/a-1/renew', {
+      termEnd: '2028-06-01',
+      billingAmount: 330,
+    });
+  });
+
+  it('cancelRenewal DELETEs /renewal', async () => {
+    await agreementApi.cancelRenewal('a-1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/agreements/a-1/renewal');
   });
 
   it('getCoverage hits /coverage', async () => {
@@ -185,6 +244,25 @@ describe('agreementApi', () => {
     expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/agreements/a-1/coverage/locations/sl-1');
   });
 
+  it('getOverview GETs the tenant-wide overview', async () => {
+    const overview = {
+      asOf: '2026-09-30', activeAgreementCount: 128, recurringMonthly: 18400,
+      renewingSoon: { withinDays: 30, count: 6, monthlyValue: 900 },
+      visitsThisMonth: { planned: 42, completed: 31, missed: 1, unscheduled: 4 },
+      visitsDueSoonUnscheduled: { withinDays: 7, count: 3 }, currency: 'USD',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: overview });
+    const out = await agreementApi.getOverview();
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/overview');
+    expect(out).toEqual(overview);
+  });
+
+  it('getOverview narrows to regions when asked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await agreementApi.getOverview({ regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/overview', { params: { regionIds: ['r1'] } });
+  });
+
   it('getCustomerSummary GETs the per-customer rollup (AG-1)', async () => {
     const summary = {
       arr: 2400, activeAgreementCount: 2, coveredLocations: 3,
@@ -206,5 +284,12 @@ describe('agreementApi', () => {
       params: { customerId: 'cust-1' },
     });
     expect(out).toEqual(rows);
+  });
+
+  it('agreementPlanApi.getAll folds sortBy/sortDir into the Spring sort param', async () => {
+    await agreementPlanApi.getAll({ active: true, sortBy: 'defaultAmount', sortDir: 'desc', page: 0, size: 25 });
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreement-plans', {
+      params: { active: true, sort: 'defaultAmount,desc', page: 0, size: 25 },
+    });
   });
 });

@@ -216,7 +216,7 @@ export default function WorkOrderFilesTab({
                 key={c.id}
                 onClick={() => setType(c.id)}
                 aria-pressed={active}
-                className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium ${
+                className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 !text-[12px] !font-medium ${
                   active
                     ? 'border-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent-500)_9%,var(--bg-elev))] text-fg-accent'
                     : 'border-border bg-bg-elev text-fg'
@@ -359,7 +359,7 @@ export default function WorkOrderFilesTab({
         onClose={() => setDeletingFile(null)}
         onConfirm={() => deletingFile && deleteMutation.mutate(deletingFile)}
         title={deletingFile ? `Delete ${deletingFile.fileName}?` : 'Delete file?'}
-        message="This permanently removes the file from this job."
+        message={`This permanently removes the file from this ${getName('work_order').toLowerCase()}.`}
         confirmLabel="Delete"
         isDestructive
         isPending={deleteMutation.isPending}
@@ -370,10 +370,11 @@ export default function WorkOrderFilesTab({
 
 // Subject backlink chips — the work item / equipment a file documents.
 function SubjectChips({ f }: { f: WorkOrderFile }) {
+  const { getName } = useGlossary();
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   if (!f.equipmentId || !f.equipmentName) return null;
   return (
-    <Link to={`/equipment/${f.equipmentId}`} onClick={stop} title="View equipment">
+    <Link to={`/equipment/${f.equipmentId}`} onClick={stop} title={`View ${getName('equipment').toLowerCase()}`}>
       <Pill tone="violet">{f.equipmentName}</Pill>
     </Link>
   );
@@ -545,12 +546,16 @@ export function FileLightbox({
   onClose,
   readOnly,
   onRequestDelete,
+  showWorkOrder = false,
 }: {
   media: WorkOrderFile[];
   startIndex: number | null;
   onClose: () => void;
   readOnly: boolean;
   onRequestDelete: (f: WorkOrderFile) => void;
+  /** Add the file's work order number to the caption line — for galleries
+   *  that span jobs (equipment history), not a single job's own files. */
+  showWorkOrder?: boolean;
 }) {
   if (startIndex === null || media.length === 0) return null;
   return (
@@ -560,6 +565,7 @@ export function FileLightbox({
       onClose={onClose}
       readOnly={readOnly}
       onRequestDelete={onRequestDelete}
+      showWorkOrder={showWorkOrder}
     />
   );
 }
@@ -570,12 +576,14 @@ function LightboxInner({
   onClose,
   readOnly,
   onRequestDelete,
+  showWorkOrder,
 }: {
   media: WorkOrderFile[];
   startIndex: number;
   onClose: () => void;
   readOnly: boolean;
   onRequestDelete: (f: WorkOrderFile) => void;
+  showWorkOrder: boolean;
 }) {
   const [index, setIndex] = useState(startIndex);
   const total = media.length;
@@ -615,7 +623,7 @@ function LightboxInner({
                 type="button"
                 onClick={() => onRequestDelete(current)}
                 aria-label="Delete"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 !text-sm text-white hover:bg-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <TrashIcon className="size-4" />
                 Delete
@@ -672,6 +680,9 @@ function LightboxInner({
               {current.equipmentName && <span>{current.equipmentName}</span>}
               {current.uploadedByName && <span>· {current.uploadedByName}</span>}
               <span>· {formatTimestamp(current.createdAt)}</span>
+              {showWorkOrder && current.workOrderNumber && (
+                <span className="font-mono">· {current.workOrderNumber}</span>
+              )}
               {total > 1 && (
                 <span className="font-mono tabular-nums">
                   · {safeIndex + 1} / {total}

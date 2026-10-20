@@ -46,6 +46,8 @@ const FIELD_PAID_BY = ['Company account', 'Cash', 'Reimbursable', 'Paid at count
 
 interface Row {
   key: string;
+  /** The saved line's id; absent on a line added in this edit. */
+  id?: string;
   name: string;
   sku: string;
   qty: string;
@@ -74,8 +76,11 @@ export default function PurchaseOrderFormPage() {
   // Attached work order (from ?workOrderId on create, or the PO in edit) — for
   // the label + back link. Stock POs (no WO) are allowed but not the WO-tab path.
   const workOrderId = editing ? (po?.workOrderId ?? null) : params.get('workOrderId');
+  // Launched from a work item (?workItemId on create): the PO is tied to that
+  // item, and saving returns to it on the WO's Work items tab.
+  const workItemId = !editing && workOrderId ? params.get('workItemId') : null;
   const { data: workOrder } = useQuery({
-    queryKey: ['work-order', workOrderId],
+    queryKey: ['work-orders', workOrderId],
     queryFn: () => workOrderApi.getById(workOrderId!),
     enabled: !!workOrderId,
   });
@@ -151,6 +156,7 @@ export default function PurchaseOrderFormPage() {
       po.lines.length
         ? po.lines.map((l) => ({
             key: `r-${++rowSeq}`,
+            id: l.id,
             name: l.name,
             sku: l.sku ?? '',
             qty: String(l.quantityOrdered),
@@ -206,6 +212,8 @@ export default function PurchaseOrderFormPage() {
 
   const buildLines = (): PurchaseOrderLineInput[] =>
     lineRows.map((r) => ({
+      // Existing lines keep their id, so invoice lines billed from them stay linked.
+      ...(r.id ? { id: r.id } : {}),
       name: r.name.trim(),
       sku: r.sku.trim() || undefined,
       quantityOrdered: parseInt(r.qty, 10) || 1,
@@ -231,6 +239,7 @@ export default function PurchaseOrderFormPage() {
       receiptAttachFailed.current = false;
       const created = await purchaseOrderApi.create({
         workOrderId: workOrderId || null,
+        ...(workItemId ? { workItemId } : {}),
         type,
         status,
         ...common,
@@ -254,7 +263,12 @@ export default function PurchaseOrderFormPage() {
       } else {
         showSuccess(editing ? 'Purchase order saved' : 'Purchase order created');
       }
-      // Land on the saved PO's detail, carrying the ?from=vendor context through.
+      // Back to the work item it was raised for; otherwise land on the saved
+      // PO's detail, carrying the ?from=vendor context through.
+      if (workItemId && workOrderId) {
+        navigate(`/work-orders/${workOrderId}?tab=items&item=${workItemId}`);
+        return;
+      }
       navigate(`/purchase-orders/${saved.id}${fromSuffix}`);
     },
     onError: (err: unknown) => showError('Could not save the purchase order', extractApiError(err) ?? undefined),
@@ -326,8 +340,8 @@ export default function PurchaseOrderFormPage() {
               {editing
                 ? `${po?.poNumber ?? ''} · ${field ? 'field purchase' : 'special order'}`
                 : field
-                  ? 'Log a counter run that already happened. Cost only — the customer price lives on the quote.'
-                  : 'Order parts or equipment from a vendor. Cost only — the customer price lives on the quote.'}
+                  ? `Log a counter run that already happened. Cost only — the ${getName('customer').toLowerCase()} price lives on the ${getName('quote').toLowerCase()}.`
+                  : `Order parts or equipment from a vendor. Cost only — the ${getName('customer').toLowerCase()} price lives on the ${getName('quote').toLowerCase()}.`}
             </Text>
           </div>
 
@@ -419,7 +433,7 @@ export default function PurchaseOrderFormPage() {
           </Card>
 
           {/* Line items */}
-          <Card title="Items" subtitle="Cost is what we pay the vendor. Bill price is the suggested sell price on the quote." className="mb-3.5">
+          <Card title="Items" subtitle={`Cost is what we pay the vendor. Bill price is the suggested sell price on the ${getName('quote').toLowerCase()}.`} className="mb-3.5">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[12px]">
                 <thead>
@@ -633,7 +647,7 @@ function VendorField({
                 onPick(v);
                 setOpen(false);
               }}
-              className="block w-full border-b border-border-soft px-2.5 py-1.5 text-left text-[12.5px] text-fg-strong last:border-b-0 hover:bg-bg-hover"
+              className="block w-full border-b border-border-soft px-2.5 py-1.5 text-left !text-[12.5px] text-fg-strong last:border-b-0 hover:bg-bg-hover"
             >
               {v.name}
             </button>

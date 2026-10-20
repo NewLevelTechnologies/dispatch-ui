@@ -1,0 +1,206 @@
+/* ───────────────────────────────────────────────────────────────────
+   Home dashboard — surface-specific CSS.
+
+   Ported from claude_designs/Home Dashboard.html (`.hd-*`). Only layout
+   and the few bespoke marks live here (count tile, status bar, tech
+   progress); cards, pills, KPIs and the timeline are the shared
+   primitives. Tints mix into `transparent`, never `--bg-elev`.
+   ─────────────────────────────────────────────────────────────────── */
+
+.home-view { display: flex; flex-direction: column; gap: 12px; }
+
+.home-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+
+.home-2col { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+
+/* ── Needs attention ───────────────────────────────────────────── */
+.home-att-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.home-att-grid > div + div { border-left: 1px solid var(--border-soft); }
+.home-att-group {
+  padding: 6px 14px;
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+.home-att-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.home-att-row:last-child { border-bottom: none; }
+.home-att-row.is-link { cursor: pointer; }
+.home-att-row.is-link:hover { background: var(--bg-hover); }
+/* The count tile borrows the pill's tone pairs (and their dark-mode lifts),
+   reshaped into a square. */
+.pill.home-att-count {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  justify-content: center;
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.home-att-label { font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+.home-att-meta { font-size: 11.5px; color: var(--fg-muted); }
+
+/* ── Today's board ─────────────────────────────────────────────── */
+.home-statusbar { display: flex; gap: 2px; height: 10px; }
+.home-statusbar > span { border-radius: 2px; min-width: 4px; }
+.home-statusbar.is-empty { background: var(--bg-active); border-radius: 2px; }
+.home-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
+.home-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--fg-muted); }
+.home-legend-item .swatch { width: 8px; height: 8px; border-radius: 2px; }
+.home-legend-item .n { color: var(--fg-strong); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.home-tech-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 150px 110px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-soft);
+}
+.home-tech-name { font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+.home-tech-stop { font-size: 11.5px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-tech-when { font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted); }
+.home-tech-prog { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.home-tech-prog .track { height: 4px; border-radius: 999px; background: var(--bg-active); overflow: hidden; }
+.home-tech-prog .fill { height: 100%; background: var(--success-500); }
+.home-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* ── Revenue ───────────────────────────────────────────────────── */
+.home-kpis.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.home-2col.even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.home-chart { display: flex; align-items: flex-end; gap: 12px; }
+.home-chart-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.home-chart-plot { position: relative; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.home-chart-bar { width: 76%; border-radius: 3px 3px 0 0; background: var(--success-500); }
+.home-chart-bar.partial {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklch, var(--success-500) 45%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--success-500) 45%, transparent);
+}
+.home-chart-val {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.home-chart-label { font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
+/* A year's 12 monthly bars. */
+.home-chart.dense { gap: 6px; }
+.home-chart.dense .home-chart-bar { width: 84%; }
+.home-chart.dense .home-chart-val { font-size: 10px; }
+.home-chart-sofar { color: var(--fg-dim); }
+/* Revenue targets: a dashed rule per bucket that has one. Green means "hit"
+   once any bar has a target, so the rest take the tint. */
+.home-chart-bar.missed { background: color-mix(in oklch, var(--success-500) 45%, transparent); }
+.home-chart-val.hit { color: var(--success-500); }
+.home-chart-target {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  border-top: 2px dashed var(--fg-muted);
+  pointer-events: none;
+}
+.home-chart-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 11.5px; color: var(--fg-muted); }
+.home-chart-actions { display: inline-flex; align-items: center; gap: 12px; }
+.home-chart-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.home-chart-key.bar { width: 10px; height: 8px; border-radius: 2px; background: var(--success-500); }
+.home-chart-key.rule { width: 10px; border-top: 2px dashed var(--fg-muted); }
+
+.home-split { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.home-foot-rule { padding-top: 8px; border-top: 1px solid var(--border-soft); }
+.home-row-label { font-size: 12px; color: var(--fg); }
+.home-row-value { font-size: 12px; font-weight: 600; color: var(--fg-strong); font-variant-numeric: tabular-nums; }
+.home-row-muted { font-size: 11.5px; font-weight: 500; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.home-prog { display: block; height: 4px; border-radius: 999px; background: var(--bg-active); overflow: hidden; }
+.home-prog.tall { height: 6px; }
+.home-prog > span { display: block; height: 100%; border-radius: 999px; }
+
+.home-funnel-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 32px 56px;
+  align-items: center;
+  gap: 10px;
+}
+.home-stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.home-stat {
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Tech productivity ─────────────────────────────────────────── */
+.home-techs tbody tr.dense-row-interactive { cursor: pointer; }
+.home-techs td.home-warn { color: var(--warning-fg); font-weight: 600; }
+.home-techs td.home-danger { color: var(--danger-500); font-weight: 600; }
+.home-techs td.home-chev { width: 24px; color: var(--fg-muted); }
+.home-techs tbody tr.home-unattr td,
+.home-techs tbody tr.home-unattr:hover td { background: var(--bg-elev-2); }
+.home-unattr-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: var(--fg-muted);
+  background: var(--bg-active);
+}
+/* The dense table only pads thead/tbody cells; the total row matches them. */
+.home-techs tfoot td { padding: 9px 12px; border-top: 1px solid var(--border); color: var(--fg); }
+.home-card-note {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-elev-2);
+  font-size: 11.5px;
+  color: var(--fg-muted);
+}
+.home-stat-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.home-drawer-table { border: 1px solid var(--border-soft); border-radius: var(--r-md); overflow: hidden; }
+.home-drawer-table .dense-table thead th { background: var(--bg-elev-2); }
+
+/* The card's secondary detail (avg ticket, the excluded-hours line, the
+   per-hour bar) drops first on narrower screens. */
+@media (max-width: 1100px) {
+  .home-col-opt { display: none; }
+}
+
+@media (max-width: 1180px) {
+  .home-2col { grid-template-columns: minmax(0, 1fr); }
+  .home-kpis.five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .home-kpis, .home-kpis.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-2col.even { grid-template-columns: minmax(0, 1fr); }
+  .home-stat-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-att-grid { grid-template-columns: minmax(0, 1fr); }
+  .home-att-grid > div + div { border-left: none; border-top: 1px solid var(--border-soft); }
+  .home-tech-row { grid-template-columns: auto minmax(0, 1fr) 130px; }
+  .home-tech-prog { display: none; }
+}
+@media (max-width: 640px) {
+  .home-kpis, .home-kpis.five { grid-template-columns: minmax(0, 1fr); }
+  .home-stat-grid, .home-stat-grid.four { grid-template-columns: minmax(0, 1fr); }
+  .home-att-row { grid-template-columns: auto minmax(0, 1fr); }
+  .home-att-row > :last-child:not(:nth-child(2)) { grid-column: 2; justify-self: start; }
+}

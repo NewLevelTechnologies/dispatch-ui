@@ -84,3 +84,12 @@
 }
 
 @import "./styles/components.css";
+@import "./styles/dispatch-board.css";
+@import "./styles/home.css";
+@import "./styles/callbacks.css";
+@import "./styles/revenue-targets.css";
+@import "./styles/reports.css";
+@import "./styles/proposal.css";
+@import "./styles/public-proposal.css";
+@import "./styles/agreements.css";
+@import "./styles/work-items.css";

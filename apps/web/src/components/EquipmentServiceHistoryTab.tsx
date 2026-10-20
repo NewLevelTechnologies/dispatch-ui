@@ -18,6 +18,7 @@ import { LoadingState } from './ui/LoadingState';
 import { useUrlPage } from '../hooks/useUrlPage';
 import { formatTimestamp } from '@dispatch/utils';
 import { WorkOrderTypePill } from './ui/WorkOrderTypePill';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 const PAGE_SIZE = 25;
 
@@ -67,6 +68,7 @@ function rangeFrom(range: RangeId): string | undefined {
 }
 
 export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentId: string }) {
+  const { getName, getAbbrev } = useGlossary();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [range, setRange] = useState<RangeId>('all');
@@ -114,14 +116,14 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
           <input
             value={search}
             onChange={(e) => setSearchAndReset(e.target.value)}
-            placeholder="Search work, tech, WO#…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            placeholder={`Search work, ${getName('technician').toLowerCase()}, ${getAbbrev('work_order')}#…`}
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
             <button
               type="button"
               onClick={() => setSearchAndReset('')}
-              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+              className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong"
               aria-label="Clear search"
             >
               ×
@@ -135,7 +137,7 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
             resetPage();
           }}
           aria-label="Date range"
-          className="h-8 rounded-md border border-border bg-bg-elev px-2 text-[12px] text-fg"
+          className="h-8 rounded-md border border-border bg-bg-elev px-2 !text-[12px] text-fg"
         >
           <option value="all">All time</option>
           <option value="1y">Past year</option>
@@ -154,7 +156,7 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
         <LoadingState />
       ) : rows.length === 0 ? (
         <div className="rounded-[10px] border border-dashed border-border px-3.5 py-10 text-center text-[12px] text-fg-muted">
-          No work orders for this unit.
+          {`No ${getName('work_order', true).toLowerCase()} for this ${getName('equipment').toLowerCase()}.`}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-[10px] border border-border">
@@ -162,10 +164,10 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
             <DenseTHead>
               <tr>
                 <th>Date</th>
-                <th>Work order</th>
+                <th>{getName('work_order')}</th>
                 <th>Work</th>
                 <th>Type</th>
-                <th>Tech</th>
+                <th>{getName('technician')}</th>
                 <th>Status</th>
               </tr>
             </DenseTHead>

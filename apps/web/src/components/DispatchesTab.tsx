@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   dispatchNotesApi,
@@ -171,7 +172,7 @@ export default function DispatchesTab({
   const advance = useMutation({
     mutationFn: ({ id, status }: { id: string; status: DispatchStatus }) => dispatchesApi.update(id, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
     },
     onError: (err: unknown) => {
@@ -370,7 +371,7 @@ function MediaThumbs({ media, onOpen }: { media: WorkOrderFile[]; onOpen: (index
         <button
           type="button"
           onClick={() => onOpen(shown.length)}
-          className="grid size-14 shrink-0 place-items-center rounded-sm border border-border bg-bg-elev-2 text-[11px] font-semibold text-fg-muted hover:bg-bg-hover"
+          className="grid size-14 shrink-0 place-items-center rounded-sm border border-border bg-bg-elev-2 !text-[11px] !font-semibold text-fg-muted hover:bg-bg-hover"
         >
           {`+${overflow}`}
         </button>

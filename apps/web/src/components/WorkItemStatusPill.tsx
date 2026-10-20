@@ -9,6 +9,7 @@ import {
 } from '../api/setup';
 import { Pill } from './ui/Pill';
 import { PROGRESS_TONE } from '../lib/workItemProgress';
+import { allowedTargetStatuses } from '../lib/workItemStatusTargets';
 import {
   Dropdown,
   DropdownButton,
@@ -37,6 +38,9 @@ interface Props {
   enforceWorkflow: boolean;
   /** Cancelled / archived WOs lock the pill to read-only. */
   readOnly?: boolean;
+  /** Runs before a move to a COMPLETED-category status; call `proceed` to
+   *  apply it (e.g. after confirming that parts are still on order). */
+  guardComplete?: (proceed: () => void) => void;
 }
 
 export default function WorkItemStatusPill({
@@ -46,6 +50,7 @@ export default function WorkItemStatusPill({
   transitions,
   enforceWorkflow,
   readOnly = false,
+  guardComplete,
 }: Props) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -79,22 +84,7 @@ export default function WorkItemStatusPill({
     currentStatus?.name ||
     t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workItem.statusCategory]}`);
 
-  const activeStatuses = statuses.filter((s) => s.isActive);
-
-  // If workflow isn't enforced (or there's no current status to transition from),
-  // any active status is a valid target. Otherwise, only statuses reachable
-  // via a defined transition from the current state are options.
-  const allowedStatuses =
-    !enforceWorkflow || !workItem.statusId
-      ? activeStatuses.filter((s) => s.id !== workItem.statusId)
-      : (() => {
-          const allowedIds = new Set(
-            transitions
-              .filter((tx) => tx.fromStatusId === workItem.statusId)
-              .map((tx) => tx.toStatusId)
-          );
-          return activeStatuses.filter((s) => allowedIds.has(s.id));
-        })();
+  const allowedStatuses = allowedTargetStatuses(workItem, statuses, transitions, enforceWorkflow);
 
   const isPending = updateStatusMutation.isPending;
   const isInteractive = !readOnly && !isPending && allowedStatuses.length > 0;
@@ -123,7 +113,11 @@ export default function WorkItemStatusPill({
         {allowedStatuses.map((s) => (
           <DropdownItem
             key={s.id}
-            onClick={() => updateStatusMutation.mutate(s.id)}
+            onClick={() => {
+              const apply = () => updateStatusMutation.mutate(s.id);
+              if (guardComplete && s.statusCategory === 'COMPLETED') guardComplete(apply);
+              else apply();
+            }}
           >
             <DropdownLabel>{s.name}</DropdownLabel>
           </DropdownItem>

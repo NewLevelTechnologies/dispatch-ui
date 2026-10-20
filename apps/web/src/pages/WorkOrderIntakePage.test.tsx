@@ -16,12 +16,17 @@ const mockEquipmentList = vi.fn();
 const mockSearchCustomers = vi.fn();
 const mockAddServiceLocation = vi.fn();
 const mockVerifyAddress = vi.fn();
+const mockCallbackCandidates = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/setup')>();
   return {
     ...actual,
-    workOrderApi: { ...actual.workOrderApi, create: (...a: unknown[]) => mockCreateWorkOrder(...a) },
+    workOrderApi: {
+      ...actual.workOrderApi,
+      create: (...a: unknown[]) => mockCreateWorkOrder(...a),
+      getCallbackCandidates: (...a: unknown[]) => mockCallbackCandidates(...a),
+    },
     workOrderTypesApi: { ...actual.workOrderTypesApi, getAll: (...a: unknown[]) => mockTypesGetAll(...a) },
     divisionsApi: { ...actual.divisionsApi, getAll: (...a: unknown[]) => mockDivisionsGetAll(...a) },
     dispatchRegionApi: { ...actual.dispatchRegionApi, getAll: (...a: unknown[]) => mockRegionsGetAll(...a) },
@@ -81,6 +86,7 @@ describe('WorkOrderIntakePage', () => {
     mockGetCustomerById.mockResolvedValue({ id: 'cust-1', name: 'Reyes Household' });
     mockEquipmentList.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 200 });
     mockCreateWorkOrder.mockResolvedValue({ id: 'wo-new' });
+    mockCallbackCandidates.mockResolvedValue([]);
     mockCreateCustomer.mockResolvedValue({
       id: 'cust-new',
       name: 'Jordan Avila',
@@ -335,6 +341,44 @@ describe('WorkOrderIntakePage', () => {
       )
     );
     await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/wo-new'));
+  });
+
+  it('opens the callback prompt for the seeded Callback type and sends the confirmed link', async () => {
+    const user = userEvent.setup();
+    // Renamed and recoded: the fixed systemKey still identifies it.
+    mockTypesGetAll.mockResolvedValue([
+      { id: 'type-1', name: 'Service Call', isActive: true, sortOrder: 0, systemKey: null },
+      { id: 'type-cb', name: 'Recall', code: 'RECALL', isActive: true, sortOrder: 1, systemKey: 'CALLBACK' },
+    ]);
+    mockCallbackCandidates.mockResolvedValue([
+      {
+        id: 'wo-1234',
+        workOrderNumber: 'WO-1234',
+        completedDate: '2026-09-18',
+        summary: 'No cooling',
+        matchedOn: { location: true, equipment: false },
+        sameLocation: true,
+        equipment: [],
+        isAgreementVisit: false,
+        technicians: [{ userId: 't1', name: 'Daniel Park' }],
+      },
+    ]);
+    renderIntake('/work-orders/new?locationId=loc-1');
+    await screen.findByRole('option', { name: 'Recall' });
+
+    // Suggestions exist, so the prompt sits collapsed until the type hints.
+    expect(await screen.findByRole('button', { name: 'callbacks.review' })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-cb');
+    await user.click(await screen.findByRole('button', { name: 'callbacks.link' }));
+    expect(screen.getByTestId('callback-linked')).toHaveTextContent('Daniel Park');
+
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Still no cooling');
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
+    await waitFor(() =>
+      expect(mockCreateWorkOrder).toHaveBeenCalledWith(
+        expect.objectContaining({ workOrderTypeId: 'type-cb', callbackOfWorkOrderId: 'wo-1234' }),
+      ),
+    );
   });
 
   it('adds and removes work-item drafts', async () => {

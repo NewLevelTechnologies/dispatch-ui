@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
@@ -16,6 +16,8 @@ vi.mock('../api/setup', () => ({
     getRevenueRecognition: vi.fn(),
     update: vi.fn(),
     cancel: vi.fn(),
+    renew: vi.fn(),
+    cancelRenewal: vi.fn(),
     list: vi.fn(),
   },
   agreementPlanApi: { getById: vi.fn(), getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -88,10 +90,10 @@ const agreement = {
   updatedAt: '',
 };
 
-function renderPage() {
+function renderPage(query = '') {
   return renderWithProviders(<AgreementDetailPage />, {
     routes: [{ path: '/agreements/:id', element: <AgreementDetailPage /> }],
-    initialPath: '/agreements/a-1',
+    initialPath: `/agreements/a-1${query}`,
   });
 }
 
@@ -147,6 +149,81 @@ describe('AgreementDetailPage', () => {
     } as unknown as TenantSettings);
   });
 
+  describe('renewal', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-08T15:00:00Z'));
+      vi.mocked(agreementApi.renew).mockResolvedValue(agreement);
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('books a renewal mid-term for the renewal term on file', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'Renew…' }));
+      const dialog = await screen.findByRole('dialog', { name: 'agreements.renew.title' });
+      expect(dialog).toHaveTextContent('agreements.renew.bookedHint');
+      expect(screen.getByLabelText(/agreements.renew.termEnd/)).toHaveValue('2028-09-01');
+      await user.click(screen.getByRole('button', { name: 'agreements.renew.submitBooked' }));
+      await waitFor(() => expect(agreementApi.renew).toHaveBeenCalledWith('a-1', { termEnd: '2028-09-01' }));
+    });
+
+    it('renews an expired agreement now, at a new price', async () => {
+      vi.mocked(agreementApi.getById).mockResolvedValue({ ...agreement, status: 'EXPIRED', termEnd: '2026-09-01' });
+      vi.mocked(agreementApi.getBillingSchedule).mockResolvedValue({
+        agreementId: 'a-1',
+        amount: 300,
+        cadenceUnit: 'QUARTER',
+        cadenceInterval: 1,
+        anchorDate: '2024-09-01',
+        netDays: 30,
+        billingMode: 'FIXED_SCHEDULE',
+        active: true,
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'Renew…' }));
+      expect(await screen.findByRole('dialog', { name: 'agreements.renew.title' })).toHaveTextContent(
+        'agreements.renew.expiredHint',
+      );
+      await user.type(await screen.findByRole('spinbutton'), '330');
+      await user.click(screen.getByRole('button', { name: 'agreements.renew.submit' }));
+      await waitFor(() =>
+        expect(agreementApi.renew).toHaveBeenCalledWith('a-1', { termEnd: '2027-09-01', billingAmount: 330 }),
+      );
+    });
+
+    it('cancels a booked renewal from the dialog', async () => {
+      vi.mocked(agreementApi.getById).mockResolvedValue({ ...agreement, nextTermEnd: '2028-09-01', nextTermBillingAmount: null });
+      vi.mocked(agreementApi.cancelRenewal).mockResolvedValue(agreement);
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'Renew…' }));
+      expect(await screen.findByRole('dialog', { name: 'agreements.renew.title' })).toHaveTextContent(
+        'agreements.renew.rebookHint',
+      );
+      expect(screen.getByRole('button', { name: 'agreements.renew.submitRebook' })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'agreements.renew.unbook' }));
+      await waitFor(() => expect(agreementApi.cancelRenewal).toHaveBeenCalledWith('a-1'));
+    });
+
+    it('shows a booked renewal and stops asking for one', async () => {
+      vi.mocked(agreementApi.getById).mockResolvedValue({
+        ...agreement,
+        termEnd: '2026-11-01',
+        nextTermEnd: '2027-11-01',
+        nextTermBillingAmount: 330,
+      });
+      renderPage();
+      expect(await screen.findByText('Next term')).toBeInTheDocument();
+      expect(screen.getByText(/330.* per invoice/)).toBeInTheDocument();
+      expect(screen.getByText(/Renewal booked to/)).toBeInTheDocument();
+      expect(screen.queryByText(/Renews in \d+ days/)).not.toBeInTheDocument();
+    });
+  });
+
   it('renders the header (name, number, customer) and the tab row', async () => {
     renderPage();
     expect(await screen.findByText('Quarterly PM — Retail')).toBeInTheDocument();
@@ -157,6 +234,12 @@ describe('AgreementDetailPage', () => {
     expect(screen.getByRole('tab', { name: /overview/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /coverage/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /schedule/i })).toBeInTheDocument();
+  });
+
+  it('arrives from the list with billing setup open, and back returns to the list as it was', async () => {
+    renderPage(`?from=agreements&back=${encodeURIComponent('status=any&plan=p1')}&billing=setup`);
+    expect(await screen.findByRole('dialog', { name: 'Set up billing' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /all agreements/i })).toHaveAttribute('href', '/agreements?status=any&plan=p1');
   });
 
   it('hides ARR and the compliance headline when billing + compliance 404', async () => {
@@ -243,7 +326,7 @@ describe('AgreementDetailPage', () => {
         {
           id: 'inv-1', invoiceNumber: 'INV-9001', status: 'PAID', customerId: 'c-1', customerName: 'Iverson',
           serviceLocationId: null, workOrderId: null, agreementId: 'a-1', billingPeriodKey: '2026-P1',
-          invoiceDate: '2026-09-01', dueDate: '2026-09-30', totalAmount: 27000, amountPaid: 27000,
+          invoiceDate: '2026-09-01', dueDate: '2026-09-30', totalAmount: 27000, subtotal: 27000, taxAmount: 0, workOrderNumber: null, divisionId: null, workOrderTypeId: null, regionId: null, amountPaid: 27000,
           balanceDue: 0, overdue: false, lastSentAt: null, createdAt: '', updatedAt: '',
         },
       ],

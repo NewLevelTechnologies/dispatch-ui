@@ -95,7 +95,7 @@ export function StatusPickerChip({
       >
         <Headless.ListboxButton
           aria-label={ariaLabel ?? label}
-          className="flex h-full items-center gap-1.5 px-2.5 font-medium text-fg outline-none focus:outline-none"
+          className="flex h-full items-center gap-1.5 px-2.5 !font-medium text-fg outline-none focus:outline-none"
         >
           <span className="text-fg-muted">{label}</span>
           <span className="font-semibold text-fg-strong">{display}</span>

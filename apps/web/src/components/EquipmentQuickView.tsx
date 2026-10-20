@@ -46,6 +46,8 @@ interface EquipmentQuickViewProps {
   equipmentId: string;
   /** Click handler for sub-unit chips — pushes the sub-unit onto the drawer stack. */
   onSelectSubUnit: (subUnit: { id: string; name: string }) => void;
+  /** Opened from a work order: new notes record it ("· WO-3188" in history). */
+  workOrderId?: string;
 }
 
 /**
@@ -56,7 +58,7 @@ interface EquipmentQuickViewProps {
  * make/model/serial/asset tag/location); specs, warranty, dates and filters are
  * deferred to the full page. Editing the record edits it everywhere.
  */
-export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: EquipmentQuickViewProps) {
+export default function EquipmentQuickView({ equipmentId, onSelectSubUnit, workOrderId }: EquipmentQuickViewProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
@@ -213,7 +215,7 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
               value={draft.name}
               onChange={(e) => patch({ name: e.target.value })}
               aria-label={t('common.form.name')}
-              className="font-bold"
+              className="!font-bold"
             />
           ) : (
             <div className="flex flex-wrap items-center gap-2">
@@ -366,7 +368,7 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
                 key={sub.id}
                 type="button"
                 onClick={() => onSelectSubUnit({ id: sub.id, name: sub.name })}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elev py-0.5 pl-1 pr-2 text-[12px] font-medium text-fg-strong hover:text-fg-accent"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elev py-0.5 pl-1 pr-2 !text-[12px] !font-medium text-fg-strong hover:text-fg-accent"
               >
                 <EquipmentThumbnail url={sub.profileImageUrl} name={sub.name} monogram sizeClass="size-[18px]" fit="cover" />
                 <span>{sub.name}</span>
@@ -433,7 +435,7 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
               <button
                 type="button"
                 onClick={() => setLightboxIndex(4)}
-                className="grid size-[60px] place-items-center rounded-lg text-[12px] font-semibold text-fg-muted ring-1 ring-border hover:text-fg-accent"
+                className="grid size-[60px] place-items-center rounded-lg !text-[12px] !font-semibold text-fg-muted ring-1 ring-border hover:text-fg-accent"
               >
                 {/* Single text node: in a grid container `+{n}` renders two
                     children that each take a grid row, stacking "+" over the digit. */}
@@ -449,6 +451,7 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
       {/* Notes — equipment-scoped, inline add. */}
       <NotesBlock
         equipmentId={equipmentId}
+        workOrderId={workOrderId}
         recentNotes={equipment.recentNotes ?? []}
         noteCount={equipment.noteCount ?? 0}
         onChanged={invalidateEquipmentRelatedCaches}
@@ -523,11 +526,13 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
 // existing note live on the full equipment page (drawer keeps the peek calm).
 function NotesBlock({
   equipmentId,
+  workOrderId,
   recentNotes,
   noteCount,
   onChanged,
 }: {
   equipmentId: string;
+  workOrderId?: string;
   recentNotes: EquipmentNote[];
   noteCount: number;
   onChanged: () => void;
@@ -538,7 +543,7 @@ function NotesBlock({
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
   const createMutation = useMutation({
-    mutationFn: (body: string) => equipmentNotesApi.create(equipmentId, { body }),
+    mutationFn: (body: string) => equipmentNotesApi.create(equipmentId, { body, ...(workOrderId ? { workOrderId } : {}) }),
     onSuccess: () => {
       onChanged();
       setDraft('');
@@ -724,7 +729,7 @@ function DrawerNoteRow({
         <button
           type="button"
           onClick={start}
-          className="min-w-0 flex-1 whitespace-pre-wrap text-left text-[12.5px] leading-normal text-fg hover:text-fg-strong"
+          className="min-w-0 flex-1 whitespace-pre-wrap text-left !text-[12.5px] leading-normal text-fg hover:text-fg-strong"
           title={t('equipment.notes.editHover')}
         >
           {note.body}
@@ -765,7 +770,7 @@ function SectionAction({ icon, label, onClick }: { icon: React.ReactNode; label:
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 text-[11.5px] leading-none !font-semibold text-fg-accent hover:underline"
+      className="inline-flex items-center gap-1 !text-[11.5px] leading-none !font-semibold text-fg-accent hover:underline"
     >
       {icon}
       {label}

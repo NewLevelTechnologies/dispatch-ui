@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   dispatchesApi,
@@ -292,7 +293,7 @@ export default function DispatchesSection({
                   type="button"
                   onClick={() => setShowPast((s) => !s)}
                   aria-expanded={showPast}
-                  className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  className="inline-flex items-center gap-1 !text-xs !font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                 >
                   <ChevronRightIcon
                     className={`size-3 transition-transform ${showPast ? 'rotate-90' : ''}`}
@@ -356,7 +357,7 @@ function DispatchRow({
     mutationFn: (next: DispatchStatus) =>
       dispatchesApi.update(dispatch.id, { status: next }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });
@@ -381,7 +382,7 @@ function DispatchRow({
   const deleteMutation = useMutation({
     mutationFn: () => dispatchesApi.delete(dispatch.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });
@@ -587,7 +588,7 @@ function PastDispatchRow({
   const deleteMutation = useMutation({
     mutationFn: () => dispatchesApi.delete(dispatch.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });

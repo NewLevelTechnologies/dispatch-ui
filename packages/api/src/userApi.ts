@@ -8,6 +8,58 @@ import apiClient from './client';
 // two non-active states.
 export type InvitationStatus = 'INVITED' | 'INVITATION_EXPIRED' | 'ACTIVE';
 
+// Which email an invite asked for.
+//
+// `INVITATION` — we created the Cognito identity, so Cognito mailed a temporary
+// password. `WORKSPACE_ADDED` — we linked an existing identity, so
+// notification-service was asked to explain the new workspace.
+//
+// Keyed on who created the identity, NOT on invitation status: a person another
+// tenant invited who never set a password comes back `INVITED` here and still
+// gets `WORKSPACE_ADDED`, because Cognito already mailed them once and will not
+// do it again. Branching invite copy on `invitationStatus` reproduces the
+// original bug this field exists to fix.
+export type NotificationRequested = 'INVITATION' | 'WORKSPACE_ADDED';
+
+/**
+ * What a removal will do to the person's sign-in, asked before the click.
+ *
+ * Two booleans rather than one because the two removals ask different
+ * questions: deactivate keys on other **enabled** memberships, delete keys on
+ * **any** membership at all. Someone whose only other membership is disabled
+ * loses their sign-in to a deactivate but keeps their identity through a
+ * delete, so a single flag would be confidently wrong about one of the two
+ * dialogs.
+ *
+ * `deactivateEndsSignIn` is false for an already-disabled member — deactivating
+ * them is a no-op and ends nothing.
+ *
+ * ADVISORY ONLY. A non-200 means *unknown*, never `false`: fall back to
+ * conditional copy and let the removal proceed. The self-removal and
+ * last-user-manager guards are enforced server-side regardless of what this
+ * returned, so a failed pre-flight cannot be used to slip past them — and a
+ * courtesy lookup must never be what stops an admin offboarding someone.
+ */
+export interface RemovalImpact {
+  deactivateEndsSignIn: boolean;
+  deleteEndsSignIn: boolean;
+}
+
+/**
+ * Per-user override on "is this person on the dispatch board".
+ *
+ * Dispatchability is normally a property of the ROLES someone holds
+ * (`tenant_roles.performs_field_work`); this is the escape hatch for the cases
+ * roles cannot express — a working owner who occasionally drives, a tech on
+ * light duty, someone promoted to dispatcher who kept their old role.
+ *
+ * `INHERIT` is the default and correct for nearly everyone. NOTE that on a
+ * sparse PUT it is a real value, not the same as omitting the field: omitting
+ * leaves the current setting alone, sending INHERIT actively resets it to
+ * follow the roles again.
+ */
+export type Dispatchable = 'INHERIT' | 'ALWAYS' | 'NEVER';
+
 export interface User {
   id: string;
   tenantId: string;
@@ -16,15 +68,41 @@ export interface User {
   firstName: string;
   lastName: string;
   phoneNumber: string | null;
+  /** Shown on proposals beside the advisor's name ("Comfort Advisor"). */
+  jobTitle?: string | null;
   // Versioned CloudFront URL; cache-immutable. null when the user hasn't
   // uploaded a photo — UI falls back to an initials avatar. Optional so the
   // type stays compatible with older endpoints that don't include it yet.
   photoUrl?: string | null;
   enabled: boolean;
   invitationStatus?: InvitationStatus;
+  // Which mail the invite asked for. Only ever populated on the POST /users
+  // response — the question is meaningless on a read, so it is null elsewhere.
+  // "Requested", not "sent": user-service asks, notification-service applies
+  // the tenant's kill-switch, so copy built on this must not claim delivery.
+  notificationRequested?: NotificationRequested | null;
   roles?: Role[];
   capabilities?: string[];
   dispatchRegionIds?: string[];
+  // What kinds of work this person is good at taking on — a STRENGTH, never a
+  // qualification. Not a certification, not a licence, not a gate: any tech can
+  // be given any job, and the words "qualified", "certified", "eligible" and
+  // "not allowed" must stay out of this feature's UI, because certifications
+  // are a separate real model WITH blocking semantics.
+  //
+  // Empty means nothing stated, therefore shown for everything — never "good at
+  // nothing". Optional here only because it arrives on a later deploy than this
+  // type; read it as `?? []`.
+  //
+  // No primary, and array order carries no meaning anywhere — the lesson of
+  // `primaryRegionId`, which the backend derived from index 0 of an array the
+  // UI appended to in checkbox-click order.
+  divisionIds?: string[];
+  // The override itself (what the form edits).
+  dispatchable?: Dispatchable;
+  // The RESOLVED answer — override applied over the roles. Read this rather
+  // than re-deriving it from the role list; the server owns the precedence.
+  performsFieldWork?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -112,13 +190,22 @@ export interface CreateUserRequest {
   roleIds: string[];
   dispatchRegionIds?: string[];
   phoneNumber?: string | null;
-  sendInvite?: boolean;
+  /** Up to 100 characters. */
+  jobTitle?: string | null;
 }
 
 export interface UpdateUserProfileRequest {
   firstName: string;
   lastName: string;
   phoneNumber?: string | null;
+  /** Up to 100 characters; null leaves it unchanged, blank clears it. */
+  jobTitle?: string | null;
+  // Rides the same sparse PUT /users/{id}. The form ALWAYS sends its current
+  // value rather than omitting it when unchanged: on this endpoint omitting
+  // means "leave alone" while INHERIT means "reset to follow the roles", and
+  // sending it every time keeps that distinction from mattering at the
+  // callsite.
+  dispatchable?: Dispatchable;
 }
 
 export interface UpdateUserRolesRequest {
@@ -127,6 +214,11 @@ export interface UpdateUserRolesRequest {
 
 export interface UpdateUserRegionsRequest {
   dispatchRegionIds: string[];
+}
+
+export interface UpdateUserDivisionsRequest {
+  /** Empty clears. */
+  divisionIds: string[];
 }
 
 export interface UpdateUserEnabledRequest {
@@ -211,6 +303,12 @@ export interface UserSearchParams {
   enabled?: boolean;
   invitationStatus?: InvitationStatus[];
   roleId?: string[];
+  // Filters on the RESOLVED answer — override applied over the roles — so it
+  // matches exactly who the dispatch board shows. Narrows the page, not the
+  // counts strip, same as `enabled`.
+  performsFieldWork?: boolean;
+  // The raw override, for auditing deliberate exclusions.
+  dispatchable?: Dispatchable;
   page?: number;
   size?: number;
   sort?: string;
@@ -256,12 +354,23 @@ export interface AuditLogEntry {
  * `tenantSlug` is the only tenant identifier ever shown to a user: it
  * disambiguates same-named companies, and becomes the hostname label once
  * per-tenant subdomains ship. `tenantId` is never rendered.
+ *
+ * `companyName` is the tenant's BASE name — the short internal one shown in the
+ * switcher and picker. It is deliberately not `TenantSettings.companyName`,
+ * which is the customer-facing display name on invoices and outbound email
+ * ("Atech" vs "Atech Incorporated, Inc").
+ *
+ * `logoUrl` is the 128px rendition, read live from the shared tenant-settings
+ * cache rather than mirrored into the membership registry. Null means "render
+ * the monogram" — either the tenant has no logo, or its branding is not
+ * currently cached. Never an error.
  */
 export interface TenantMembership {
   tenantId: string;
   tenantSlug: string;
   companyName: string;
   userId: string;
+  logoUrl?: string | null;
 }
 
 export interface MembershipListResponse {
@@ -296,6 +405,10 @@ export const userApi = {
     if (typeof params.enabled === 'boolean') sp.set('enabled', String(params.enabled));
     params.invitationStatus?.forEach((s) => sp.append('invitationStatus', s));
     params.roleId?.forEach((id) => sp.append('roleId', id));
+    if (typeof params.performsFieldWork === 'boolean') {
+      sp.set('performsFieldWork', String(params.performsFieldWork));
+    }
+    if (params.dispatchable) sp.set('dispatchable', params.dispatchable);
     if (typeof params.page === 'number') sp.set('page', String(params.page));
     if (typeof params.size === 'number') sp.set('size', String(params.size));
     if (params.sort) sp.set('sort', params.sort);
@@ -313,6 +426,19 @@ export const userApi = {
   // server-paged results directly via `searchUsers`.
   getAll: async (): Promise<User[]> => {
     const page = await userApi.searchUsers({ size: 100 });
+    return page.content;
+  },
+
+  /**
+   * Everyone who can actually be assigned work — the same predicate the
+   * dispatch board rows use, resolved server-side.
+   *
+   * For PICKERS only. Name-resolution lists must keep using `getAll`: a
+   * dispatch assigned to someone since moved off field work still has to
+   * render their name, and filtering there would blank it.
+   */
+  getFieldWorkers: async (): Promise<User[]> => {
+    const page = await userApi.searchUsers({ size: 100, performsFieldWork: true, enabled: true });
     return page.content;
   },
 
@@ -399,6 +525,18 @@ export const userApi = {
     return response.data;
   },
 
+  updateDivisions: async (id: string, request: UpdateUserDivisionsRequest): Promise<User> => {
+    const response = await apiClient.put<User>(`/users/${id}/divisions`, request);
+    return response.data;
+  },
+
+  // NOTE: POST /users/divisions/bulk exists server-side, with a required
+  // `mode` of ADD | REMOVE | REPLACE. Deliberately not wrapped here: bulk
+  // assignment is a one-time backfill for techs who already exist the day the
+  // feature turns on — new users get divisions at invite time — and a REPLACE
+  // across sixty people is a lot of risk for a tool used once. Wrap it if the
+  // backfill turns out to hurt, or when a tenant adds a whole new division.
+
   // Backend dropped the `enabled` field from PUT /users/{id} — sending it
   // is silently ignored now. Activation/deactivation goes through the
   // dedicated POST endpoints, which also emit the matching activity-feed
@@ -406,6 +544,14 @@ export const userApi = {
   // The original method names are preserved so call sites stay the same.
   enable: async (id: string): Promise<User> => {
     const response = await apiClient.post<User>(`/users/${id}/activate`);
+    return response.data;
+  },
+
+  // Prefetched when a row's action menu opens, so the confirm dialog usually
+  // reads it from cache rather than making the admin wait. Cheap by design:
+  // one indexed read.
+  getRemovalImpact: async (id: string): Promise<RemovalImpact> => {
+    const response = await apiClient.get<RemovalImpact>(`/users/${id}/removal-impact`);
     return response.data;
   },
 

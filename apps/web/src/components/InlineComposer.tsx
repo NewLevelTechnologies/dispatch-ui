@@ -9,6 +9,7 @@ interface Props {
   rows?: number;
   placeholder?: string;
   ariaLabel?: string;
+  maxLength?: number;
   /**
    * Called with the trimmed value on Save. May be async; if it throws, the
    * composer stays open so the entry isn't lost (the caller surfaces the error).
@@ -24,7 +25,15 @@ interface Props {
  * the Add-note composer. Never a modal: a work item is a continuously-touched
  * operational record, so editing happens in place beside its context.
  */
-export default function InlineComposer({ value = '', rows = 2, placeholder, ariaLabel, onSave, onCancel }: Props) {
+export default function InlineComposer({
+  value = '',
+  rows = 2,
+  placeholder,
+  ariaLabel,
+  maxLength,
+  onSave,
+  onCancel,
+}: Props) {
   const { t } = useTranslation();
   const [text, setText] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -50,7 +59,19 @@ export default function InlineComposer({ value = '', rows = 2, placeholder, aria
         value={text}
         placeholder={placeholder}
         aria-label={ariaLabel}
+        maxLength={maxLength}
         onChange={(e) => setText(e.target.value)}
+        // Esc cancels; ⌘/Ctrl+Enter saves (plain Enter stays a newline).
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!saving) onCancel();
+          } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void submit();
+          }
+        }}
       />
       <div className="flex items-center justify-end gap-1.5">
         <Button plain size="xs" onClick={onCancel} disabled={saving}>

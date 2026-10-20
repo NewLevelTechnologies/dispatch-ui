@@ -27,6 +27,13 @@ describe('purchaseOrderApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/inventory/purchase-orders', { params: {} });
   });
 
+  it('summary forwards overdue=true for the past-ETA count', async () => {
+    await purchaseOrderApi.summary({ overdue: true });
+    expect(apiClient.get).toHaveBeenCalledWith('/inventory/purchase-orders/summary', {
+      params: { overdue: true },
+    });
+  });
+
   it('summary GETs the aggregate with the filter params', async () => {
     await purchaseOrderApi.summary({ vendorId: 'v-1' });
     expect(apiClient.get).toHaveBeenCalledWith('/inventory/purchase-orders/summary', {

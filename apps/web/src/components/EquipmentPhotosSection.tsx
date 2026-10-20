@@ -74,7 +74,7 @@ export default function EquipmentPhotosSection({
           <button
             type="button"
             onClick={() => onSelectImage(visible.length)}
-            className="flex size-12 items-center justify-center rounded text-sm font-medium text-zinc-700 ring-1 ring-zinc-950/10 hover:bg-zinc-50 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-blue-400"
+            className="flex size-12 items-center justify-center rounded !text-sm !font-medium text-zinc-700 ring-1 ring-zinc-950/10 hover:bg-zinc-50 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-blue-400"
           >
             +{overflow}
           </button>

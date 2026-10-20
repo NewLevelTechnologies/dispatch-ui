@@ -5,14 +5,41 @@ import DispatchFormDrawer from './DispatchFormDrawer';
 import type { Dispatch, User, WorkItemResponse } from '../api/setup';
 
 const mockUserGetAll = vi.fn();
+const mockGetFieldWorkers = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockNotify = vi.fn();
+const mockTenantSettings = vi.fn();
+// The job section the composer now renders reads the work order and its
+// context. All of it shares query keys with the board, so these stand in for
+// caches that are usually already warm.
+const mockWorkOrderGetById = vi.fn();
+const mockListForWorkOrder = vi.fn();
+const mockListForServiceLocation = vi.fn();
+// Names the picker's group heading. Shares a query key with the board and the
+// work order list, so in the app this is usually a cache read.
+const mockDivisionsGetAll = vi.fn();
 
 vi.mock('@dispatch/api/src/userApi', () => ({
-  userApi: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
-  default: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
+  userApi: {
+    getAll: (...args: unknown[]) => mockUserGetAll(...args),
+    getFieldWorkers: (...args: unknown[]) => mockGetFieldWorkers(...args),
+  },
+  default: {
+    getAll: (...args: unknown[]) => mockUserGetAll(...args),
+    getFieldWorkers: (...args: unknown[]) => mockGetFieldWorkers(...args),
+  },
 }));
+
+vi.mock('@dispatch/api/src/tenantSettingsApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/tenantSettingsApi')>(
+    '@dispatch/api/src/tenantSettingsApi',
+  );
+  return {
+    ...actual,
+    tenantSettingsApi: { ...actual.tenantSettingsApi, getSettings: () => mockTenantSettings() },
+  };
+});
 
 vi.mock('@dispatch/api/src/schedulingApi', async () => {
   const actual = await vi.importActual<typeof import('../api/setup')>('@dispatch/api/src/schedulingApi');
@@ -23,11 +50,53 @@ vi.mock('@dispatch/api/src/schedulingApi', async () => {
       create: (...args: unknown[]) => mockCreate(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
       notify: (...args: unknown[]) => mockNotify(...args),
+      listForWorkOrder: (...args: unknown[]) => mockListForWorkOrder(...args),
+      listForServiceLocation: (...args: unknown[]) => mockListForServiceLocation(...args),
     },
   };
 });
 
-const tech = (id: string, first: string, last: string): User =>
+vi.mock('@dispatch/api/src/financialApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/financialApi')>(
+    '@dispatch/api/src/financialApi',
+  );
+  return {
+    ...actual,
+    financialSummaryApi: {
+      ...actual.financialSummaryApi,
+      getByWorkOrder: () => Promise.resolve({ balance: '0' }),
+    },
+  };
+});
+
+vi.mock('@dispatch/api/src/notesApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/notesApi')>(
+    '@dispatch/api/src/notesApi',
+  );
+  return { ...actual, notesApi: { ...actual.notesApi, list: () => Promise.resolve([]) } };
+});
+
+vi.mock('@dispatch/api/src/workOrderConfigApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/workOrderConfigApi')>(
+    '@dispatch/api/src/workOrderConfigApi',
+  );
+  return {
+    ...actual,
+    divisionsApi: { ...actual.divisionsApi, getAll: () => mockDivisionsGetAll() },
+  };
+});
+
+vi.mock('@dispatch/api/src/workOrderApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/workOrderApi')>(
+    '@dispatch/api/src/workOrderApi',
+  );
+  return {
+    ...actual,
+    workOrderApi: { ...actual.workOrderApi, getById: (...a: unknown[]) => mockWorkOrderGetById(...a) },
+  };
+});
+
+const tech = (id: string, first: string, last: string, divisionIds?: string[]): User =>
   ({
     id,
     tenantId: 't1',
@@ -36,6 +105,9 @@ const tech = (id: string, first: string, last: string): User =>
     firstName: first,
     lastName: last,
     enabled: true,
+    // Left off entirely unless a test says otherwise — that is the shape a
+    // tenant which has never configured divisions actually sends.
+    ...(divisionIds ? { divisionIds } : {}),
   }) as User;
 
 const wi = (
@@ -80,7 +152,13 @@ const render = (props: Partial<React.ComponentProps<typeof DispatchFormDrawer>> 
 describe('DispatchFormDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDivisionsGetAll.mockResolvedValue([]);
     mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park'), tech('u-2', 'Marcus', 'Lee')]);
+    mockGetFieldWorkers.mockResolvedValue([
+      tech('u-1', 'Daniel', 'Park'),
+      tech('u-2', 'Marcus', 'Lee'),
+    ]);
+    mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
     mockCreate.mockResolvedValue(editDispatch);
     mockUpdate.mockResolvedValue(editDispatch);
     mockNotify.mockResolvedValue(undefined);
@@ -203,5 +281,433 @@ describe('DispatchFormDrawer', () => {
     await user.click(screen.getByRole('button', { name: /schedule dispatch/i }));
     // Release still "now" → TECH only (no CUSTOMER/BOTH).
     await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'TECH'));
+  });
+});
+
+// A technician picker has to offer exactly who can be assigned. Listing every
+// enabled user put admins and CSRs in the dropdown — and surfaced a second
+// account for the same person, only one of whom was dispatchable.
+describe('DispatchFormDrawer technician picker', () => {
+  it('asks for field workers, not every enabled user', async () => {
+    render();
+    await waitFor(() => expect(mockGetFieldWorkers).toHaveBeenCalled());
+    expect(mockUserGetAll).not.toHaveBeenCalled();
+  });
+});
+
+// A tech's divisions are a STRENGTH — "the kinds of work they're good at
+// taking on" — not a qualification, a licence or a gate. So everything below
+// is about ORDER. Nothing here may hide a row, disable a row, warn, or confirm:
+// certification is a separate model with real blocking semantics, and a picker
+// that counterfeits it teaches dispatchers the wrong thing about both.
+describe('DispatchFormDrawer technician picker — division preference', () => {
+  const HVAC = 'dv-hvac';
+  const PLUMBING = 'dv-plumbing';
+
+  const openPicker = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(await screen.findByRole('button', { name: /^technician$/i }));
+  };
+  // Scoped to the picker panel: the arrival-window <select> further up the
+  // drawer contributes native <option>s of its own.
+  const techOptions = () => within(screen.getByRole('listbox')).getAllByRole('option');
+  // Off the avatar's own label rather than the row's text, which also carries
+  // the initials the avatar draws.
+  const optionNames = () =>
+    techOptions().map((el) => el.querySelector('[aria-label]')?.getAttribute('aria-label') ?? '');
+
+  const CREW = [
+    tech('u-1', 'Daniel', 'Park'), // says nothing
+    tech('u-2', 'Marcus', 'Lee', [HVAC]),
+    tech('u-3', 'Ana', 'Adams', [PLUMBING]),
+    tech('u-4', 'Rosa', 'Vega', [PLUMBING, HVAC]),
+  ];
+
+  beforeEach(() => {
+    mockGetFieldWorkers.mockResolvedValue(CREW);
+    mockDivisionsGetAll.mockResolvedValue([
+      { id: HVAC, name: 'HVAC', isActive: true },
+      { id: PLUMBING, name: 'Plumbing', isActive: true },
+    ]);
+  });
+
+  it('floats the techs who state this kind of work to the top', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, divisionId: HVAC });
+    await openPicker(user);
+
+    // Lee and Vega state HVAC (alphabetical by surname inside the group), then
+    // everyone else — Adams before Park, still alphabetical.
+    expect(optionNames()).toEqual([
+      'Marcus Lee',
+      'Rosa Vega',
+      'Ana Adams',
+      'Daniel Park',
+    ]);
+  });
+
+  it('says once why the order is what it is', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, divisionId: HVAC });
+    await openPicker(user);
+
+    expect(screen.getByText('Takes HVAC work')).toBeInTheDocument();
+    expect(screen.getByText('Other technicians')).toBeInTheDocument();
+    // Printed once as a heading, never stamped on the rows: the dispatcher
+    // already knows the job is HVAC — it is why they opened the drawer.
+    expect(screen.getAllByText('Takes HVAC work')).toHaveLength(1);
+  });
+
+  // The heading is the TENANT's word for the division, not a fixed string —
+  // and the verb has to survive every name they might choose. "Does Plumbing
+  // work" reads as a question; "Takes" does not.
+  it('names the job\u2019s own division in the heading', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, divisionId: PLUMBING });
+    await openPicker(user);
+
+    expect(screen.getByText('Takes Plumbing work')).toBeInTheDocument();
+    expect(screen.queryByText(/HVAC/)).not.toBeInTheDocument();
+    // Adams and Vega state plumbing; Lee (HVAC) and Park (nothing) do not.
+    expect(optionNames()).toEqual(['Ana Adams', 'Rosa Vega', 'Marcus Lee', 'Daniel Park']);
+  });
+
+  // The whole point. A plumber on an HVAC job is a normal assignment.
+  it('leaves an out-of-division tech plainly pickable, with no warning', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, divisionId: HVAC });
+    await openPicker(user);
+
+    const adams = screen.getByRole('option', { name: /Ana Adams/ });
+    expect(adams).not.toBeDisabled();
+    await user.click(adams);
+    expect(await screen.findByText('Ana Adams')).toBeInTheDocument();
+    // None of this feature's forbidden vocabulary, anywhere in the drawer.
+    expect(document.body.textContent).not.toMatch(/qualif|certif|eligib|not allowed/i);
+  });
+
+  it('orders plainly when the job carries no division', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null });
+    await openPicker(user);
+
+    expect(optionNames()).toEqual([
+      'Ana Adams',
+      'Marcus Lee',
+      'Daniel Park',
+      'Rosa Vega',
+    ]);
+    expect(screen.queryByText(/Takes .* work/)).not.toBeInTheDocument();
+  });
+
+  // The permissive property that keeps a half-configured tenant usable: if
+  // nobody has been given this division, the picker is exactly what it was
+  // before the feature existed.
+  it('orders plainly when nobody states the division', async () => {
+    const user = userEvent.setup();
+    mockGetFieldWorkers.mockResolvedValue([
+      tech('u-1', 'Daniel', 'Park'),
+      tech('u-3', 'Ana', 'Adams', [PLUMBING]),
+    ]);
+    render({ dispatch: null, divisionId: HVAC });
+    await openPicker(user);
+
+    expect(optionNames()).toEqual([
+      'Ana Adams',
+      'Daniel Park',
+    ]);
+    expect(screen.queryByText(/Takes .* work/)).not.toBeInTheDocument();
+  });
+
+  // A heading true of every row is a constant, and a constant is noise — the
+  // same reason the rail card doesn't print the state after the city.
+  it('drops the headings when everyone states the division', async () => {
+    const user = userEvent.setup();
+    mockGetFieldWorkers.mockResolvedValue([
+      tech('u-1', 'Daniel', 'Park', [HVAC]),
+      tech('u-3', 'Ana', 'Adams', [HVAC]),
+    ]);
+    render({ dispatch: null, divisionId: HVAC });
+    await openPicker(user);
+
+    expect(techOptions()).toHaveLength(2);
+    expect(screen.queryByText('Takes HVAC work')).not.toBeInTheDocument();
+    expect(screen.queryByText('Other technicians')).not.toBeInTheDocument();
+  });
+
+  // A heading with nothing under it is worse than no heading.
+  it('takes a heading away with its last row when the search empties it', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, divisionId: HVAC });
+    await openPicker(user);
+
+    await user.type(screen.getByRole('textbox', { name: /search technicians/i }), 'Ana');
+    expect(screen.getByRole('option', { name: /Ana Adams/ })).toBeInTheDocument();
+    expect(screen.queryByText('Takes HVAC work')).not.toBeInTheDocument();
+    expect(screen.getByText('Other technicians')).toBeInTheDocument();
+  });
+});
+
+// Two dispatchers on one board is the normal case. Without the version
+// precondition the second save silently overwrites the first.
+describe('DispatchFormDrawer concurrency', () => {
+  const existing = {
+    id: 'd-1',
+    workOrderId: 'wo-1',
+    assignedUserId: 'u-1',
+    arrivalWindowStart: '2026-03-15T15:00:00Z',
+    arrivalWindowEnd: '2026-03-15T17:00:00Z',
+    estimatedDuration: null,
+    status: 'SCHEDULED' as const,
+    arrivedAt: null,
+    departedAt: null,
+    notes: null,
+    createdAt: '2026-03-14T00:00:00Z',
+    updatedAt: '2026-03-14T00:00:00Z',
+    version: 7,
+  };
+
+  it('round-trips the version it opened against', async () => {
+    const u = userEvent.setup();
+    render({ dispatch: existing });
+
+    await screen.findByText('Daniel Park');
+    await u.click(screen.getAllByRole('button', { name: /save|schedule/i })[0]);
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ version: 7 })
+    );
+  });
+
+  // A conflict isn't a validation failure — the form is fine, the record moved
+  // underneath it. Retrying into the same wall would be the wrong affordance.
+  it('explains a conflict rather than reporting a generic save error', async () => {
+    const u = userEvent.setup();
+    mockUpdate.mockRejectedValue(
+      Object.assign(new Error('conflict'), {
+        response: { status: 409, data: { code: 'DISPATCH_VERSION_CONFLICT' } },
+      })
+    );
+
+    render({ dispatch: existing });
+    await screen.findByText('Daniel Park');
+    await u.click(screen.getAllByRole('button', { name: /save|schedule/i })[0]);
+
+    expect(await screen.findByText(/Someone else changed this/)).toBeInTheDocument();
+  });
+
+  // Once the tech arrives the server refuses to move the window.
+  it('fixes the date and window once the tech has arrived', async () => {
+    render({ dispatch: { ...existing, status: 'IN_PROGRESS', arrivedAt: '2026-03-15T15:20:00Z' } });
+    await screen.findByText('Daniel Park');
+    expect(screen.getByLabelText('Date')).toBeDisabled();
+    expect(screen.getByLabelText('Arrival window')).toBeDisabled();
+    expect(screen.getByText('dispatchBoard.drag.windowLockedHint')).toBeInTheDocument();
+  });
+
+  it('says the window is fixed when the tech arrived while it was open', async () => {
+    const u = userEvent.setup();
+    mockUpdate.mockRejectedValue(
+      Object.assign(new Error('locked'), {
+        response: { status: 409, data: { code: 'DISPATCH_WINDOW_LOCKED' } },
+      })
+    );
+    render({ dispatch: existing });
+    await screen.findByText('Daniel Park');
+    await u.click(screen.getAllByRole('button', { name: /save|schedule/i })[0]);
+    expect(await screen.findByText('dispatchBoard.drag.windowLocked')).toBeInTheDocument();
+  });
+});
+
+// An arrival window is tenant-local: "9–11a" means 9am where the truck is
+// going. Read back through the browser's clock instead, editing a dispatch
+// silently shifts its window by the offset every time it is saved — and a
+// preset window stops matching its own preset.
+describe('DispatchFormDrawer tenant timezone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDivisionsGetAll.mockResolvedValue([]);
+    mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
+    mockGetFieldWorkers.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
+    mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
+    mockUpdate.mockResolvedValue(editDispatch);
+  });
+
+  // 16:00Z is 9am in Phoenix, which IS a preset. Read in any other zone it is
+  // some other hour, and the drawer would offer a synthetic "current" window
+  // instead of the preset the dispatcher actually booked.
+  it('matches an existing window to its preset in the tenant’s zone', async () => {
+    render({ dispatch: editDispatch });
+    expect(await screen.findByDisplayValue('9:00 – 11:00 AM')).toBeInTheDocument();
+  });
+
+  it('writes the window back unchanged when nothing is edited', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: editDispatch });
+
+    await screen.findByDisplayValue('9:00 – 11:00 AM');
+    await user.click(screen.getByRole('button', { name: /save|update/i }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][1]).toMatchObject({
+      arrivalWindowStart: '2026-05-18T16:00:00.000Z',
+      arrivalWindowEnd: '2026-05-18T18:00:00.000Z',
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Map prefill.
+//
+// A map drop carries a PERSON and a DAY and nothing else. Since every window
+// the board creates has to be one of the tenant's presets, auto-picking one
+// would quote a customer an arrival window no dispatcher ever chose — and an
+// undo toast does not undo a phone call. So the window arrives unset, and the
+// form refuses to submit until someone answers it.
+// ─────────────────────────────────────────────────────────────────────
+describe('DispatchFormDrawer — opened from a map drop', () => {
+  const prefill = { assignedUserId: 'u-2', date: '2026-03-15' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDivisionsGetAll.mockResolvedValue([]);
+    mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park'), tech('u-2', 'Marcus', 'Lee')]);
+    mockGetFieldWorkers.mockResolvedValue([
+      tech('u-1', 'Daniel', 'Park'),
+      tech('u-2', 'Marcus', 'Lee'),
+    ]);
+    mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
+    mockCreate.mockResolvedValue(editDispatch);
+    mockNotify.mockResolvedValue(undefined);
+  });
+
+  it('prefills the technician the drop resolved to', async () => {
+    render({ dispatch: null, prefill });
+    await waitFor(() => expect(mockGetFieldWorkers).toHaveBeenCalled());
+    expect(await screen.findByText('Prefilled from the map')).toBeInTheDocument();
+  });
+
+  it('prefills the VIEWED date, not tomorrow', async () => {
+    // The default create path opens on tomorrow. A drop on Thursday's board
+    // that scheduled Friday would be a quiet, expensive bug.
+    render({ dispatch: null, prefill });
+    expect(await screen.findByDisplayValue('2026-03-15')).toBeInTheDocument();
+  });
+
+  it('leaves the arrival window unchosen', async () => {
+    render({ dispatch: null, prefill });
+    const select = await screen.findByLabelText('Arrival window');
+    expect((select as HTMLSelectElement).value).toBe('');
+  });
+
+  it('cannot be submitted until a window is chosen', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, prefill });
+    const submit = await screen.findByRole('button', { name: /Schedule/ });
+    expect(submit).toBeDisabled();
+
+    await user.selectOptions(await screen.findByLabelText('Arrival window'), '9:00 – 11:00 AM');
+    await waitFor(() => expect(submit).toBeEnabled());
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('drops the placeholder once a real window is picked', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, prefill });
+    const select = await screen.findByLabelText('Arrival window');
+    await user.selectOptions(select, '9:00 – 11:00 AM');
+    // An empty option that stays in the list reads as a valid answer.
+    expect(within(select).queryByRole('option', { name: 'Select…' })).not.toBeInTheDocument();
+  });
+
+  it('still defaults the window when opened WITHOUT a map drop', async () => {
+    // The rail path is unchanged: a dispatcher who opened the form on purpose
+    // gets a sensible default to accept or change. Both paths still start
+    // disabled, but for different reasons — this one has no technician yet,
+    // which is precisely the field a map drop is able to answer.
+    render({ dispatch: null });
+    const select = await screen.findByLabelText('Arrival window');
+    expect((select as HTMLSelectElement).value).not.toBe('');
+    expect(within(select).queryByRole('option', { name: 'Select…' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Prefilled from the map')).not.toBeInTheDocument();
+  });
+});
+
+// The composer covers the rail when it is open, so the card's own work-order
+// link goes with it. A dispatcher scheduling a 95-day-old job usually wants to
+// read the job before promising a window.
+describe('DispatchFormDrawer — the job behind the visit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDivisionsGetAll.mockResolvedValue([]);
+    mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
+    mockGetFieldWorkers.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
+    mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
+    mockWorkOrderGetById.mockResolvedValue({ id: 'wo-1', workItems: [], customer: { name: 'Pham, A.' } });
+    mockListForWorkOrder.mockResolvedValue([]);
+    mockListForServiceLocation.mockResolvedValue({ content: [], totalElements: 0 });
+  });
+
+  it('links to the work order by number', async () => {
+    render({
+      dispatch: null,
+      workOrderNumber: 'WO-3911',
+      workOrderHref: '/work-orders/wo-1?from=dispatch',
+    });
+    const link = await screen.findByRole('link', { name: /WO-3911/ });
+    expect(link).toHaveAttribute('href', '/work-orders/wo-1?from=dispatch');
+  });
+
+  it('is a real href, so middle-click and cmd-click reach a new tab', async () => {
+    // A JS-only navigation silently removes the way dispatchers read a job
+    // without losing the board.
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1' });
+    expect((await screen.findByRole('link', { name: /WO-3911/ })).tagName).toBe('A');
+  });
+
+  it('says WHICH job, not just that one exists', async () => {
+    // The section reads the work order itself, so the summary comes from the
+    // same cache the board and the detail drawer already share.
+    mockWorkOrderGetById.mockResolvedValue({
+      id: 'wo-1',
+      summary: 'No cooling — full system',
+      workItems: [],
+      customer: { name: 'Pham, A.' },
+    });
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1' });
+    expect(await screen.findByText('No cooling — full system')).toBeInTheDocument();
+  });
+
+  it('names the SITE, not the customer who is billed', async () => {
+    mockWorkOrderGetById.mockResolvedValue({
+      id: 'wo-1',
+      summary: 'No cooling',
+      workItems: [],
+      customer: { name: 'Kroger Co.' },
+      serviceLocation: { id: 'l1', locationName: 'Store #4412' },
+    });
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1' });
+    expect(await screen.findByText(/Store #4412/)).toBeInTheDocument();
+    expect(screen.queryByText(/Kroger Co\./)).not.toBeInTheDocument();
+  });
+
+  it('falls back to the customer for a site with no name', async () => {
+    mockWorkOrderGetById.mockResolvedValue({
+      id: 'wo-1',
+      summary: 'No cooling',
+      workItems: [],
+      customer: { name: 'Pham, A.' },
+      serviceLocation: { id: 'l1' },
+    });
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1' });
+    expect(await screen.findByText(/Pham, A\./)).toBeInTheDocument();
+  });
+
+  it('renders nothing when the caller is already on the work order', async () => {
+    // The work order's own page opens this too, and a link back to the page
+    // you are standing on is noise.
+    render({ dispatch: null, workOrderNumber: 'WO-3911' });
+    await screen.findByLabelText('Arrival window');
+    expect(screen.queryByRole('link', { name: /WO-3911/ })).not.toBeInTheDocument();
   });
 });

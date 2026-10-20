@@ -13,11 +13,15 @@ import {
   LockOpenIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
+import { formatCurrency } from '@dispatch/utils';
 import {
   approvalsApi,
+  quotePriceApprovalsApi,
   type ApprovalRequest,
   type ApprovalStatus,
   type ListApprovalsParams,
+  type ListPriceApprovalsParams,
+  type QuotePriceApproval,
 } from '../api/setup';
 import AppLayout from '../components/AppLayout';
 import { Avatar } from '../components/ui/Avatar';
@@ -30,8 +34,9 @@ import { ErrorState } from '../components/ui/ErrorState';
 import { LoadingState } from '../components/ui/LoadingState';
 import { StatusChip } from '../components/ui/StatusChip';
 import { useApprovalsVisible } from '../hooks/useApprovalsVisible';
-import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 type TabId = 'pending' | 'my-requests' | 'all' | 'approved' | 'rejected' | 'expired';
 
@@ -53,6 +58,30 @@ function tabToParams(tab: TabId): ListApprovalsParams {
       return { status: 'EXPIRED' };
   }
 }
+
+/**
+ * Quote price approvals (financial-service) per tab. "Pending" is the
+ * managers' queue; nobody else answers them. They don't expire, so the
+ * Expired tab and a work-order filter show none.
+ */
+function priceParamsFor(tab: TabId, canApproveQuotes: boolean): ListPriceApprovalsParams | null {
+  switch (tab) {
+    case 'pending':
+      return canApproveQuotes ? { status: ['PENDING'] } : null;
+    case 'my-requests':
+      return { status: ['PENDING'], mine: true };
+    case 'all':
+      return {};
+    case 'approved':
+      return { status: ['APPROVED'] };
+    case 'rejected':
+      return { status: ['REJECTED'] };
+    case 'expired':
+      return null;
+  }
+}
+
+const marginPct = (f: number | null | undefined) => (f == null ? '—' : `${Math.round(f * 1000) / 10}%`);
 
 const URGENT_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 
@@ -115,6 +144,7 @@ export default function ApprovalsPage() {
   const idDeepLink = searchParams.get('id');
   const currentTab: TabId = TAB_IDS.includes(tabParam as TabId) ? (tabParam as TabId) : 'pending';
   const approvalsVisible = useApprovalsVisible();
+  const canApproveQuotes = useHasAnyCapability('APPROVE_QUOTES');
 
   const setCurrentTab = useCallback(
     (tab: TabId) => {
@@ -154,6 +184,21 @@ export default function ApprovalsPage() {
     staleTime: 60_000,
   });
 
+  // Quote price approvals, beside the workflow ones.
+  const priceParams = woFilter ? null : priceParamsFor(currentTab, canApproveQuotes);
+  const { data: priceRequests = [] } = useQuery({
+    queryKey: ['quote-price-approvals', 'list', priceParams],
+    queryFn: () => quotePriceApprovalsApi.list(priceParams!),
+    enabled: !!priceParams,
+  });
+  const { data: priceCount } = useQuery({
+    queryKey: ['quote-price-approvals', 'count'],
+    queryFn: () => quotePriceApprovalsApi.count(),
+    enabled: canApproveQuotes,
+    staleTime: 60_000,
+  });
+  const visiblePrice = priceParams ? priceRequests : [];
+
   // ─── Selection state ────────────────────────────────────────
   const sortedRequests = useMemo(() => {
     if (!requests) return [];
@@ -183,9 +228,10 @@ export default function ApprovalsPage() {
   // avoid a cascading-render cycle and the `react-hooks/set-state-in-effect`
   // lint trip.
   const effectiveSelectedId =
-    selectedId && sortedRequests.some((r) => r.id === selectedId)
+    selectedId && (sortedRequests.some((r) => r.id === selectedId) || visiblePrice.some((r) => r.id === selectedId))
       ? selectedId
-      : (sortedRequests[0]?.id ?? null);
+      : (sortedRequests[0]?.id ?? visiblePrice[0]?.id ?? null);
+  const selectedPrice = visiblePrice.find((r) => r.id === effectiveSelectedId) ?? null;
 
   const selectedRequest = useMemo(
     () => sortedRequests.find((r) => r.id === effectiveSelectedId) ?? null,
@@ -278,7 +324,7 @@ export default function ApprovalsPage() {
   }, [selectedRequestId, selectedRequestStatus, selectedRequesterId, currentUserId, queryClient]);
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
-    { id: 'pending', label: t('approvals.tabs.pending'), count: pendingCount },
+    { id: 'pending', label: t('approvals.tabs.pending'), count: pendingCount + (priceCount?.pending ?? 0) },
     { id: 'my-requests', label: t('approvals.tabs.myRequests'), count: myRequestsCount },
     { id: 'all', label: t('approvals.tabs.all') },
     { id: 'approved', label: t('approvals.tabs.approved') },
@@ -288,13 +334,14 @@ export default function ApprovalsPage() {
 
   // Mobile collapses to single-pane: rail by default, detail fills the
   // screen when an item is selected. Desktop renders both regardless.
-  const showDetail = !!selectedRequest;
+  const showDetail = !!selectedRequest || !!selectedPrice;
 
   // OPEN-mode tenant with zero history: render a dedicated empty state
   // instead of the inbox. The page stays reachable (no route guard) so
   // a stale bookmark from when the tenant was STRICT still resolves to
   // *something* useful — and the action links straight to the toggle.
-  if (!approvalsVisible) {
+  // Price approvals show whatever the workflow mode: they're the quotes' own.
+  if (!approvalsVisible && !canApproveQuotes && visiblePrice.length === 0) {
     return (
       <AppLayout>
         <div className="flex flex-1 items-center justify-center px-6 py-12">
@@ -352,7 +399,7 @@ export default function ApprovalsPage() {
               aria-selected={currentTab === tab.id}
               onClick={() => setCurrentTab(tab.id)}
               className={clsx(
-                '-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3.5 py-2 text-[12.5px] font-semibold whitespace-nowrap transition-colors',
+                '-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3.5 py-2 !text-[12.5px] !font-semibold whitespace-nowrap transition-colors',
                 currentTab === tab.id
                   ? 'border-accent-500 text-fg-accent'
                   : 'text-fg-muted hover:text-fg-strong',
@@ -384,7 +431,7 @@ export default function ApprovalsPage() {
           >
             <div className="flex items-center justify-between gap-2 border-b border-border-soft px-4 py-3">
               <Text size="xs" tone="muted" as="span" className="font-semibold tracking-[0.08em] uppercase">
-                {t('approvals.rail.countLabel', { count: sortedRequests.length })}
+                {t('approvals.rail.countLabel', { count: sortedRequests.length + visiblePrice.length })}
               </Text>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -400,17 +447,33 @@ export default function ApprovalsPage() {
                     </Button>
                   }
                 />
-              ) : sortedRequests.length === 0 ? (
+              ) : sortedRequests.length === 0 && visiblePrice.length === 0 ? (
                 <RailEmpty tab={currentTab} />
               ) : (
-                sortedRequests.map((req) => (
-                  <RequestRow
-                    key={req.id}
-                    request={req}
-                    selected={req.id === effectiveSelectedId}
-                    onSelect={() => setSelectedId(req.id)}
-                  />
-                ))
+                <>
+                  {visiblePrice.length > 0 && (
+                    <>
+                      <RailSection>{t('approvals.price.section')}</RailSection>
+                      {visiblePrice.map((req) => (
+                        <PriceRequestRow
+                          key={req.id}
+                          request={req}
+                          selected={req.id === effectiveSelectedId}
+                          onSelect={() => setSelectedId(req.id)}
+                        />
+                      ))}
+                      {sortedRequests.length > 0 && <RailSection>{t('approvals.price.workflowSection')}</RailSection>}
+                    </>
+                  )}
+                  {sortedRequests.map((req) => (
+                    <RequestRow
+                      key={req.id}
+                      request={req}
+                      selected={req.id === effectiveSelectedId}
+                      onSelect={() => setSelectedId(req.id)}
+                    />
+                  ))}
+                </>
               )}
             </div>
           </aside>
@@ -422,8 +485,16 @@ export default function ApprovalsPage() {
               !showDetail && 'max-md:hidden',
             )}
           >
-            {!selectedRequest ? (
-              !isLoading && !error && sortedRequests.length === 0 ? (
+            {selectedPrice ? (
+              <PriceDetailPane
+                request={selectedPrice}
+                canApprove={canApproveQuotes}
+                isMine={selectedPrice.requestedByUserId === currentUser?.id}
+                onBack={() => setSelectedId(null)}
+                onOpenQuote={() => navigate(`/quotes/${selectedPrice.quoteId}`)}
+              />
+            ) : !selectedRequest ? (
+              !isLoading && !error && sortedRequests.length === 0 && visiblePrice.length === 0 ? (
                 <DetailEmpty tab={currentTab} />
               ) : (
                 <div />
@@ -459,6 +530,7 @@ function RequestRow({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const urgent = isUrgent(request);
   const name = requesterFullName(request.requester);
@@ -507,7 +579,7 @@ function RequestRow({
       </div>
 
       <div className="font-mono text-[11px] text-fg-muted">
-        <Strong>{request.workOrder.displayId}</Strong> · {fallbackText(request.workOrder.customerName, 'Unknown customer')}
+        <Strong>{request.workOrder.displayId}</Strong> · {fallbackText(request.workOrder.customerName, `Unknown ${getName('customer').toLowerCase()}`)}
       </div>
 
       {urgent && (
@@ -577,6 +649,7 @@ function DetailPane({
   onOpenWorkOrder,
   hasNeighbors,
 }: DetailPaneProps) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const name = requesterFullName(request.requester);
   const urgent = isUrgent(request);
@@ -643,7 +716,7 @@ function DetailPane({
           />
           <KVRow
             k={t('common.customer')}
-            v={fallbackText(request.workOrder.customerName, 'Unknown customer')}
+            v={fallbackText(request.workOrder.customerName, `Unknown ${getName('customer').toLowerCase()}`)}
           />
           {request.workOrder.serviceLocation && (
             <KVRow k={t('common.serviceLocation')} v={request.workOrder.serviceLocation} />
@@ -863,3 +936,213 @@ function Kbd({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ─── Quote price approvals ─────────────────────────────────────
+
+function RailSection({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="border-b border-border-soft bg-bg-elev-2 px-4 py-1.5 text-[10.5px] font-semibold tracking-[0.08em] text-fg-muted uppercase">
+      {children}
+    </div>
+  );
+}
+
+function PriceRequestRow({
+  request,
+  selected,
+  onSelect,
+}: {
+  request: QuotePriceApproval;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { t } = useTranslation();
+  const name = request.requestedByName ?? t('approvals.price.someone');
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      data-testid="price-approval-row"
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={clsx(
+        'relative cursor-pointer border-b border-border-soft px-4 py-3 pl-[18px] outline-none hover:bg-bg-hover focus-visible:bg-bg-hover',
+        selected && 'bg-[color-mix(in_oklch,var(--color-accent-500)_6%,var(--color-bg))]',
+      )}
+    >
+      {selected && <span aria-hidden className="absolute top-0 bottom-0 left-0 w-[3px] bg-accent-500" />}
+      <div className="mb-1 flex items-center gap-2">
+        <Avatar name={name} size="sm" />
+        <Text size="sm" tone="strong" as="span" className="truncate font-semibold">
+          {name}
+        </Text>
+        <span className="ml-auto font-mono text-[10.5px] text-fg-dim">{relativeTime(request.requestedAt)}</span>
+      </div>
+      <div className="mb-1 text-[12px] text-fg">
+        {t('approvals.price.rowSummary', { margin: marginPct(request.lowestMargin), floor: marginPct(request.floor) })}
+      </div>
+      <div className="font-mono text-[11px] text-fg-muted">
+        <Strong>{request.quoteNumber}</Strong> · {request.customerName ?? '—'}
+        {request.totalAmount != null && ` · ${formatCurrency(request.totalAmount)}`}
+      </div>
+      {request.status === 'PENDING' && !request.current && (
+        <div className="mt-1.5 text-[10.5px] font-semibold text-warning-500">{t('approvals.price.changed')}</div>
+      )}
+    </div>
+  );
+}
+
+function PriceDetailPane({
+  request,
+  canApprove,
+  isMine,
+  onBack,
+  onOpenQuote,
+}: {
+  request: QuotePriceApproval;
+  canApprove: boolean;
+  isMine: boolean;
+  onBack: () => void;
+  onOpenQuote: () => void;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const name = request.requestedByName ?? t('approvals.price.someone');
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['quote-price-approvals'] });
+    queryClient.invalidateQueries({ queryKey: ['quote-price-clearance', request.quoteId] });
+  };
+  const failed = (title: string) => (err: unknown) => {
+    showError(title, extractApiError(err));
+    if ((err as { response?: { data?: { code?: string } } })?.response?.data?.code === 'PRICE_APPROVAL_CLOSED') refresh();
+  };
+  const approve = useMutation({
+    mutationFn: (note?: string) => quotePriceApprovalsApi.approve(request.id, note),
+    onSuccess: () => {
+      showSuccess(t('approvals.price.approved', { number: request.quoteNumber }), request.sendsOnApproval ? t('approvals.price.approvedSends') : undefined);
+      refresh();
+    },
+    onError: failed(t('approvals.notifications.errorApprove')),
+  });
+  const reject = useMutation({
+    mutationFn: (note: string) => quotePriceApprovalsApi.reject(request.id, note),
+    onSuccess: () => {
+      showSuccess(t('approvals.price.rejected', { number: request.quoteNumber }));
+      refresh();
+    },
+    onError: failed(t('approvals.notifications.errorReject')),
+  });
+  const withdraw = useMutation({
+    mutationFn: () => quotePriceApprovalsApi.cancel(request.id),
+    onSuccess: () => {
+      showSuccess(t('approvals.price.withdrawn'));
+      refresh();
+    },
+    onError: failed(t('approvals.price.withdrawFailed')),
+  });
+  const pending = request.status === 'PENDING';
+
+  return (
+    <div className="w-full px-7 py-6 max-md:px-4" data-testid="price-approval-detail">
+      <div className="mb-3 flex items-center gap-2 md:hidden">
+        <Button plain size="xs" onClick={onBack}>
+          <ArrowLeftIcon className="size-4" />
+          {t('common.actions.back')}
+        </Button>
+      </div>
+      <div className="mx-auto max-w-[720px]">
+        <div className="flex items-start gap-3.5 border-b border-border-soft pb-4">
+          <Avatar name={name} size="lg" />
+          <div className="min-w-0 flex-1">
+            <Text size="md" tone="strong" as="div" className="font-semibold">
+              {t('approvals.price.header', { name })}
+            </Text>
+            <div className="mt-0.5 text-[12px] text-fg-muted">
+              {relativeTime(request.requestedAt)} ·{' '}
+              {request.sendsOnApproval ? t('approvals.price.sendsOnApproval') : t('approvals.price.inPerson')}
+            </div>
+          </div>
+        </div>
+
+        <SectionLabel>{t('approvals.price.quote')}</SectionLabel>
+        <KV>
+          <KVRow
+            k={t('common.id')}
+            v={
+              <button type="button" onClick={onOpenQuote} className="cursor-pointer text-fg-accent hover:underline">
+                <Code>{request.quoteNumber}</Code>
+              </button>
+            }
+          />
+          <KVRow k={t('common.customer')} v={request.customerName ?? '—'} />
+          {request.quoteTitle && <KVRow k={t('approvals.price.title')} v={request.quoteTitle} />}
+          {request.totalAmount != null && <KVRow k={t('approvals.price.total')} v={formatCurrency(request.totalAmount)} />}
+          <KVRow
+            k={t('approvals.price.margin')}
+            v={
+              <span className="text-warning-fg">
+                {t('approvals.price.marginValue', { margin: marginPct(request.lowestMargin), floor: marginPct(request.floor) })}
+              </span>
+            }
+          />
+        </KV>
+
+        {request.reason && (
+          <>
+            <SectionLabel>{t('approvals.detail.reasonFromRequester')}</SectionLabel>
+            <ReasonQuote>{request.reason}</ReasonQuote>
+          </>
+        )}
+
+        {pending && !request.current && (
+          <div className="mt-5 rounded-lg border border-border bg-bg-elev p-4">
+            <Text size="sm" tone="muted">
+              {t('approvals.price.changedBody')}
+            </Text>
+          </div>
+        )}
+        {pending && request.current && canApprove && (
+          <ActionPane
+            requesterFirstName={name.split(' ')[0] ?? name}
+            isPending={approve.isPending || reject.isPending}
+            onApprove={(note) => approve.mutate(note)}
+            onReject={(note) => reject.mutate(note)}
+            onPrev={() => {}}
+            onNext={() => {}}
+            hasNeighbors={false}
+          />
+        )}
+        {pending && request.current && !canApprove && (
+          <div className="mt-5 rounded-lg border border-border bg-bg-elev p-4">
+            <Text size="sm" tone="muted">
+              {t('approvals.price.waiting')}
+            </Text>
+          </div>
+        )}
+        {pending && (isMine || canApprove) && (
+          <div className="mt-3">
+            <Button plain size="xs" disabled={withdraw.isPending} onClick={() => withdraw.mutate()}>
+              {t('approvals.price.withdraw')}
+            </Button>
+          </div>
+        )}
+        {!pending && (
+          <div className="mt-5 rounded-lg border border-border bg-bg-elev p-4">
+            <div className="mb-1.5 flex items-center gap-2 text-[12.5px]">
+              <Strong>{t(`approvals.price.status.${request.status}`)}</Strong>
+              {request.respondedAt && <span className="text-fg-muted">· {relativeTime(request.respondedAt)}</span>}
+              {request.respondedByName && (
+                <span className="text-fg-muted">· {t('approvals.detail.by', { name: request.respondedByName })}</span>
+              )}
+            </div>
+            {request.responseNote && <ReasonQuote>{request.responseNote}</ReasonQuote>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

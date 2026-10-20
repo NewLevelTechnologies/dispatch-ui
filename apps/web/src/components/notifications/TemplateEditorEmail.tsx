@@ -117,7 +117,7 @@ export function TemplateEditorEmail({ form, onChange, variables }: Props) {
             <Textarea
               ref={plainBodyRef}
               rows={12}
-              className="font-mono text-[12px] leading-[1.55]"
+              className="font-mono !text-[12px] leading-[1.55]"
               value={form.bodyTemplate}
               onChange={(e) => update({ bodyTemplate: e.target.value })}
               aria-label="Plain-text body"

@@ -19,6 +19,7 @@ import {
 } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthenticator } from '@aws-amplify/ui-react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient, userApi, type TenantMembership } from '../api/setup';
 import { SwitchingOverlay } from '../components/workspace/WorkspaceStates';
 import {
@@ -49,6 +50,10 @@ interface TenantContextValue {
 // stall. Applies even when the remount is instant.
 const SWITCH_HOLD_MS = 450;
 
+// Person-scoped, not tenant-scoped: the answer is the same whichever workspace
+// is active, so a switch must not evict it.
+const MEMBERSHIPS_KEY = ['me', 'tenants'] as const;
+
 const TenantContext = createContext<TenantContextValue | null>(null);
 
 /**
@@ -78,6 +83,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const { authStatus } = useAuthenticator((context) => [context.authStatus]);
   const isAuthenticated = authStatus === 'authenticated';
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   // Only the explicit choice is state. The active membership is derived from it
   // plus the resolver, so there is no effect writing state back into render —
   // and no window where the two disagree.
@@ -91,7 +97,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['me', 'tenants'],
+    queryKey: MEMBERSHIPS_KEY,
     queryFn: () => userApi.listMyTenants(),
     enabled: isAuthenticated,
     // An empty list is a legitimate answer, not a transient failure, so there is
@@ -112,12 +118,30 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setSwitchingTo(membership);
       setChosenTenantId(membership.tenantId);
       setRevokedFrom(null);
-      // Not optional: every cached list, detail and count belongs to the
-      // workspace being left. Dropping the cache is what makes a switch safe
+
+      // Drop every cached list, detail and count — they all belong to the
+      // workspace being left, and dropping them is what makes a switch safe
       // without a reload.
-      queryClient.clear();
+      //
+      // But NOT the membership list. That query is person-scoped:
+      // /users/me/tenants returns the same answer whichever workspace is
+      // active. `queryClient.clear()` took it out too, which left the app
+      // briefly with no memberships, so the resolver returned null and the
+      // interceptor published no tenant at all — and any request whose auth
+      // interceptor was mid-await picked up that null and went out with no
+      // X-Tenant-Id, earning a 400 TENANT_REQUIRED. Intermittent by nature,
+      // since it is a race with this query refetching.
+      queryClient.removeQueries({
+        predicate: (query) =>
+          !(query.queryKey[0] === MEMBERSHIPS_KEY[0] && query.queryKey[1] === MEMBERSHIPS_KEY[1]),
+      });
+
+      // Leave the current page. Entity ids do not carry across workspaces, so
+      // staying on a detail route would ask the new workspace for a record it
+      // has never heard of.
+      navigate('/');
     },
-    [queryClient]
+    [queryClient, navigate]
   );
 
   // Hold the transition a minimum beat even when the remount is instant, so it
@@ -142,12 +166,18 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const activeMembership = resolution?.kind === 'resolved' ? resolution.membership : null;
 
+  // An explicit choice is known before the membership list has confirmed it, so
+  // publish that rather than nothing while the two are catching up. The auth
+  // interceptor attaches the tenant header after an await, so a momentarily
+  // null holder is enough to send a header-less request.
+  const publishedTenantId = revokedFrom ? null : (activeMembership?.tenantId ?? chosenTenantId);
+
   // Written during render, deliberately. This is a module variable, not React
   // state, and the write is idempotent — but it has to land before children
   // render, because a child's query fires on ITS effect and child effects run
   // before the parent's. Doing this in an effect here would let the first
   // request of a session go out with no tenant.
-  setActiveTenantId(activeMembership?.tenantId ?? null);
+  setActiveTenantId(publishedTenantId);
 
   // Storage, by contrast, only matters for the *next* load, so it is safely an
   // effect rather than another render-phase side effect.

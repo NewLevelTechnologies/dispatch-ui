@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
 import { apiClient } from '../api/setup';
-import type { RouteObject } from 'react-router-dom';
+import { useLocation, type RouteObject } from 'react-router-dom';
 import type {
   ServiceLocationDetailDto,
   WorkItemResponse,
@@ -13,6 +13,12 @@ import type {
 } from '../api/setup';
 
 vi.mock('@dispatch/api/src/client');
+
+const mockShowUndo = vi.fn();
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return { ...actual, showUndo: (...a: unknown[]) => mockShowUndo(...a) };
+});
 
 const mockWorkOrder: WorkOrder = {
   id: 'wo-1',
@@ -110,6 +116,19 @@ const WORK_ITEM: WorkItemResponse = {
   updatedAt: '2026-04-21T13:40:00Z',
 };
 
+/** Stand-in for the dispatch board that reports the query it was handed, so a
+ *  back-link can be checked for carrying the date and scope, not just the
+ *  path. */
+function BoardProbe() {
+  const { search } = useLocation();
+  return <div>{`Dispatch Board${search}`}</div>;
+}
+
+function AgreementsProbe() {
+  const { search } = useLocation();
+  return <div>{`Agreements${search}`}</div>;
+}
+
 describe('WorkOrderDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -117,6 +136,9 @@ describe('WorkOrderDetailPage', () => {
 
   const ZERO_SUMMARY: WorkOrderFinancialSummary = {
     invoiced: '0.00',
+    inDraft: '0.00',
+    quotedAccepted: '0.00',
+    quotedAwaiting: '0.00',
     paid: '0.00',
     balance: '0.00',
     currency: 'USD',
@@ -219,6 +241,9 @@ describe('WorkOrderDetailPage', () => {
           },
         });
       }
+      if (url.endsWith('/work-orders/callback-candidates')) {
+        return Promise.resolve({ data: [] });
+      }
       if (url.match(/\/work-orders\/[^/]+$/)) {
         return workOrder
           ? Promise.resolve({ data: workOrder })
@@ -233,6 +258,8 @@ describe('WorkOrderDetailPage', () => {
     const routes: RouteObject[] = [
       { path: '/work-orders/:id', element: <WorkOrderDetailPage /> },
       { path: '/work-orders', element: <div>Work Orders List</div> },
+      { path: '/dispatch', element: <BoardProbe /> },
+      { path: '/agreements', element: <AgreementsProbe /> },
       { path: '/customers/:id', element: <div>Customer Detail</div> },
       { path: '/service-locations/:id', element: <div>Service Location Detail</div> },
     ];
@@ -243,6 +270,32 @@ describe('WorkOrderDetailPage', () => {
       initialPath: `/work-orders/${id}${search}`,
     });
   };
+
+  // The dispatch board is a place, not a list: a dispatcher who opened a job
+  // from it is mid-triage, so back returns to the day and scope they left
+  // rather than dropping them on the work order list.
+  it('returns to the dispatch board, restoring its date and scope', async () => {
+    const user = userEvent.setup();
+    mockApiResponses();
+    renderPage('wo-1', '?from=dispatch&back=date%3D2026-03-15%26region%3Dr1');
+
+    await user.click(await screen.findByRole('button', { name: /back to the board/i }));
+    expect(
+      await screen.findByText('Dispatch Board?date=2026-03-15&region=r1'),
+    ).toBeInTheDocument();
+  });
+
+  // The agreements queue's Schedule button lands straight on booking, and back
+  // returns to the queue it came from.
+  it('opens the dispatch form from the agreements queue, and goes back to it', async () => {
+    const user = userEvent.setup();
+    mockApiResponses();
+    renderPage('wo-1', `?from=agreements&back=${encodeURIComponent('view=visits')}&schedule=new`);
+
+    expect(await screen.findByText('Work addressed')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /back to agreements/i }));
+    expect(await screen.findByText('Agreements?view=visits')).toBeInTheDocument();
+  });
 
   it('displays loading state', async () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
@@ -413,34 +466,27 @@ describe('WorkOrderDetailPage', () => {
     });
   });
 
-  // ── Overview: Details (extraRail) card — PO# + NTE inline edit ────────
-  it('renders the Details card with the customer PO number', async () => {
-    mockApiResponses();
+  // ── Header meta line: PO, NTE, Completed ─────────────────────────────
+  it('shows the PO and NTE in the header only when set, and no info card', async () => {
+    mockApiResponses({ ...mockWorkOrder, notToExceed: 2500 });
     renderPage();
-    // PO# shows in the header meta line AND the Details card.
-    await waitFor(() => {
-      expect(screen.getAllByText('PO-12345').length).toBeGreaterThan(0);
-    });
+    expect(await screen.findByText('PO-12345')).toBeInTheDocument();
+    expect(screen.getByText('NTE $2,500.00')).toBeInTheDocument();
+    expect(screen.queryByText('Work Order Info')).not.toBeInTheDocument();
   });
 
-  it('saves a new NTE value via the Details card inline edit', async () => {
-    const user = userEvent.setup();
-    mockApiResponses();
-    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...mockWorkOrder, notToExceed: 1500 } });
+  it('leaves the PO and NTE out of the header when empty', async () => {
+    mockApiResponses({ ...mockWorkOrder, customerOrderNumber: null, notToExceed: null });
     renderPage();
+    await screen.findByText(/^Opened /);
+    expect(screen.queryByText('PO')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^NTE /)).not.toBeInTheDocument();
+  });
 
-    const nteTrigger = await screen.findByLabelText('NTE');
-    await user.click(nteTrigger);
-    const input = await screen.findByLabelText('NTE');
-    await user.type(input, '1500');
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(apiClient.patch).toHaveBeenCalledWith(
-        expect.stringMatching(/\/work-orders\/wo-1$/),
-        { notToExceed: 1500 },
-      );
-    });
+  it('shows the completed date once the job is complete', async () => {
+    mockApiResponses({ ...mockWorkOrder, progressCategory: 'COMPLETED', completedDate: '2026-04-26T15:00:00Z' });
+    renderPage();
+    expect(await screen.findByText('Completed Apr 26, 2026')).toBeInTheDocument();
   });
 
   // ── Header actions ───────────────────────────────────────────────────
@@ -539,5 +585,90 @@ describe('WorkOrderDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'WO-00010' })).toBeInTheDocument();
     });
+  });
+
+  // ── Callback link ────────────────────────────────────────────────────
+  const callbackOf = {
+    id: 'wo-orig',
+    workOrderNumber: 'WO-1234',
+    summary: 'No cooling — upstairs unit',
+    completedDate: '2026-09-18',
+    chargedTechnicians: [{ userId: 't1', name: 'Daniel Park' }],
+    linkedByUserId: 'u1',
+    linkedByName: 'Ana Ruiz',
+    linkedAt: '2026-09-29T13:58:00Z',
+  };
+
+  it('shows a linked callback in the header and its card, naming who it counts for', async () => {
+    mockApiResponses({ ...mockWorkOrder, callbackOf });
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'callbacks.chipLabel' })).toHaveAttribute('href', '/work-orders/wo-orig');
+    const card = await screen.findByTestId('callback-card-linked');
+    expect(card).toHaveTextContent('WO-1234');
+    expect(card).toHaveTextContent('Daniel Park');
+    expect(card).toHaveTextContent('callbacks.linkedBy');
+  });
+
+  it('unlinks instantly and offers Undo, which restores the link', async () => {
+    const user = userEvent.setup();
+    mockApiResponses({ ...mockWorkOrder, callbackOf });
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...mockWorkOrder, callbackOf: null } });
+    renderPage();
+
+    const card = await screen.findByTestId('callback-card-linked');
+    await user.click(within(card).getByRole('button', { name: 'callbacks.unlink' }));
+    await waitFor(() =>
+      expect(apiClient.patch).toHaveBeenCalledWith(expect.stringMatching(/\/work-orders\/wo-1$/), {
+        callbackOfWorkOrderId: null,
+      }),
+    );
+    await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
+    const undo = mockShowUndo.mock.calls[0][2] as () => void;
+    undo();
+    await waitFor(() =>
+      expect(apiClient.patch).toHaveBeenLastCalledWith(expect.stringMatching(/\/work-orders\/wo-1$/), {
+        callbackOfWorkOrderId: 'wo-orig',
+      }),
+    );
+  });
+
+  it('keeps the Callback card off an unlinked work order until it is linked from the header menu', async () => {
+    const user = userEvent.setup();
+    mockApiResponses({ ...mockWorkOrder, callbackOf: null });
+    renderPage();
+
+    // The Overview has rendered (the Details card), but no Callback card.
+    await waitFor(() => expect(screen.getAllByText('PO-12345').length).toBeGreaterThan(0));
+    expect(screen.queryByText('callbacks.notACallback')).toBeNull();
+    expect(screen.queryByTestId('callback-prompt')).toBeNull();
+
+    await user.click(await screen.findByRole('button', { name: 'More options' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'callbacks.linkAsCallback' }));
+    expect(await screen.findByTestId('callback-prompt')).toBeInTheDocument();
+  });
+
+  it('lists the callbacks that point to an original job', async () => {
+    mockApiResponses({
+      ...mockWorkOrder,
+      completedDate: '2026-09-18',
+      callbacks: [
+        {
+          id: 'wo-cb',
+          workOrderNumber: 'WO-1302',
+          summary: 'No cooling again',
+          createdAt: '2026-09-29T13:58:00Z',
+          createdByUserId: 'u1',
+          createdByName: 'Ana Ruiz',
+          lifecycleState: 'ACTIVE',
+          progressCategory: 'AWAITING_SCHEDULE',
+        },
+      ],
+    });
+    renderPage();
+
+    const row = await screen.findByTestId('callback-backref');
+    expect(row).toHaveTextContent('WO-1302');
+    expect(row).toHaveTextContent('callbacks.daysAfter');
   });
 });

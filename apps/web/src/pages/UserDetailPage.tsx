@@ -4,11 +4,19 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { userApi, dispatchRegionApi, tenantSettingsApi, type User, type Role } from '../api/setup';
+import {
+  userApi,
+  dispatchRegionApi,
+  divisionsApi,
+  tenantSettingsApi,
+  type User,
+  type Role,
+} from '../api/setup';
 import { RoleChip } from '../components/RoleChip';
 import { formatPhone, roleAccent } from '@dispatch/utils';
 import { auditApi, type AccountActivityEvent } from '../api/setup';
-import { useHasCapability } from '../hooks/useCurrentUser';
+import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
+import { useRemovalImpact } from '../hooks/useRemovalImpact';
 import { Avatar } from '../components/ui/Avatar';
 import { Callout } from '../components/ui/Callout';
 import { Pill } from '../components/ui/Pill';
@@ -16,10 +24,13 @@ import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
 import { DataRow } from '../components/catalyst/data-row';
+import { summarizeAssignment } from '../lib/dispatchable';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { showError, showSuccess, extractApiError } from '../lib/toast';
+import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
+import { showError, showSuccess, extractApiError, errorCode, isConflict } from '../lib/toast';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 function formatDateShort(d: string | Date | undefined): string {
   if (!d) return '—';
@@ -52,6 +63,22 @@ export default function UserDetailPage() {
   // it can be granted independently of profile/role edits.
   const canDeactivateUsers = useHasCapability('DEACTIVATE_USERS');
   const canViewAuditLogs = useHasCapability('VIEW_AUDIT_LOGS');
+  const { data: currentUser } = useCurrentUser();
+  // Your own detail page offers no removal, same as your own row on the list.
+  // The backend refuses it with a 409 either way, but the option shouldn't be
+  // sitting there to reach for.
+  const isMe = currentUser?.id === id;
+
+  // Which removal the backend refused, if any — read off the 409's `code`.
+  const [guard, setGuard] = useState<RemovalGuard | null>(null);
+  const removalError = (title: string) => (err: unknown) => {
+    const code = errorCode(err);
+    if (isConflict(err) && (code === 'SELF_REMOVAL' || code === 'LAST_USER_MANAGER')) {
+      setGuard(code);
+      return;
+    }
+    showError(title, extractApiError(err));
+  };
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: ['users', id],
@@ -74,14 +101,37 @@ export default function UserDetailPage() {
     queryFn: () => dispatchRegionApi.getAll(true),
   });
 
+  // Same key the dispatch board and the user form use, so this is usually warm.
+  const { data: allDivisions } = useQuery({
+    queryKey: ['work-order-config', 'divisions'],
+    queryFn: () => divisionsApi.getAll(),
+  });
+
+  const [lifecycleConfirm, setLifecycleConfirm] = useState<'deactivate' | 'activate' | null>(null);
+  // Asked as soon as the page can offer a removal, not when the dialog opens.
+  // We already know who this is and the removal footer is on screen, so there
+  // is nothing to gain by waiting for the click — and everything to lose: a
+  // dialog that opens before the answer arrives has to hedge about whether the
+  // sign-in dies, which is the one thing the admin is deciding about.
+  const { impact, isSettled: impactSettled } = useRemovalImpact(
+    id,
+    canDeactivateUsers && !isMe
+  );
+  const endsSignIn = impact?.deactivateEndsSignIn;
+
   const disableMutation = useMutation({
     mutationFn: () => userApi.disable(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess('Access removed');
+      showSuccess(
+        t('users.actions.removedToast', {
+          name: `${user?.firstName} ${user?.lastName}`,
+          company: workspaceName,
+        })
+      );
     },
-    onError: (err) => showError("Couldn't remove access", extractApiError(err)),
+    onError: removalError(t('users.actions.removeFailed')),
   });
 
   const enableMutation = useMutation({
@@ -89,9 +139,14 @@ export default function UserDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess('User reactivated');
+      showSuccess(
+        t('users.actions.restoredToast', {
+          name: `${user?.firstName} ${user?.lastName}`,
+          company: workspaceName,
+        })
+      );
     },
-    onError: (err) => showError("Couldn't reactivate user", extractApiError(err)),
+    onError: (err) => showError(t('users.actions.restoreFailed'), extractApiError(err)),
   });
 
   // Resend Invitation — only meaningful while the user is in INVITED or
@@ -130,7 +185,6 @@ export default function UserDetailPage() {
 
   const handleResendInvitation = () => resendInvitationMutation.mutate();
 
-  const [lifecycleConfirm, setLifecycleConfirm] = useState<'deactivate' | 'activate' | null>(null);
   const handleDeactivate = () => setLifecycleConfirm('deactivate');
   const handleActivate = () => setLifecycleConfirm('activate');
   const confirmLifecycle = () => {
@@ -178,7 +232,12 @@ export default function UserDetailPage() {
       />
 
       <div className="mt-3">
-        <RolesAndRegionsCard user={user} regions={allRegions ?? []} onEditAccess={canEditUsers ? handleEdit : undefined} />
+        <AccessCard
+          user={user}
+          regions={allRegions ?? []}
+          divisions={allDivisions ?? []}
+          onEditAccess={canEditUsers ? handleEdit : undefined}
+        />
       </div>
 
       <div className="mt-3">
@@ -191,10 +250,12 @@ export default function UserDetailPage() {
         </div>
       )}
 
-      {canDeactivateUsers && (
+      {canDeactivateUsers && !isMe && (
         <div className="mt-3">
           <LifecycleFooter
             user={user}
+            workspaceName={workspaceName}
+            endsSignIn={endsSignIn}
             onDeactivate={handleDeactivate}
             onActivate={handleActivate}
             pending={disableMutation.isPending || enableMutation.isPending}
@@ -212,27 +273,53 @@ export default function UserDetailPage() {
                 name: `${user.firstName} ${user.lastName}`,
                 company: workspaceName,
               })
-            : t('users.actions.enableConfirm', { name: `${user.firstName} ${user.lastName}` })
+            : t('users.actions.enableConfirm', {
+                name: `${user.firstName} ${user.lastName}`,
+                company: workspaceName,
+              })
         }
         message={
           lifecycleConfirm === 'deactivate'
-            ? t('users.actions.disableWarning')
+            ? t(removalWarningKey(endsSignIn))
             : t('users.actions.enableWarning')
         }
-        confirmLabel={lifecycleConfirm === 'deactivate' ? 'Remove access' : 'Reactivate'}
+        confirmLabel={
+          lifecycleConfirm === 'deactivate'
+            ? t('users.actions.removeAccessLabel')
+            : t('users.table.restoreAccess')
+        }
         isDestructive={lifecycleConfirm === 'deactivate'}
-        isPending={disableMutation.isPending || enableMutation.isPending}
+        isPending={
+          disableMutation.isPending ||
+          enableMutation.isPending ||
+          (lifecycleConfirm === 'deactivate' && !impactSettled)
+        }
       >
-        {/* Removal is per-workspace: the person keeps their login and any other
-            workspaces. Stated unconditionally — whether they actually belong to
-            others is cross-tenant information this admin has no claim on, and
-            the sentence is true either way. */}
+        {/* Only what survives on every path. Their sign-in does NOT: the
+            backend disables the Cognito identity and signs them out
+            everywhere when this was their last enabled membership
+            (UserService.kt:974), which is the common case. The consequence is
+            stated in the body, conditionally, because the frontend has no
+            signal for which case this is — see the BACKEND_ASKS note on
+            `lastEnabledMembership`. */}
         {lifecycleConfirm === 'deactivate' && (
           <Callout kind="neutral" title={t('users.actions.disableNotAffectedLabel')}>
-            {t('users.actions.disableNotAffected')}
+            {endsSignIn === false
+              ? t('users.actions.disableNotAffectedKeepsSignIn')
+              : t('users.actions.disableNotAffected')}
           </Callout>
         )}
       </ConfirmDialog>
+
+      {/* The footer offers no removal on your own page, but a stale tab can
+          still reach either refusal — someone else may have taken the last
+          user-management role away while this page sat open. */}
+      <RemovalGuardDialog
+        guard={guard}
+        onClose={() => setGuard(null)}
+        company={workspaceName}
+        onChangeRoles={() => navigate(`/settings/access/users/${user.id}/edit`)}
+      />
     </div>
   );
 }
@@ -251,6 +338,7 @@ function Header({
   onResendInvitation?: () => void;
   resendInvitationPending?: boolean;
 }) {
+  const { t } = useTranslation();
   const fullName = `${user.firstName} ${user.lastName}`;
   // Per the v1.5 spec: "Resend invite" only surfaces while the user is in
   // INVITED or INVITATION_EXPIRED. Don't gate on `enabled` — a disabled
@@ -273,7 +361,7 @@ function Header({
             {user.enabled ? (
               <Pill tone="success" dot live inline>Active</Pill>
             ) : (
-              <Pill tone="neutral" dot inline>Disabled</Pill>
+              <Pill tone="neutral" dot inline>{t('users.status.removed')}</Pill>
             )}
             <span className="text-fg-dim">·</span>
             <span className="break-all">{user.email}</span>
@@ -338,22 +426,82 @@ function RoleStack({ roles, max = 3 }: { roles: Role[]; max?: number }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Roles + Regions — combined card with capabilities expander
+// Assignment value — answer, then reason. The pill carries the effective
+// outcome and the line beneath carries the derivation, so a reader never has
+// to compute eligibility from a role list.
 // ──────────────────────────────────────────────────────────────────
-function RolesAndRegionsCard({
+function AssignmentValue({ user }: { user: User }) {
+  const { assignable, override, reason } = summarizeAssignment(user);
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        {assignable ? (
+          <Pill tone="success" dot>
+            Assignable
+          </Pill>
+        ) : (
+          <Pill tone="neutral">Not assignable</Pill>
+        )}
+        {/* Quiet metadata, not a second status pill — one shape, two tones,
+            and it only renders when an override is actually in play. `xs`
+            already matches the intended geometry; the uppercase, weight and
+            tracking are what stop it reading as a peer of the pill. */}
+        {override && (
+          <Badge
+            size="xs"
+            color={override === 'warning' ? 'amber' : 'zinc'}
+            className="font-bold tracking-[0.05em] uppercase"
+          >
+            Override
+          </Badge>
+        )}
+      </div>
+
+      <span className="text-[11.5px] leading-[1.45] text-fg-muted">
+        {reason.map((part, i) =>
+          part.strong ? (
+            <b key={i} className="font-semibold text-fg-strong">
+              {part.text}
+            </b>
+          ) : (
+            <span key={i}>{part.text}</span>
+          )
+        )}
+      </span>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// How work reaches this person: what they can do, whether they can be
+// given any, which board they appear on, and what kind they're offered.
+// Named for the action it carries — "Edit access" — which is the one
+// button for all four.
+// ──────────────────────────────────────────────────────────────────
+function AccessCard({
   user,
   regions,
+  divisions,
   onEditAccess,
 }: {
   user: User;
   regions: { id: string; name: string }[];
+  divisions: { id: string; name: string }[];
   onEditAccess?: () => void;
 }) {
+  const { getName } = useGlossary();
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
   const userRegions = (user.dispatchRegionIds ?? [])
     .map((id) => regions.find((r) => r.id === id))
     .filter((r): r is { id: string; name: string } => !!r);
+  // Resolved against the tenant's catalogue, so an id that no longer exists
+  // renders as nothing rather than a raw uuid. The backend does not validate
+  // these against work-order-service, so a stale id is a real possibility.
+  const userDivisions = (user.divisionIds ?? [])
+    .map((id) => divisions.find((d) => d.id === id))
+    .filter((d): d is { id: string; name: string } => !!d);
   const capCount = user.capabilities?.length ?? 0;
 
   return (
@@ -379,7 +527,26 @@ function RolesAndRegionsCard({
           )}
         </div>
       </DataRow>
-      <DataRow label="Regions" labelWidth={90} last={capCount === 0}>
+      {/* Between Roles and Regions on purpose: it qualifies the roles above
+          it, and it answers the prior question to the one below — WHETHER
+          someone can be given work, before WHICH board they show up on.
+          Omitted entirely when the server hasn't sent `performsFieldWork`,
+          rather than guessing: this page is where people come to ask.
+
+          Labelled "Assignment", not "Dispatch board" — the flag gates every
+          assignment path, and naming one symptom would imply switching it off
+          merely hides someone from a view. */}
+      {user.performsFieldWork !== undefined && (
+        <DataRow label="Assignment" labelWidth={90}>
+          <AssignmentValue user={user} />
+        </DataRow>
+      )}
+
+      <DataRow
+        label={getName('dispatch_region', true)}
+        labelWidth={90}
+        last={capCount === 0 && divisions.length === 0}
+      >
         <div className="flex flex-wrap gap-1">
           {userRegions.length === 0 ? (
             <span className="text-[11.5px] italic text-fg-muted">
@@ -390,6 +557,29 @@ function RolesAndRegionsCard({
           )}
         </div>
       </DataRow>
+
+      {/* After Regions, because the progression is whether → where → what.
+          Hidden entirely for a tenant with no divisions configured: a row
+          about a feature they do not use is noise on every user.
+
+          Empty reads as "offered for all work", never "none assigned". The
+          two say opposite things — empty means nothing was stated, so this
+          person is offered for everything, and a deficit-shaped label would
+          invite an admin to "fix" it by narrowing someone who is available
+          for anything. */}
+      {divisions.length > 0 && (
+        <DataRow label={getName('division', true)} labelWidth={90} last={capCount === 0}>
+          <div className="flex flex-wrap gap-1">
+            {userDivisions.length === 0 ? (
+              <span className="text-[11.5px] text-fg-muted">
+                {t('users.detail.allDivisions')}
+              </span>
+            ) : (
+              userDivisions.map((d) => <Badge key={d.id}>{d.name}</Badge>)
+            )}
+          </div>
+        </DataRow>
+      )}
 
       {capCount > 0 && (
         <div className="flex items-center gap-2.5 px-3.5 py-2.5 text-[11px] text-fg-muted">
@@ -402,7 +592,7 @@ function RolesAndRegionsCard({
           <span className="text-fg-dim">·</span>
           <button
             onClick={() => setOpen(!open)}
-            className="font-medium text-fg-accent hover:underline"
+            className="!font-medium text-fg-accent hover:underline"
           >
             {open ? 'Hide details' : 'View detailed permissions'}
           </button>
@@ -719,7 +909,14 @@ function SecurityCard({ userId, email, canEdit }: { userId: string; email: strin
 // are intentionally separate facts — render them back-to-back; do not
 // de-dupe. Payload may be null; only role events populate it today.
 // ──────────────────────────────────────────────────────────────────
-type Kind = 'signin' | 'access' | 'security' | 'failed' | 'lifecycle' | 'lifecycle-warn';
+type Kind =
+  | 'signin'
+  | 'access'
+  | 'security'
+  | 'security-warn'
+  | 'failed'
+  | 'lifecycle'
+  | 'lifecycle-warn';
 
 function rolePayloadName(payload: AccountActivityEvent['payload']): string {
   if (!payload || typeof payload !== 'object') return '(unknown role)';
@@ -764,6 +961,15 @@ function formatWindowSeconds(seconds: number): string {
   return `${hours}h`;
 }
 
+// SOME_NEW_ACTION → "Some new action". Only reached for action types this
+// switch doesn't know, so it can't be pretty — it just has to be honest about
+// what happened rather than rendering a label with no information in it.
+function humanizeActionType(actionType: string): string {
+  const words = actionType.replace(/_/g, ' ').trim().toLowerCase();
+  if (!words) return 'Activity';
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function classifyEvent(event: AccountActivityEvent): {
   kind: Kind;
   text: string;
@@ -802,6 +1008,25 @@ function classifyEvent(event: AccountActivityEvent): {
         text: method ? `2FA enabled (${method})` : '2FA enabled',
       };
     }
+    case 'TWO_FA_DISABLED':
+      // Warn tone for the same reason USER_DEACTIVATED gets one: this weakens
+      // the account's posture and is worth the visual cue. Emitted with no
+      // payload, so there is no method to name.
+      return { kind: 'security-warn', text: '2FA disabled' };
+    case 'TWO_FA_METHOD_CHANGED': {
+      // Not emitted by the backend yet, but it's in the locked action enum —
+      // handled so it doesn't land in the fallback the day it starts firing.
+      const p = (event.payload ?? {}) as { method?: unknown };
+      const method = typeof p.method === 'string' ? p.method : null;
+      return {
+        kind: 'security',
+        text: method ? `2FA method changed to ${method}` : '2FA method changed',
+      };
+    }
+    case 'DEVICE_TRUSTED':
+      return { kind: 'security', text: 'Device trusted' };
+    case 'DEVICE_UNTRUSTED':
+      return { kind: 'security', text: 'Device no longer trusted' };
     case 'GLOBAL_SIGNOUT':
       return { kind: 'security', text: 'Signed out of all sessions' };
     case 'SIGN_IN_SUCCESS': {
@@ -832,10 +1057,11 @@ function classifyEvent(event: AccountActivityEvent): {
       return { kind: 'failed', text: 'Failed sign-in attempts', meta };
     }
     default:
-      // Forward-compat: a brand-new actionType still renders. Use access
-      // tone (★) since it reads as "something happened" without claiming
-      // a category.
-      return { kind: 'access', text: 'Activity' };
+      // Forward-compat: a brand-new actionType still renders, and says which
+      // one. A bare "Activity" is indistinguishable from a broken row — that
+      // is how the missing TWO_FA_DISABLED case was found. Access tone (★)
+      // reads as "something happened" without claiming a category.
+      return { kind: 'access', text: humanizeActionType(event.actionType) };
   }
 }
 
@@ -862,6 +1088,14 @@ const KIND_STYLES: Record<Kind, { glyph: string; bg: string; fg: string }> = {
     fg: 'var(--violet-500)',
   },
   'lifecycle-warn': {
+    glyph: '−',
+    bg: 'color-mix(in oklch, var(--warning-500) 14%, transparent)',
+    fg: 'var(--warning-fg)',
+  },
+  // Security events that reduce protection. The ✓ of `security` is this file's
+  // "a security event was recorded" mark (password-reset-sent uses it too), so
+  // it doesn't read as approval — but a weakening still earns the warn cue.
+  'security-warn': {
     glyph: '−',
     bg: 'color-mix(in oklch, var(--warning-500) 14%, transparent)',
     fg: 'var(--warning-fg)',
@@ -925,38 +1159,63 @@ function AccountActivityCard({ userId }: { userId: string }) {
   );
 }
 
+// Which removal sentence applies. `endsSignIn` is undefined until the
+// pre-flight answers (or if it failed), and undefined means UNKNOWN — the
+// hedged wording — never "the sign-in is safe".
+//
+// Shared by the footer card and the confirm dialog on purpose: they describe
+// the same action, and letting each pick its own copy is how the trigger ended
+// up contradicting the dialog in the first place.
+function removalWarningKey(endsSignIn: boolean | undefined): string {
+  if (endsSignIn === undefined) return 'users.actions.disableWarning';
+  return endsSignIn
+    ? 'users.actions.disableWarningEndsSignIn'
+    : 'users.actions.disableWarningKeepsSignIn';
+}
+
+// The trigger has to say the same thing as the dialog behind it. It previously
+// read "Deactivate / Revokes sign-in immediately", which named the wrong scope
+// twice: this ends one membership, not the person's login, and the workspace it
+// ends is the one worth naming.
 function LifecycleFooter({
   user,
+  workspaceName,
+  endsSignIn,
   onDeactivate,
   onActivate,
   pending,
 }: {
   user: User;
+  workspaceName: string;
+  endsSignIn: boolean | undefined;
   onDeactivate: () => void;
   onActivate: () => void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const first = user.firstName;
   return (
     <Callout
       kind="neutral"
       icon={null}
-      title={user.enabled ? `Deactivate ${first}` : `Reactivate ${first}`}
+      title={
+        user.enabled
+          ? t('users.actions.removeTitle', { name: first, company: workspaceName })
+          : t('users.actions.restoreTitle', { name: first, company: workspaceName })
+      }
       action={
         user.enabled ? (
           <Button outline="red" size="xxs" onClick={onDeactivate} disabled={pending}>
-            Deactivate
+            {t('users.actions.removeAccessLabel')}
           </Button>
         ) : (
           <Button outline size="xxs" onClick={onActivate} disabled={pending}>
-            Reactivate
+            {t('users.table.restoreAccess')}
           </Button>
         )
       }
     >
-      {user.enabled
-        ? 'Revokes sign-in immediately. Audit history is preserved.'
-        : 'Restores sign-in access. Existing roles and regions are kept as-is.'}
+      {user.enabled ? t(removalWarningKey(endsSignIn)) : t('users.actions.enableWarning')}
     </Callout>
   );
 }

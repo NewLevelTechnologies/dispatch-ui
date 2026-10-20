@@ -106,7 +106,7 @@ export default function CustomerWorkOrdersTab({
   onNewJob: () => void;
 }) {
   const { t } = useTranslation();
-  const { getName } = useGlossary();
+  const { getName, getAbbrev } = useGlossary();
 
   // Default to All — this tab is the customer's full history, not just open.
   const [statusId, setStatusId] = useState('all');
@@ -182,8 +182,8 @@ export default function CustomerWorkOrdersTab({
               setSearch(e.target.value);
               resetPage();
             }}
-            placeholder="Search WO#, summary, tech, equipment…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            placeholder={`Search ${getAbbrev('work_order')}#, summary, ${getName('technician').toLowerCase()}, ${getName('equipment').toLowerCase()}…`}
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
             <button
@@ -191,7 +191,7 @@ export default function CustomerWorkOrdersTab({
                 setSearch('');
                 resetPage();
               }}
-              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+              className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong"
             >
               ×
             </button>
@@ -271,13 +271,13 @@ export default function CustomerWorkOrdersTab({
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
               {filtersActive
-                ? 'No matching work orders'
+                ? `No matching ${getName('work_order', true).toLowerCase()}`
                 : t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
             </div>
             <div className="mt-1 text-[12px] text-fg-muted">
               {filtersActive
                 ? 'Adjust your search or clear filters.'
-                : `${getName('work_order', true)} for this customer will appear here.`}
+                : `${getName('work_order', true)} for this ${getName('customer').toLowerCase()} will appear here.`}
             </div>
             {filtersActive && (
               <Button plain size="xs" className="mt-2" onClick={clearFilters}>

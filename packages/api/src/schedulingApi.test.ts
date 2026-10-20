@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   dispatchesApi,
   dispatchNotesApi,
-  availabilityApi,
-  recurringOrdersApi,
 } from './schedulingApi';
 import apiClient from './client';
 
@@ -149,6 +147,16 @@ describe('dispatchesApi.notify', () => {
   });
 });
 
+describe('dispatchesApi.release', () => {
+  // The per-dispatch verb. Its bulk sibling on dispatchBoardApi takes a SCOPE
+  // and would release the whole day, so these must not be confused.
+  it('posts to the dispatch\u2019s own release path with no body', async () => {
+    await dispatchesApi.release('d-1');
+
+    expect(apiClient.post).toHaveBeenCalledWith('/scheduling/dispatches/d-1/release');
+  });
+});
+
 describe('dispatchNotesApi', () => {
   it('nests the visit-note collection under its dispatch', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
@@ -170,48 +178,3 @@ describe('dispatchNotesApi', () => {
   });
 });
 
-describe('availabilityApi', () => {
-  it('covers the availability surface', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-
-    await availabilityApi.getAll({ userId: 'u-1', startDate: '2026-01-01' });
-    await availabilityApi.getById('a-1');
-    await availabilityApi.create({ userId: 'u-1' } as never);
-    await availabilityApi.update('a-1', { status: 'APPROVED' } as never);
-    await availabilityApi.delete('a-1');
-
-    expect(apiClient.get).toHaveBeenCalledWith('/scheduling/availability', {
-      params: { userId: 'u-1', startDate: '2026-01-01' },
-    });
-    expect(apiClient.get).toHaveBeenCalledWith('/scheduling/availability/a-1');
-    expect(apiClient.post).toHaveBeenCalledWith('/scheduling/availability', { userId: 'u-1' });
-    expect(apiClient.put).toHaveBeenCalledWith('/scheduling/availability/a-1', {
-      status: 'APPROVED',
-    });
-    expect(apiClient.delete).toHaveBeenCalledWith('/scheduling/availability/a-1');
-  });
-});
-
-describe('recurringOrdersApi', () => {
-  it('covers the recurring-order surface', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-
-    await recurringOrdersApi.getAll({ customerId: 'c-1', dueBefore: '2026-02-01' });
-    await recurringOrdersApi.getById('r-1');
-    await recurringOrdersApi.create({ customerId: 'c-1' } as never);
-    await recurringOrdersApi.update('r-1', { status: 'PAUSED' } as never);
-    await recurringOrdersApi.delete('r-1');
-
-    expect(apiClient.get).toHaveBeenCalledWith('/scheduling/recurring-orders', {
-      params: { customerId: 'c-1', dueBefore: '2026-02-01' },
-    });
-    expect(apiClient.get).toHaveBeenCalledWith('/scheduling/recurring-orders/r-1');
-    expect(apiClient.post).toHaveBeenCalledWith('/scheduling/recurring-orders', {
-      customerId: 'c-1',
-    });
-    expect(apiClient.put).toHaveBeenCalledWith('/scheduling/recurring-orders/r-1', {
-      status: 'PAUSED',
-    });
-    expect(apiClient.delete).toHaveBeenCalledWith('/scheduling/recurring-orders/r-1');
-  });
-});

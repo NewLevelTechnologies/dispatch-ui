@@ -4,6 +4,7 @@
 // status pill + pager as the customer AR tab, scoped to the agreement and with
 // a Period column (billingPeriodKey) so each invoice maps back to its
 // installment. Read-only: no per-invoice detail route yet.
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import {
@@ -22,7 +23,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { useUrlPage } from '../../hooks/useUrlPage';
 import { formatDateShort, formatMoney } from '../../components/customer-detail/format';
 
-// Canonical AR status → tone (mirrors CustomerInvoicesTab / InvoicesPage).
+// Canonical AR status → tone (mirrors InvoicesPage).
 const INVOICE_STATUS_TONE: Record<InvoiceStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
   [InvoiceStatus.DRAFT]: 'neutral',
   [InvoiceStatus.SENT]: 'info',
@@ -78,7 +79,7 @@ export default function AgreementInvoicesTab({ agreementId }: { agreementId: str
       ) : rows.length === 0 ? (
         <EmptyState
           title={`No ${getName('invoice', true).toLowerCase()} yet`}
-          description="Installment invoices generate automatically once the billing schedule is active and each period comes due."
+          description={`Installment ${getName('invoice', true).toLowerCase()} generate automatically once the billing schedule is active and each period comes due.`}
         />
       ) : (
         <>
@@ -106,14 +107,9 @@ export default function AgreementInvoicesTab({ agreementId }: { agreementId: str
                   return (
                   <DenseRow key={inv.id}>
                     <td>
-                      {/* Plain identifier, NOT accent: accent text is reserved for
-                          links that navigate to another page (cf. the Schedule
-                          tab's WO number → /work-orders/:id). Invoices have no
-                          detail route yet — switch to `id-mono font-semibold
-                          text-fg-accent` and make the row navigate once one lands. */}
-                      <span className={voided ? 'font-mono text-fg-muted' : 'font-mono font-bold text-fg-strong'}>
+                      <Link to={`/invoices/${inv.id}`} className="id-mono font-semibold text-fg-accent hover:underline">
                         {inv.invoiceNumber}
-                      </span>
+                      </Link>
                     </td>
                     <td className="muted" data-label="Period">
                       {inv.billingPeriodKey ? (

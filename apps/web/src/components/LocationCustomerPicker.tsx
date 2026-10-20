@@ -13,10 +13,11 @@ export interface PickedCustomer {
   name: string;
 }
 
-// Customer picker for the "add a location" flow: the parent customer is the
-// pick-target, so this is intentionally NOT the generic CustomerPicker (which
-// surfaces payers for invoicing). It runs off the operational list query, which
-// default-excludes BILLING_ONLY — you can't add a service location to a payer —
+// Customer picker for flows whose customer owns service locations — adding a
+// location, selling an agreement (which covers locations). Intentionally NOT
+// the generic CustomerPicker (which surfaces payers for invoicing). It runs off
+// the operational list query, which default-excludes BILLING_ONLY — a payer
+// has no locations to add or cover —
 // and rides CustomerListDto so each row can disambiguate by full address +
 // location count (reusing CustomerResultRow). A "+ New customer" escape hatch
 // at the foot keeps a no-match search from dead-ending.
@@ -129,7 +130,7 @@ export default function LocationCustomerPicker({
           <button
             type="button"
             onClick={() => navigate('/customers/new')}
-            className="flex w-full items-center gap-1.5 border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-left text-[12px] font-medium text-fg-accent hover:bg-bg-hover"
+            className="flex w-full items-center gap-1.5 border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-left !text-[12px] !font-medium text-fg-accent hover:bg-bg-hover"
           >
             <span className="text-[14px] leading-none">+</span>
             {t('common.actions.new', { entity: getName('customer') })}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   customerApi,
@@ -25,20 +26,18 @@ import {
   type WorkOrderPriority,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
-import ActivityButton from '../components/ActivityButton';
-import ActivityDrawer from '../components/ActivityDrawer';
-import ActivityStream from '../components/ActivityStream';
+import WorkOrderActivityTab from '../features/work-orders/WorkOrderActivityTab';
+import { resolveBack } from '../lib/backContext';
+import { useDocumentBack } from '../hooks/useDocumentBack';
 import AppLayout from '../components/AppLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchesTab from '../components/DispatchesTab';
-import EditableField from '../components/EditableField';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import { equipmentCreateUrl, workItemAttachToken, parseWorkItemAttachToken } from '../lib/equipmentCreate';
-import { showError, extractApiError } from '../lib/toast';
-import FinancialInvoicesTab from '../components/FinancialInvoicesTab';
-import FinancialQuotesTab from '../components/FinancialQuotesTab';
+import { showError, extractApiError, errorCode } from '../lib/toast';
+import WorkOrderBillingTab from '../components/WorkOrderBillingTab';
 import WorkItemsTab from '../components/WorkItemsTab';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
@@ -46,14 +45,13 @@ import WorkOrderOverview from '../features/work-orders/WorkOrderOverview';
 import { formatExactTimestamp, formatPhone, formatTimestamp, roleAccent, titleCaseAddress, tripsByWorkItem } from '@dispatch/utils';
 import WorkOrderFilesTab from '../components/WorkOrderFilesTab';
 import WorkOrderPurchasingTab from '../components/WorkOrderPurchasingTab';
-import { TimeAgo } from '../components/TimeAgo';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { LoadingState } from '../components/ui/LoadingState';
 import { Tabs } from '../components/ui/Tabs';
 import { Pill, Tag } from '../components/ui/Pill';
-import { Card } from '../components/catalyst/card';
-import { CardTitle } from '../components/customer-detail/shared';
+import { CallbackChip, WorkOrderCallbackCard, WorkOrderCallbacksBackCard } from '../features/callbacks/CallbackCards';
+import { isSeededCallbackType } from '../features/callbacks/callbackModel';
 import { Button } from '../components/catalyst/button';
 import {
   Dropdown,
@@ -63,11 +61,6 @@ import {
   DropdownMenu,
 } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
-import {
-  DescriptionList,
-  DescriptionTerm,
-  DescriptionDetails,
-} from '../components/catalyst/description-list';
 import { useUrlTab } from '../hooks/useUrlTab';
 import {
   ArrowLeftIcon,
@@ -144,18 +137,56 @@ export default function WorkOrderDetailPage() {
   const fromPurchasing = searchParams.get('from') === 'purchasing';
   const { t } = useTranslation();
   const { getName } = useGlossary();
+
+  // Where "back" goes. The dispatch board is a place, not a list, and a
+  // dispatcher who opened a job from it is mid-triage — dropping them on the
+  // Work Orders list loses the date and scope they were working. `back`
+  // carries the board's own query, so they land on the board they left.
+  // The agreements queue works the same way: back lands on the queue's tab.
+  const from = searchParams.get('from');
+  // Opened from a quote or invoice's header: back returns to that document.
+  const docBack = useDocumentBack();
+  const back = docBack
+    ? { href: docBack.href, label: t('common.actions.backTo', { entities: docBack.label }) }
+    : from === 'dispatch'
+      ? {
+          href: resolveBack('/dispatch', searchParams.get('back')),
+          label: t('common.actions.backTo', { entities: t('dispatchBoard.backTarget') }),
+        }
+      : from === 'agreements'
+        ? {
+            href: resolveBack('/agreements', searchParams.get('back')),
+            label: t('common.actions.backTo', { entities: getName('agreement', true) }),
+          }
+        : fromPurchasing
+          ? {
+              href: '/purchasing',
+              label: t('common.actions.backTo', { entities: t('entities.purchasing') }),
+            }
+          : {
+              href: '/work-orders',
+              label: t('common.actions.backTo', { entities: getName('work_order', true) }),
+            };
+
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
-  const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
   const [tab, setTab] = useUrlTab<WorkOrderTab>(TAB_IDS, 'overview');
+  // Linking a callback from the header menu opens the Callback card on Overview.
+  const [callbackEditing, setCallbackEditing] = useState(false);
   // Bumped by the "Add work item" affordances (header button, overview card,
   // the W shortcut) to open the inline composer on the Items tab. All work-item
   // editing is inline on the card (complaint / diagnosis / equipment) — there
   // is no add or edit modal.
   const [composeWorkItemSignal, setComposeWorkItemSignal] = useState(0);
   const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
-  const [assignDispatchDialogOpen, setAssignDispatchDialogOpen] = useState(false);
+  // `?schedule=new` opens the dispatch form on arrival: a queue's Schedule
+  // button lands straight on booking. The param is dropped when it closes.
+  const [assignDispatchDialogOpen, setAssignDispatchDialogOpen] = useState(
+    () => searchParams.get('schedule') === 'new',
+  );
   // Same dialog handles edit — when set, the dialog opens prefilled in PUT mode.
   const [editingDispatch, setEditingDispatch] = useState<Dispatch | null>(null);
+  // A work item's own "Schedule" seeds the form with just that item.
+  const [scheduleWorkItemIds, setScheduleWorkItemIds] = useState<string[] | null>(null);
   // Row click opens the read+manage drawer (lifecycle audit, notification
   // history, edit/delete footer). Null = closed.
   const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null);
@@ -186,19 +217,6 @@ export default function WorkOrderDetailPage() {
     setDrawerEquipment(subUnit);
   };
 
-  // "+ Add unit" (from a work-item chip row) → the full-page create with the
-  // parent locked. Sub-units inherit the parent's location; no work-item link,
-  // so no attachTo — we just return to the Work items tab.
-  const handleAddSubUnit = (parent: { id: string; name: string }) => {
-    navigate(
-      equipmentCreateUrl({
-        returnTo: `/work-orders/${id}?tab=items`,
-        locationId: workOrder?.serviceLocationId || workOrder?.serviceLocation?.id,
-        parent: parent.id,
-      })
-    );
-  };
-
   const deleteWorkItemMutation = useMutation({
     mutationFn: ({ workItemId }: { workItemId: string }) =>
       workOrderApi.deleteWorkItem(id!, workItemId),
@@ -208,24 +226,32 @@ export default function WorkOrderDetailPage() {
       setWorkItemToDelete(null);
     },
     onError: (err: unknown) => {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorDelete', { entity: getName('work_item') }));
+      // The server's refusals carry a code; say why in our words.
+      const code = errorCode(err);
+      const reason =
+        code === 'LAST_WORK_ITEM' ||
+        code === 'WORK_ITEM_HAS_COMPLETED_VISIT' ||
+        code === 'WORK_ORDER_CANCELLED'
+          ? t(`workOrders.workItems.deleteRefused.${code}`, {
+              entity: getName('work_item').toLowerCase(),
+              dispatch: getName('dispatch').toLowerCase(),
+              workOrder: getName('work_order').toLowerCase(),
+            })
+          : extractApiError(err);
+      showError(t('common.form.errorDelete', { entity: getName('work_item') }), reason ?? undefined);
     },
   });
 
   // The card's ⋯ → Delete opens the ConfirmDialog; onConfirm fires the mutation.
   const handleDeleteWorkItem = (wi: WorkItemResponse) => setWorkItemToDelete(wi);
 
-  // Duplicate item (⋯ menu) — clone the complaint, diagnosis, and equipment
-  // link into a fresh item; status resets server-side (Triage).
+  // Duplicate item (⋯ menu) — clone the complaint and equipment link into a
+  // fresh item; status resets server-side. Findings stay with the original
+  // (copying them would credit whoever duplicated as their author).
   const duplicateWorkItemMutation = useMutation({
     mutationFn: (wi: WorkItemResponse) =>
       workOrderApi.createWorkItem(id!, {
         description: wi.description,
-        diagnosis: wi.diagnosis?.trim() || undefined,
         equipmentId: wi.equipment?.id ?? undefined,
         equipmentNeeded: wi.equipmentNeeded,
       }),
@@ -235,11 +261,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     },
     onError: (err: unknown) => {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorCreate', { entity: getName('work_item') }));
+      showError(t('common.form.errorCreate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
     },
   });
 
@@ -277,11 +299,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      showError(t('common.form.errorUpdate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
       throw err;
     }
   };
@@ -294,11 +312,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      showError(t('common.form.errorUpdate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
       throw err;
     }
   };
@@ -313,11 +327,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      showError(t('common.form.errorUpdate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
     }
   };
 
@@ -335,11 +345,7 @@ export default function WorkOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
     } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      showError(t('common.form.errorUpdate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
     }
   };
 
@@ -380,10 +386,8 @@ export default function WorkOrderDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, id]);
 
-  // Generic single-field PATCH for inline edits on the WO meta card. Each
-  // EditableField calls this with the field name and new value. EditableField
-  // stays in edit mode if we throw, so we propagate after alert so the user
-  // can retry / cancel.
+  // Generic single-field PATCH for inline edits in the header (priority).
+  // Rethrows after the alert so a caller can stay in its edit state.
   const handleSaveWorkOrderField = async <K extends keyof UpdateWorkOrderRequest>(
     field: K,
     next: UpdateWorkOrderRequest[K]
@@ -401,31 +405,6 @@ export default function WorkOrderDetailPage() {
       throw err;
     }
   };
-
-  // N shortcut → open the activity drawer when it's closed. Once the drawer
-  // opens the composer mounts and grabs focus via its autoFocus prop; any
-  // subsequent N press while the drawer is open is handled by the composer's
-  // own listener (refocus the textarea if the user clicked elsewhere).
-  useEffect(() => {
-    if (activityDrawerOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'n' && e.key !== 'N') return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      e.preventDefault();
-      setActivityDrawerOpen(true);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [activityDrawerOpen]);
 
   // W shortcut → open the inline work-item composer on the Items tab. Ignored
   // when an input is focused or modifier keys are held.
@@ -563,7 +542,10 @@ export default function WorkOrderDetailPage() {
   // Positional trip numbers per work item — shared with the overview peek so
   // the Work items tab header/footer never drift from it. (Hook stays above any
   // early return.)
-  const wiTrips = useMemo(() => tripsByWorkItem(dispatches), [dispatches]);
+  const wiTrips = useMemo(
+    () => tripsByWorkItem(dispatches, (workOrder?.workItems ?? []).map((wi) => wi.id)),
+    [dispatches, workOrder?.workItems],
+  );
 
   const handleCopy = async (kind: 'phone' | 'address', value: string) => {
     if (!value) return;
@@ -601,11 +583,9 @@ export default function WorkOrderDetailPage() {
               {error && `: ${(error as Error).message}`}
             </Text>
           </div>
-          <Button className="mt-4" onClick={() => navigate(fromPurchasing ? '/purchasing' : '/work-orders')}>
+          <Button className="mt-4" onClick={() => navigate(back.href)}>
             <ArrowLeftIcon className="size-4" />
-            {fromPurchasing
-              ? t('common.actions.backTo', { entities: t('entities.purchasing') })
-              : t('common.actions.backTo', { entities: getName('work_order', true) })}
+            {back.label}
           </Button>
         </div>
       </AppLayout>
@@ -692,11 +672,9 @@ export default function WorkOrderDetailPage() {
     <AppLayout>
       <div className="mx-auto max-w-[1240px]">
         {/* Smart back */}
-        <Button plain onClick={() => navigate(fromPurchasing ? '/purchasing' : '/work-orders')} className="mb-2">
+        <Button plain onClick={() => navigate(back.href)} className="mb-2">
           <ArrowLeftIcon className="size-4" />
-          {fromPurchasing
-            ? t('common.actions.backTo', { entities: t('entities.purchasing') })
-            : t('common.actions.backTo', { entities: getName('work_order', true) })}
+          {back.label}
         </Button>
 
         {/* Header — location-led identity + classification + actions. */}
@@ -763,6 +741,7 @@ export default function WorkOrderDetailPage() {
                     {woType.name}
                   </span>
                 )}
+                {workOrder.callbackOf && <CallbackChip callbackOf={workOrder.callbackOf} />}
               </div>
 
               {/* Meta line — render only populated items. */}
@@ -770,6 +749,20 @@ export default function WorkOrderDetailPage() {
                 {displayAddress && <span className="font-medium text-fg-strong">{displayAddress}</span>}
                 {displayAddress && <span className="text-fg-dim">·</span>}
                 <span className="font-mono">{woDisplayNumber}</span>
+                {workOrder.customerOrderNumber && (
+                  <>
+                    <span className="text-fg-dim">·</span>
+                    <span>
+                      {t('workOrders.detail.po')} <span className="font-mono">{workOrder.customerOrderNumber}</span>
+                    </span>
+                  </>
+                )}
+                {workOrder.notToExceed != null && (
+                  <>
+                    <span className="text-fg-dim">·</span>
+                    <span>{t('workOrders.detail.nte', { amount: currencyFormatter.format(workOrder.notToExceed) })}</span>
+                  </>
+                )}
                 {essence && (
                   <>
                     <span className="text-fg-dim">·</span>
@@ -785,11 +778,11 @@ export default function WorkOrderDetailPage() {
                 <span title={formatExactTimestamp(workOrder.createdAt)}>
                   {t('workOrders.detail.openedAt', { time: formatDate(workOrder.createdAt) })}
                 </span>
-                {workOrder.customerOrderNumber && (
+                {workOrder.completedDate && (
                   <>
                     <span className="text-fg-dim">·</span>
-                    <span>
-                      {t('workOrders.form.customerOrderNumber')} <span className="font-mono text-fg-strong">{workOrder.customerOrderNumber}</span>
+                    <span title={formatExactTimestamp(workOrder.completedDate)}>
+                      {t('workOrders.detail.completedAt', { time: formatDate(workOrder.completedDate) })}
                     </span>
                   </>
                 )}
@@ -824,11 +817,6 @@ export default function WorkOrderDetailPage() {
                   {t('workOrders.detail.directions')}
                 </Button>
               )}
-              <ActivityButton
-                workOrderId={workOrder.id}
-                drawerOpen={activityDrawerOpen}
-                onOpen={() => setActivityDrawerOpen(true)}
-              />
               <Button
                 outline
                 size="xs"
@@ -848,6 +836,16 @@ export default function WorkOrderDetailPage() {
                   <EllipsisHorizontalIcon className="size-4" />
                 </DropdownButton>
                 <DropdownMenu anchor="bottom end">
+                  {!workOrder.callbackOf && !frozen && (
+                    <DropdownItem
+                      onClick={() => {
+                        setTab('overview');
+                        setCallbackEditing(true);
+                      }}
+                    >
+                      <DropdownLabel>{t('callbacks.linkAsCallback')}</DropdownLabel>
+                    </DropdownItem>
+                  )}
                   <DropdownItem disabled>
                     <DropdownLabel>{t('workOrders.detail.print')}</DropdownLabel>
                   </DropdownItem>
@@ -892,87 +890,28 @@ export default function WorkOrderDetailPage() {
                 setAssignDispatchDialogOpen(true);
               }}
               extraRail={
-                <Card title={<CardTitle>{t('workOrders.detail.info', { entity: getName('work_order') })}</CardTitle>} padding="none">
-                  <div className="px-3.5 py-3">
-                    <DescriptionList>
-                      <DescriptionTerm>{t('workOrders.detail.created')}</DescriptionTerm>
-                      <DescriptionDetails><TimeAgo iso={workOrder.createdAt} /></DescriptionDetails>
-
-                      <DescriptionTerm>{t('workOrders.form.customerOrderNumber')}</DescriptionTerm>
-                      <DescriptionDetails>
-                        <EditableField
-                          value={workOrder.customerOrderNumber ?? ''}
-                          onSave={(v) => handleSaveWorkOrderField('customerOrderNumber', v || undefined)}
-                          disabled={frozen}
-                          placeholder={t('workOrders.form.customerOrderNumberPlaceholder')}
-                          ariaLabel={t('workOrders.form.customerOrderNumber')}
-                          className="font-mono"
-                        />
-                      </DescriptionDetails>
-
-                      <DescriptionTerm>{t('workOrders.form.notToExceed')}</DescriptionTerm>
-                      <DescriptionDetails>
-                        <EditableField
-                          value={workOrder.notToExceed != null ? String(workOrder.notToExceed) : ''}
-                          onSave={async (raw) => {
-                            const trimmed = raw.trim().replace(/[$,\s]/g, '');
-                            if (trimmed === '') {
-                              await handleSaveWorkOrderField('notToExceed', null);
-                              return;
-                            }
-                            const n = Number(trimmed);
-                            if (!Number.isFinite(n) || n < 0) {
-                              alert(t('workOrders.form.notToExceedInvalid'));
-                              throw new Error('invalid NTE');
-                            }
-                            await handleSaveWorkOrderField('notToExceed', n);
-                          }}
-                          disabled={frozen}
-                          placeholder={t('workOrders.form.notToExceedPlaceholder')}
-                          ariaLabel={t('workOrders.form.notToExceed')}
-                          renderDisplay={(v) => (v ? currencyFormatter.format(Number(v)) : '-')}
-                        />
-                      </DescriptionDetails>
-
-                      <DescriptionTerm>{getName('division')}</DescriptionTerm>
-                      <DescriptionDetails>
-                        <EditableField
-                          as="select"
-                          value={workOrder.divisionId ?? ''}
-                          options={[
-                            { value: '', label: t('workOrders.form.divisionPlaceholder') },
-                            ...((divisions ?? []).filter((d) => d.isActive).map((d) => ({ value: d.id, label: d.name }))),
-                          ]}
-                          onSave={(v) => handleSaveWorkOrderField('divisionId', v || null)}
-                          disabled={frozen}
-                          ariaLabel={getName('division')}
-                        />
-                      </DescriptionDetails>
-
-                      <DescriptionTerm>{t('workOrders.form.type')}</DescriptionTerm>
-                      <DescriptionDetails>
-                        <EditableField
-                          as="select"
-                          value={workOrder.workOrderTypeId ?? ''}
-                          options={[
-                            { value: '', label: t('workOrders.form.typePlaceholder') },
-                            ...((workOrderTypes ?? []).filter((wt) => wt.isActive).map((wt) => ({ value: wt.id, label: wt.name }))),
-                          ]}
-                          onSave={(v) => handleSaveWorkOrderField('workOrderTypeId', v || null)}
-                          disabled={frozen}
-                          ariaLabel={t('workOrders.form.type')}
-                        />
-                      </DescriptionDetails>
-
-                      {workOrder.completedDate && (
-                        <>
-                          <DescriptionTerm>{t('workOrders.detail.completed')}</DescriptionTerm>
-                          <DescriptionDetails><TimeAgo iso={workOrder.completedDate} /></DescriptionDetails>
-                        </>
-                      )}
-                    </DescriptionList>
-                  </div>
-                </Card>
+                <>
+                  {(workOrder.callbackOf || callbackEditing) && (
+                    <WorkOrderCallbackCard
+                      workOrder={workOrder}
+                      typeName={woType?.name ?? null}
+                      isCallbackType={isSeededCallbackType(woType)}
+                      frozen={frozen}
+                      editing={callbackEditing}
+                      onEditingChange={setCallbackEditing}
+                    />
+                  )}
+                  <WorkOrderCallbacksBackCard
+                    workOrderId={workOrder.id}
+                    callbacks={workOrder.callbacks ?? []}
+                    completedDate={workOrder.completedDate}
+                    statusPill={(c) => (
+                      <Pill tone={PROGRESS_PILL_TONE[c.progressCategory]} dot>
+                        {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[c.progressCategory]}`)}
+                      </Pill>
+                    )}
+                  />
+                </>
               }
             />
           )}
@@ -986,6 +925,8 @@ export default function WorkOrderDetailPage() {
               transitions={workflowTransitions}
               enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
               readOnly={frozen}
+              dispatches={dispatches}
+              customerId={workOrder.customer?.id}
               onDelete={handleDeleteWorkItem}
               onDuplicate={(wi) => duplicateWorkItemMutation.mutate(wi)}
               onSaveDescription={handleSaveWorkItemDescription}
@@ -993,8 +934,13 @@ export default function WorkOrderDetailPage() {
               onAttachEquipment={handleAttachEquipmentToWorkItem}
               onSetEquipmentNeeded={handleSetWorkItemEquipmentNeeded}
               onAddEquipment={handleAddEquipmentToWorkItem}
-              onSelectSubUnit={handleSelectSubUnit}
-              onAddSubUnit={handleAddSubUnit}
+              onOpenEquipment={handleSelectSubUnit}
+              onScheduleDispatch={(wi) => {
+                setEditingDispatch(null);
+                setScheduleWorkItemIds([wi.id]);
+                setAssignDispatchDialogOpen(true);
+              }}
+              onSelectDispatch={(d) => setSelectedDispatch(d)}
               focusWorkItemId={focusWorkItemId}
               tripsByWorkItem={wiTrips}
               openComposerSignal={composeWorkItemSignal}
@@ -1021,20 +967,11 @@ export default function WorkOrderDetailPage() {
           )}
 
           {tab === 'estimate' && (
-            <div className="flex flex-col gap-4">
-              <FinancialInvoicesTab
-                workOrderId={workOrder.id}
-                workOrderNumber={woDisplayNumber}
-                customerId={customer?.id ?? workOrder.customerId ?? ''}
-                customerName={customer?.name ?? ''}
-              />
-              <FinancialQuotesTab
-                workOrderId={workOrder.id}
-                workOrderNumber={woDisplayNumber}
-                customerId={customer?.id ?? workOrder.customerId ?? ''}
-                customerName={customer?.name ?? ''}
-              />
-            </div>
+            <WorkOrderBillingTab
+              workOrderId={workOrder.id}
+              workOrderNumber={woDisplayNumber}
+              customer={{ id: customer?.id ?? workOrder.customerId ?? '', name: customer?.name ?? '' }}
+            />
           )}
 
           {tab === 'purchasing' && (
@@ -1045,22 +982,9 @@ export default function WorkOrderDetailPage() {
             <WorkOrderFilesTab workOrderId={workOrder.id} dispatches={dispatches} readOnly={frozen} />
           )}
 
-          {tab === 'activity' && (
-            <Card>
-              <ActivityStream workOrderId={workOrder.id} />
-            </Card>
-          )}
+          {tab === 'activity' && <WorkOrderActivityTab workOrderId={workOrder.id} />}
         </div>
       </div>
-
-      {/* Activity drawer — page-level note/activity composer (N shortcut). Kept
-          alongside the Activity tab until the work_order notes endpoint lands
-          and the shared NotesCard fully replaces the composer. */}
-      <ActivityDrawer
-        open={activityDrawerOpen}
-        onClose={() => setActivityDrawerOpen(false)}
-        workOrderId={workOrder.id}
-      />
 
       {/* Dispatch detail drawer — row body click opens this with the
           dispatch's lifecycle audit + notification history. Edit handoff
@@ -1085,7 +1009,7 @@ export default function WorkOrderDetailPage() {
           if (!window.confirm(t('workOrders.dispatches.deleteConfirm'))) return;
           try {
             await dispatchesApi.delete(d.id);
-            queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+            invalidateDispatchConsumers(queryClient);
             queryClient.invalidateQueries({
               queryKey: ['work-order-activity', d.workOrderId],
             });
@@ -1108,16 +1032,28 @@ export default function WorkOrderDetailPage() {
       />
 
       <DispatchFormDrawer
-        open={assignDispatchDialogOpen}
+        open={assignDispatchDialogOpen && !frozen}
         onClose={() => {
           setAssignDispatchDialogOpen(false);
           setEditingDispatch(null);
+          setScheduleWorkItemIds(null);
+          if (searchParams.has('schedule'))
+            setSearchParams(
+              (prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('schedule');
+                return next;
+              },
+              { replace: true },
+            );
         }}
         workOrderId={workOrder.id}
         workItems={workOrder.workItems ?? []}
         locationName={location?.locationName}
         workOrderNumber={woDisplayNumber}
+        divisionId={workOrder.divisionId}
         dispatch={editingDispatch}
+        initialWorkItemIds={scheduleWorkItemIds}
       />
 
       {/* Equipment quickview drawer — slides in from the right when a
@@ -1139,6 +1075,7 @@ export default function WorkOrderDetailPage() {
       <EquipmentQuickViewDrawer
         initialEquipment={drawerEquipment}
         onClose={() => setDrawerEquipment(null)}
+        workOrderId={workOrder.id}
       />
     </AppLayout>
   );

@@ -24,6 +24,7 @@ import {
   auditApi,
   financialActivityApi,
   type ActivityCategory,
+  type FinancialActivityKind,
   type ListActivityParams,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -34,12 +35,12 @@ import {
   buildDays,
   isLongChange,
   type AuditChange,
+  type BaseRow,
   type AuditRowModel,
   type ChipId,
   type FinancialRow,
   type GetName,
   type GroupRow,
-  type Row,
   type SingleRow,
   type TFunc,
 } from '../lib/locationActivityRows';
@@ -60,15 +61,20 @@ const AUDIT_LIMIT = 500;
 // flips business BUSINESS→ALL and adds audit. Row view-model + ChipId live in
 // ../lib/locationActivityRows.
 
-// Business-feed chips map to one coarse server category; the financial/audit
-// chips pull their own streams instead.
-const CHIP_CATEGORY: Partial<Record<ChipId, ActivityCategory>> = {
-  job: 'STATUS',
-  visit: 'DISPATCH',
-  note: 'NOTE',
+// Business-feed chips map to server categories (a job is its own lifecycle plus
+// its work items); the financial/audit chips pull their own streams instead.
+const CHIP_CATEGORY: Partial<Record<ChipId, ActivityCategory[]>> = {
+  job: ['STATUS', 'WORK_ITEM'],
+  visit: ['DISPATCH'],
+  note: ['NOTE'],
 };
 const BUSINESS_CHIPS: ChipId[] = ['all', 'job', 'visit', 'note'];
 const FINANCIAL_CHIPS: ChipId[] = ['all', 'invoice', 'payment'];
+// The financial chips narrow its stream by kind on the server, so paging stays right.
+const CHIP_KINDS: Partial<Record<ChipId, FinancialActivityKind[]>> = {
+  invoice: ['QUOTE_SENT', 'QUOTE_VIEWED', 'QUOTE_ACCEPTED', 'QUOTE_DECLINED', 'QUOTE_CHOICE_CHANGED', 'QUOTE_DELETED', 'INVOICE_SENT', 'INVOICE_PAID', 'INVOICE_VOIDED'],
+  payment: ['PAYMENT_RECEIVED'],
+};
 
 // Scope-aware: the same merged feed powers the Location detail and the Customer
 // detail Activity tabs. Location scope adds the audit (field-edit) stream + the
@@ -104,9 +110,7 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
   // location scope (no customer-level audit stream).
   const auditActive = canViewAudit && isLocation && (chip === 'change' || (chip === 'all' && showChanges));
 
-  const businessCategory: ActivityCategory[] | undefined = CHIP_CATEGORY[chip]
-    ? [CHIP_CATEGORY[chip]!]
-    : undefined;
+  const businessCategory: ActivityCategory[] | undefined = CHIP_CATEGORY[chip];
   // The toggle flips the business stream BUSINESS→ALL (server brings in
   // status-change / note-delete CHANGE rows); BUSINESS hides that churn.
   const classification = showChanges ? 'ALL' : 'BUSINESS';
@@ -147,7 +151,7 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
     { id: 'all', label: t('serviceLocations.activity.filter.all') },
     { id: 'job', label: getName('work_order', true) },
     { id: 'visit', label: getName('dispatch', true) },
-    { id: 'invoice', label: getName('invoice', true) },
+    { id: 'invoice', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}` },
     { id: 'payment', label: getName('payment', true) },
     { id: 'note', label: t('serviceLocations.activity.filter.notes') },
     ...(canViewAudit && isLocation
@@ -191,9 +195,9 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
     isLoading: financialLoading,
     error: financialError,
   } = useInfiniteQuery({
-    queryKey: ['financial-activity', scope.type, scope.id],
+    queryKey: ['financial-activity', scope.type, scope.id, CHIP_KINDS[chip] ?? 'ALL'],
     queryFn: ({ pageParam }) => {
-      const params = { cursor: pageParam, limit: PAGE_SIZE };
+      const params = { cursor: pageParam, limit: PAGE_SIZE, kinds: CHIP_KINDS[chip] };
       return isLocation
         ? financialActivityApi.getForLocation(scope.id, params)
         : financialActivityApi.getForCustomer(scope.id, params);
@@ -245,11 +249,10 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
         events: businessActive ? events.filter((e) => tsMs(e.timestamp) >= boundaryMs) : [],
         financial: financialActive ? financialData.filter((f) => tsMs(f.timestamp) >= boundaryMs) : [],
         audit: auditActive ? auditData ?? [] : [],
-        chip,
         t,
         getName,
       }),
-    [businessActive, financialActive, auditActive, events, financialData, auditData, boundaryMs, chip, t, getName]
+    [businessActive, financialActive, auditActive, events, financialData, auditData, boundaryMs, t, getName]
   );
 
   // Combined infinite scroll across both cursor streams. On load-more, advance
@@ -422,7 +425,7 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
 
 // ── Rows ──────────────────────────────────────────────────────────
 
-function ActGlyph({ glyph, tone }: { glyph: string; tone: ActivityTone }) {
+export function ActGlyph({ glyph, tone }: { glyph: string; tone: ActivityTone }) {
   const s = ACTIVITY_TONE_STYLE[tone] ?? ACTIVITY_TONE_STYLE.neutral;
   return (
     <div
@@ -444,7 +447,7 @@ function ActGlyph({ glyph, tone }: { glyph: string; tone: ActivityTone }) {
   );
 }
 
-function ActorCell({ name, isPerson }: { name: string; isPerson: boolean }) {
+export function ActorCell({ name, isPerson }: { name: string; isPerson: boolean }) {
   const initials = name
     .split(' ')
     .map((p) => p[0])
@@ -503,12 +506,12 @@ function ActorCell({ name, isPerson }: { name: string; isPerson: boolean }) {
   );
 }
 
-function EventCell({
+export function EventCell({
   row,
   groupSuffix,
   muted,
 }: {
-  row: Row;
+  row: Pick<BaseRow, 'text' | 'obj' | 'objHref'>;
   groupSuffix?: React.ReactNode;
   // Audit/change rows render in a quieter tone so business events lead the feed.
   muted?: boolean;
@@ -562,7 +565,7 @@ function DeltaValue({ change }: { change: AuditChange }) {
   );
 }
 
-function ActivityRow({ row }: { row: SingleRow | AuditRowModel | FinancialRow }) {
+export function ActivityRow({ row }: { row: SingleRow | AuditRowModel | FinancialRow }) {
   if (row.kind === 'audit') return <AuditRow row={row} />;
   return (
     <div style={{ borderBottom: '1px solid var(--border-soft)' }}>
@@ -581,7 +584,7 @@ function ActivityRow({ row }: { row: SingleRow | AuditRowModel | FinancialRow })
 // Audit rows sit on a recessed surface with muted text so that, with "Show all
 // changes" on, business events still visually lead. A lone short field renders
 // its delta inline; a long field or several render indented below.
-function AuditRow({ row }: { row: AuditRowModel }) {
+export function AuditRow({ row }: { row: AuditRowModel }) {
   const [open, setOpen] = useState(false);
   const reverted = !!row.reverted;
   // A lone short field shows its delta inline; reverted pairs collapse to the

@@ -1,0 +1,569 @@
+// Dispatch board read — GET /scheduling/board
+//
+// The board's own read, separate from `dispatchesApi.getAll()` (the paged
+// tenant-wide dispatch list). Two reasons they don't share: the board is
+// day-bounded and unpaged (~300 rows), and it carries `techs[]` — rows exist
+// for technicians with no work, which a dispatch list can't express.
+//
+// The unscheduled rail is a SECOND endpoint, not part of this envelope: it
+// paginates and filters independently of the grid. See `getUnscheduled`.
+//
+// Contract per claude_designs/dispatch-board.md §2.2. Only
+// `/api/v1/scheduling*` reaches scheduling-service at the ALB, so every path
+// here lives under `/scheduling`.
+import apiClient from './client';
+import type { DispatchStatus } from './schedulingApi';
+import type { WorkOrderPriority } from './workOrderApi';
+
+// NOTE: there is deliberately no `location` on BoardTech. Nothing in the
+// platform captures technician position, so the field would be null for every
+// tech forever — and a type that promises data no producer writes is the same
+// lie as a fabricated default. The map's position-overlay design (handoff
+// §3.5) stands for whenever a producer exists; add the field then.
+
+// One absence span from an `availability` row with status = OFF, clipped
+// server-side to the requested day — so a week of PTO arrives as that day's
+// slice and the client never intersects anything.
+//
+// A LIST, not one object: nothing prevents two absences on the same day
+// (no uniqueness on (user, date) at the entity or the table, and the
+// availability API permits it). A dentist appointment at 9 plus leaving at 3
+// is one tech and two rows; collapsing them would render an arbitrary label
+// over an arbitrary span.
+export interface TechTimeOff {
+  startsAt: string;
+  endsAt: string;
+  // The LABELLING distinction, not a redundancy: all-day reads "Out —
+  // Vacation" while a span reads "Out 8:00–12:00".
+  //
+  // Also set defensively by the server when a row's stored times don't
+  // overlap the requested day at all — reachable while the entity still
+  // stores a bare duration rather than instants. A row exists, so the tech
+  // is off; rendering them available is the one error this board cannot
+  // afford to make permissively. The §0b reshape removes the ambiguity.
+  allDay: boolean;
+  label: string;
+}
+
+// A board row. NOT every user: the server filters to enabled AND
+// performsFieldWork (from tenant_roles.performs_field_work), so a CSR or
+// dispatcher who merely has dispatch regions is not a row. The flag itself is
+// not echoed — the filtering already happened.
+export interface BoardTech {
+  id: string;
+  name: string;
+  // M:N. FILTERING matches any of these, so narrowing to East Valley still
+  // finds the Phoenix tech who also covers it.
+  regionIds: string[];
+  // Booked stops today — the load bar's numerator. Server-computed over the
+  // whole day, NOT over whatever the exception chips currently show: counting
+  // the filtered set would shrink every bar the moment a chip is on.
+  //
+  // IN-SCOPE: responds to the active region and division narrowing, which is
+  // the whole reason anyone filters.
+  stopCount: number;
+  // TOTAL committed, including work outside the narrowing. The tech cell
+  // reports THIS, with the in-scope share solid and the remainder hatched —
+  // deriving load from in-scope work alone is a capacity lie in the one column
+  // a dispatcher scans: a tech whose whole day sits in another region prints
+  // 0/6 and reads as the most available person on the board.
+  committedCount: number;
+  // What kinds of work this person is good at taking on. A STRENGTH, never a
+  // qualification — empty means nothing stated, therefore matches every filter.
+  divisionIds: string[];
+  // Empty = available all day. Each span hatches its own slice of the lane
+  // and rejects drops there — a tech out all morning is still bookable in the
+  // afternoon, which is the whole point of spans over a boolean.
+  timeOff?: TechTimeOff[];
+}
+
+// Mirrors BoardDispatchResponse. Deliberately NOT `extends DispatchBoardRow`:
+// that projection carries notes/createdAt/updatedAt/workOrderTypeName, none of
+// which the board read sends, and inheriting them would be a type that lies
+// about the payload.
+//
+// Region NAMES are not in scheduling-service — it holds only the user↔region
+// link — so ids are joined to names client-side from
+// `dispatchRegionApi.getAll()` (GET /tenant/dispatch-regions).
+export interface BoardDispatch {
+  id: string;
+  seq: number;
+  status: DispatchStatus;
+  // The block geometry is the arrival WINDOW, never a start/end time.
+  arrivalWindowStart: string;
+  arrivalWindowEnd: string;
+  // Minutes. Nullable and defaulted nowhere — null renders as an outline with
+  // no fill, which is the honest "we promised a window, we don't know how long
+  // the work takes". Never substitute a default.
+  estimatedDuration: number | null;
+  // When the job was FIRST handed over. Not what drives hollow any more — a
+  // released-then-moved block still carries it. Use `releaseState`.
+  releasedAt: string | null;
+  // Whether the tech's copy matches the board. UNRELEASED and CHANGED both
+  // render hollow on purpose: either way the tech is working from an
+  // out-of-date copy and the next step is the same — release. A comparison on
+  // the server, not a flag set on edit, so dragging away and back (or Undo)
+  // returns it to RELEASED with no request from us.
+  releaseState: DispatchReleaseState;
+  // What the tech was last sent; null while UNRELEASED. After a reassignment
+  // `released.assignedUserId` is the PREVIOUS tech — which is how the drawer
+  // knows sending will tell them it's off their schedule.
+  released: ReleasedCopy | null;
+  // Present so the board can DIM work outside the active division filter
+  // rather than hide it. Division is a lens, not a permission: the dispatcher
+  // is entitled to that job and merely asked to look elsewhere, so redacting
+  // it would hide data from someone permitted to see it.
+  divisionId: string | null;
+  // Round-trips on PUT for stale-read protection; a mismatch is a 409.
+  version: number;
+  // When the arrival window last changed; null = never since create. The
+  // move confirm counts only customer notices sent after it.
+  windowChangedAt: string | null;
+  assignedUserId: string;
+  assignedUserName: string | null;
+  workOrderId: string;
+  workOrderNumber: string | null;
+  workOrderTypeId: string | null;
+  workOrderSummary: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  priority: WorkOrderPriority | null;
+  // Agreement-generated work; the board marks it with a recurrence glyph.
+  recurring: boolean;
+  serviceLocationId: string | null;
+  // The operative label: what the board actually routes TO. `Kroger Co.` on
+  // eleven cards is eleven different stores; `Store #4412` is the one you are
+  // going to. Rendered as `serviceLocationName || customerName`, the rule
+  // `ServiceLocationSearchResponse` states and `ServiceLocationPicker` already
+  // implements — many sites have no name (residential usually doesn't), and
+  // the customer is the right fallback, not a placeholder.
+  //
+  // Nullable, never padded: a site with no name is normal, not a failure.
+  serviceLocationName: string | null;
+  // `Street`, not `Address`: this is the name the value already ships under
+  // on WorkOrderSummaryResponse and the WorkOrder* events. One concept, one
+  // wire name.
+  //
+  // Null means the site has no street on file — NOT that a lookup failed. So
+  // it renders as absence: the line is composed from the parts that exist and
+  // nothing stands in for the ones that don't.
+  serviceLocationStreet: string | null;
+  serviceLocationCity: string | null;
+  serviceLocationState: string | null;
+  serviceLocationZip: string | null;
+  // Null when the site never geocoded. The map reports these via
+  // `dispatchesMissingCoordinates` rather than dropping the pins.
+  latitude: number | null;
+  longitude: number | null;
+  // Derived per read, never stored: every reschedule invalidates a route's
+  // legs. Null on the first stop, and null when either end lacks coordinates —
+  // the board suppresses the connector rather than inventing a number.
+  driveMinFromPrev: number | null;
+  arrivedAt: string | null;
+  departedAt: string | null;
+  addressedWorkItemIds: string[];
+}
+
+/** Three fields. No customer, no work order, no title, no address, no
+ *  coordinates, no status — the redaction is STRUCTURAL rather than a nulling
+ *  rule, so nothing can leak a field somebody forgot. */
+export interface BoardCommitment {
+  assignedUserId: string;
+  start: string;
+  end: string;
+}
+
+export type DispatchReleaseState = 'UNRELEASED' | 'RELEASED' | 'CHANGED';
+
+/** A tech's copy of a dispatch — what they were last sent. On a block it is
+ *  the drawer's "Maya still has 9–11a"; on a rail card it is a removal owed. */
+export interface ReleasedCopy {
+  dispatchId: string;
+  assignedUserId: string;
+  // Null when scheduling's user cache has no row for them yet.
+  assignedUserName: string | null;
+  arrivalWindowStart: string;
+  arrivalWindowEnd: string;
+  sentAt: string;
+}
+
+/** What the day's release would send, split the way the button labels it.
+ *  Computed from the same queries the release runs, so it is the number the
+ *  button acts on — render this rather than counting blocks: removals have
+ *  no block, and dimmed out-of-division work on a showing row is included. */
+export interface PendingRelease {
+  newCount: number;
+  // Includes reassignments.
+  changedCount: number;
+  // Released, then unscheduled or cancelled — still on the tech's phone.
+  removedCount: number;
+  total: number;
+  // Techs who get a message, for a confirm's "to 4 techs". A reassignment
+  // reaches two: the old tech's removal and the new one's assignment.
+  techCount: number;
+}
+
+export interface DispatchBoard {
+  // Echoed so a client can tell a stale response from a current one after a
+  // fast date change.
+  date: string;
+  // The tenant's IANA zone, which `date` was resolved in. The axis and the
+  // now-line are drawn in it — taking the zone from the browser instead puts
+  // every block in the wrong column for anyone outside the tenant's zone.
+  timeZone: string;
+  techs: BoardTech[];
+  dispatches: BoardDispatch[];
+  // Rows the division filter withheld. A filter that silently removes a
+  // technician who is free has taken an option away — so the board says how
+  // many and offers them back. Revealing them is a RE-REQUEST (refetch with no
+  // division filter), not a hidden payload: shipping them on every board would
+  // make every board pay for rows nobody asked to see.
+  techsHiddenByDivisionFilter: number;
+  // Work outside the REGION scope, redacted to three fields. Not customer
+  // data — an availability fact about a technician the dispatcher already sees
+  // as a row, exactly what a calendar free/busy lookup returns across
+  // organisational boundaries.
+  //
+  // Region only. Division never redacts (see `BoardDispatch.divisionId`).
+  commitments: BoardCommitment[];
+  // How many of the day's dispatches sit at a location with no coordinates.
+  // The map has to say "3 jobs have no location" rather than silently
+  // dropping those pins.
+  dispatchesMissingCoordinates: number;
+  // Load-bar denominator, from scheduling-service config
+  // (`app.dispatch.default-stops-per-day`). Absent = render the stop count
+  // with NO bar. The board's own rule is that a load bar needs a real
+  // denominator or it is decoration, and this number has already drifted
+  // twice against a hardcoded copy. Deliberately no client fallback.
+  defaultStopsPerDay?: number;
+  pendingRelease: PendingRelease;
+  // The day's scheduled releases, every dispatcher's, earliest first.
+  // Cancelled ones are left out. Listed for the DATE, not the view's scope, so
+  // a record set from another filter shows here too and has to say its scope.
+  scheduledReleases: ScheduledRelease[];
+}
+
+// SENDING is mid-run; FAILED and MISSED (the day ended first) never retry,
+// because a retry after a partial send would text the same techs again.
+export type ScheduledReleaseStatus = 'SCHEDULED' | 'SENDING' | 'SENT' | 'FAILED' | 'MISSED';
+
+/** A bulk release set to run later. A timer on the Release button, not a
+ *  snapshot: it sends whatever is pending when it runs, in the scope it was
+ *  set from. */
+export interface ScheduledRelease {
+  id: string;
+  date: string;
+  releaseAt: string;
+  status: ScheduledReleaseStatus;
+  // Due and nothing went out: still waiting or stuck mid-send past its time,
+  // FAILED, or MISSED. The dispatcher's Release is the recovery, and it is
+  // safe — a run that goes out afterwards finds nothing left to send.
+  overdue: boolean;
+  // Null = every region. Stored at scheduling time, resolved against the
+  // caller's own regions.
+  regionIds: string[] | null;
+  divisionIds: string[];
+  createdByUserId: string | null;
+  createdByName: string | null;
+  // Set once SENT. Later than `releaseAt` when the service was down.
+  sentAt: string | null;
+  newCount: number | null;
+  changedCount: number | null;
+  removedCount: number | null;
+  // Set once SENT. MANUAL = it was overdue and someone released it by hand
+  // (or a board release covered it); the pill can't credit the schedule.
+  sentBy: 'SCHEDULE' | 'MANUAL' | null;
+  // Only when overdue: what `releaseScheduled` would send now, counted for
+  // the RECORD's stored scope — not the view's. The strip's count and its
+  // confirm read this, never the board's `pendingRelease`.
+  pendingRelease: PendingRelease | null;
+  // Only when overdue. False = the caller holds only some of the record's
+  // regions: releasing sends their part, and the strip stays for the rest.
+  callerCoversScope: boolean | null;
+}
+
+export interface ScheduleReleaseRequest {
+  date: string;
+  // An instant, built from the dispatcher's wall-clock pick in the BOARD's
+  // zone. After now, and before `date` ends; the evening before is allowed.
+  releaseAt: string;
+  regionIds?: string[];
+  divisionIds?: string[];
+}
+
+// ── Week ────────────────────────────────────────────────────────────
+// A different READ, not a different spine. Seven days of a 60-tech shop is
+// ~2,000 dispatches and the week grid renders none of them individually, so
+// the server aggregates to one cell per tech per day rather than the client
+// calling the day read seven times.
+
+/** One tech, one day. Deliberately NOT booked hours: no labor estimate exists
+ *  anywhere in the platform, which is the same reason the day board's load bar
+ *  counts stops. */
+export interface BoardWeekCell {
+  date: string;
+  // Excludes cancelled and no-show — work the tech will not drive to.
+  //
+  // In-scope, so the week responds to the filter. Deliberately NOT redefined
+  // as committed: a week that ignores the active filter is a different bug.
+  stopCount: number;
+  committedCount: number;
+  // Deliberately still IN-SCOPE, unlike the counts: saying a redacted
+  // commitment is urgent would disclose a priority the caller is not entitled
+  // to. A count of occupied slots discloses nothing about the other region's
+  // customer, which is why committedCount is safe and this is not.
+  hasUrgent: boolean;
+  // Any dispatch that day still on deck. At week scale this is the "which
+  // days still have unhanded-over work" glance, which is the whole reason a
+  // dispatcher opens the week while staging.
+  hasUnreleased: boolean;
+  // Time off overlapping this day. Per CELL, not per row — a tech can be out
+  // Thursday and working Friday. True whenever `timeOff` is non-empty.
+  off: boolean;
+  // The absences behind `off`, clipped to this day — the day read's shape.
+  // An `allDay` span makes the cell undroppable; a part-day span leaves it
+  // droppable and refuses only a window that overlaps it. A multi-day absence
+  // is `allDay` on the days it covers end to end and a partial slice on its
+  // first and last days.
+  timeOff: TechTimeOff[];
+}
+
+export interface BoardWeekTech {
+  id: string;
+  name: string;
+  regionIds: string[];
+  divisionIds: string[];
+  // Always one entry per day in `days`, zero-filled, so the grid renders
+  // without gap-handling. A tech with no work all week is still a row.
+  cells: BoardWeekCell[];
+}
+
+export interface BoardWeek {
+  techsHiddenByDivisionFilter: number;
+  weekStart: string;
+  // Exclusive — the same half-open convention as the day read.
+  weekEnd: string;
+  timeZone: string;
+  // The seven dates, in order. Rendered from the SERVER's idea of the week
+  // rather than recomputed, so a week containing a DST change still has
+  // exactly seven columns and the two sides cannot disagree.
+  days: string[];
+  defaultStopsPerDay?: number;
+  techs: BoardWeekTech[];
+  // What Release would send for each day, one entry per day, zero-filled.
+  // Each equals the day board's `pendingRelease` for that date and scope, and
+  // releasing one is the day endpoint with that date. There is deliberately
+  // no week-wide release: it would text Monday about Friday's jobs, and every
+  // later move of those becomes another text.
+  pendingReleaseByDay: BoardWeekDayPending[];
+}
+
+export interface BoardWeekDayPending {
+  date: string;
+  pendingRelease: PendingRelease;
+}
+
+export interface GetWeekParams {
+  // Any date in the week; the server resolves the week it belongs to in the
+  // TENANT's timezone and echoes the days it used.
+  weekStart: string;
+  regionIds?: string[];
+  divisionIds?: string[];
+}
+
+export interface GetBoardParams {
+  // Local calendar date (YYYY-MM-DD), resolved to an instant range server-side
+  // in the TENANT's timezone — not the browser's and not the server's.
+  date: string;
+  // Narrows within what the server already allows. Scope is enforced
+  // server-side from the caller's own regions; this only ever subtracts.
+  regionIds?: string[];
+  // Filters the WORK, not the rows: division is a property of a work order and
+  // never of a technician, so this empties blocks while every row stays in
+  // place. That is correct, and at 60 rows it looks broken — which is what the
+  // hide-empty toggle is for.
+  divisionIds?: string[];
+}
+
+// One rail card per WORK ORDER, not per work item: a WO with three items may
+// need two visits, and which items a visit covers is the composer's decision.
+export interface UnscheduledWorkOrder {
+  // `workOrderId`, NOT `id` — the row is a work order, not a dispatch.
+  workOrderId: string;
+  workOrderNumber: string;
+  workOrderSummary: string | null;
+  workOrderTypeId: string | null;
+  customerId: string;
+  customerName: string;
+  serviceLocationId: string;
+  // The operative label: what the board actually routes TO. `Kroger Co.` on
+  // eleven cards is eleven different stores; `Store #4412` is the one you are
+  // going to. Rendered as `serviceLocationName || customerName`, the rule
+  // `ServiceLocationSearchResponse` states and `ServiceLocationPicker` already
+  // implements — many sites have no name (residential usually doesn't), and
+  // the customer is the right fallback, not a placeholder.
+  //
+  // Nullable, never padded: a site with no name is normal, not a failure.
+  serviceLocationName: string | null;
+  // Nullable here while city/state are not: a cached site always has the
+  // latter two, and may legitimately have neither street nor zip.
+  serviceLocationStreet: string | null;
+  serviceLocationCity: string;
+  serviceLocationState: string;
+  serviceLocationZip: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  priority: WorkOrderPriority;
+  // Correct at creation and then stale until the order is next updated —
+  // work-order-service publishes no event for item add/remove. The same
+  // caveat applies to `workOrderSummary`, derived from the items.
+  itemCount: number;
+  recurring: boolean;
+  // The card renders both, and the division filter applies to the rail as
+  // well as the grid. Ids only — names are joined client-side.
+  dispatchRegionId: string | null;
+  divisionId: string | null;
+  // The rail sorts on priority, then age from here.
+  createdAt: string;
+  // Visits of this order that were released and then unscheduled or
+  // cancelled, whose tech hasn't been told yet — "Still on Maya's schedule ·
+  // not sent". Usually empty. Clears when the removal goes out, by the day's
+  // release or `POST /scheduling/dispatches/{dispatchId}/release`.
+  stillWithTechs?: ReleasedCopy[];
+}
+
+export interface UnscheduledPage {
+  content: UnscheduledWorkOrder[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+export interface GetUnscheduledParams {
+  regionIds?: string[];
+  divisionIds?: string[];
+  q?: string;
+  page?: number;
+  size?: number;
+}
+
+/** One local day: visits booked (cancelled / no-show excluded), how many the
+ * tech has arrived at, and how many of those arrived by the window's end
+ * (early counts as on time). */
+export interface BoardSummaryDay {
+  date: string; // ISO date yyyy-MM-dd
+  jobCount: number;
+  arrivedCount: number;
+  onTimeCount: number;
+}
+
+/** Home dashboard scheduling trends, in the caller's region scope. `days` is the
+ * last 14 local days, oldest first, zero-filled: `days[13]` is today and
+ * `days[6]` the same weekday last week. `arrivalWindow` rolls up the last 7
+ * days; `onTimeRate` is 0–1, null when nothing has an arrival. Today's live
+ * counts come from the day board, not here. */
+export interface BoardSummary {
+  asOf: string;
+  timeZone: string;
+  days: BoardSummaryDay[];
+  arrivalWindow: {
+    arrivedCount: number;
+    onTimeCount: number;
+    onTimeRate: number | null;
+  };
+}
+
+export interface ReleaseRequest {
+  date: string;
+  regionIds?: string[];
+  // The board's division filter, sent exactly as the board read used it: the
+  // release hands a tech their day, so it narrows ROWS the way the read does.
+  divisionIds?: string[];
+}
+
+export interface ReleaseResponse {
+  released: number;
+  newCount: number;
+  changedCount: number;
+  removedCount: number;
+}
+
+export const dispatchBoardApi = {
+  // The grid read. Day-bounded and unpaged by design — a tenant-day is ~300
+  // rows, and paging a timeline would mean paging techs, which breaks the
+  // "every tech has a row" premise.
+  getBoard: async (params: GetBoardParams): Promise<DispatchBoard> => {
+    const response = await apiClient.get<DispatchBoard>('/scheduling/board', { params });
+    return response.data;
+  },
+
+  // The week read. A separate endpoint rather than seven day reads: the
+  // aggregate is ~420 cells where the rows would be ~2,000 dispatches, and
+  // the grouping happens in one query instead of in the client.
+  getWeek: async (params: GetWeekParams): Promise<BoardWeek> => {
+    const response = await apiClient.get<BoardWeek>('/scheduling/board/week', { params });
+    return response.data;
+  },
+
+  // Home dashboard trends. Omitting regionIds means all of the caller's regions
+  // (the whole company for a caller with none assigned).
+  getSummary: async (params: { regionIds?: string[] } = {}): Promise<BoardSummary> => {
+    const response = await apiClient.get<BoardSummary>('/scheduling/board/summary', { params });
+    return response.data;
+  },
+
+  // The rail read. Paged separately from the grid so scrolling the inbox
+  // never refetches the board.
+  getUnscheduled: async (params: GetUnscheduledParams = {}): Promise<UnscheduledPage> => {
+    const { page = 0, size = 50, ...rest } = params;
+    const response = await apiClient.get<UnscheduledPage>('/scheduling/board/unscheduled', {
+      params: { ...rest, page, size },
+    });
+    return response.data;
+  },
+
+  // Bulk release takes a SCOPE, not an id list: an id list would let a client
+  // release dispatches outside its own regions, and scope is a permission.
+  // The server recomputes what is owed — new work, changes and removals — so
+  // the button can't act on a stale board either.
+  release: async (request: ReleaseRequest): Promise<ReleaseResponse> => {
+    const response = await apiClient.post<ReleaseResponse>(
+      '/scheduling/dispatches/release',
+      request,
+    );
+    return response.data;
+  },
+
+  // Scheduling again for the same date REPLACES the caller's pending one, so
+  // "move it to 6:30" is this same call. Other dispatchers' are separate.
+  scheduleRelease: async (request: ScheduleReleaseRequest): Promise<ScheduledRelease> => {
+    const response = await apiClient.post<ScheduledRelease>(
+      '/scheduling/scheduled-releases',
+      request,
+    );
+    return response.data;
+  },
+
+  // The overdue strip's Release now: sends the record's OWN stored scope and
+  // marks it SENT (sentBy MANUAL). 409 SCHEDULED_RELEASE_NOT_RELEASABLE when it
+  // was already sent or cancelled, or the job is sending it right now.
+  releaseScheduled: async (id: string): Promise<ScheduledRelease> => {
+    const response = await apiClient.post<ScheduledRelease>(
+      `/scheduling/scheduled-releases/${id}/release`,
+    );
+    return response.data;
+  },
+
+  // Anyone may cancel a pending one. 409 SCHEDULED_RELEASE_NOT_CANCELLABLE
+  // once it has started sending.
+  cancelScheduledRelease: async (id: string): Promise<void> => {
+    await apiClient.delete(`/scheduling/scheduled-releases/${id}`);
+  },
+};
+
+export type { DispatchStatus };
+
+export default dispatchBoardApi;

@@ -18,7 +18,8 @@ import { Card, CardBody } from '../components/ui/Card';
 import { TagPill } from '../components/ui/TagPill';
 import { TagList } from '../components/ui/TagList';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
-import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -27,6 +28,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PayerMark } from '../components/customer-detail/shared';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 // Payers list — the bookkeeper triage surface for BILLING_ONLY customers
 // ("find who owes"). Default sort is outstanding,desc (server-side; we just omit
@@ -63,20 +65,13 @@ const moneyK = (n: number) =>
 const DEFAULT_SORT: SortState = { key: 'outstanding', dir: 'desc' };
 // Columns that read best most-first (amounts, counts, dates) default to desc on
 // first click; text columns (name, terms) default to asc.
-const DESC_FIRST = new Set(['outstanding', 'aged91', 'openInvoices', 'lifetimePaid', 'lastPayment', 'createdAt']);
-
-function parseSort(raw: string | null): SortState {
-  if (raw) {
-    const [key, dir] = raw.split(',');
-    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
-  }
-  return DEFAULT_SORT;
-}
+const DESC_FIRST = ['outstanding', 'aged91', 'openInvoices', 'lifetimePaid', 'lastPayment', 'createdAt'];
 
 export default function PayersPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
   const [searchParams, setSearchParams] = useSearchParams();
   // Payers are customers — gate the Add button on the customer capability.
   const canAddPayers = useHasCapability('ADD_CUSTOMERS');
@@ -89,8 +84,7 @@ export default function PayersPage() {
   // serializes to comma-separated `?tags=` on the wire. getAll() returns a fresh
   // array each call, so memoize to keep the query key stable across renders.
   const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
-  const sortParam = searchParams.get('sort');
-  const currentSort = parseSort(sortParam);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({ defaultSort: DEFAULT_SORT, descFirst: DESC_FIRST });
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
     setSearchQuery(urlSearch);
@@ -126,24 +120,6 @@ export default function PayersPage() {
     else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
-  };
-
-  // Toggle dir when re-clicking the active column, else the column's default
-  // dir. Writing the default (outstanding,desc) back into the URL is harmless —
-  // it equals the implicit default the BE applies when the param is absent.
-  const onSort = (key: string) => {
-    const dir: SortDir =
-      key === currentSort.key
-        ? currentSort.dir === 'asc'
-          ? 'desc'
-          : 'asc'
-        : DESC_FIRST.has(key)
-          ? 'desc'
-          : 'asc';
-    const next = new URLSearchParams(searchParams);
-    next.set('sort', `${key},${dir}`);
-    next.delete('page');
-    setSearchParams(next, { replace: false });
   };
 
   // Tag list for the "type" filter picker. Tenant-wide tag set (same source as
@@ -203,7 +179,7 @@ export default function PayersPage() {
         <PageHead
           eyebrow={
             <EntityToggle
-              ariaLabel={t('customers.entityToggleAria')}
+              ariaLabel={t('customers.entityToggleAria', names)}
               items={[
                 { label: getName('customer', true), to: '/customers' },
                 { label: getName('payer', true), to: '/payers' },
@@ -224,7 +200,7 @@ export default function PayersPage() {
         <ListToolbar
           search={
             <ListSearch
-              placeholder={t('payers.search.placeholder')}
+              placeholder={t('payers.search.placeholder', names)}
               value={searchQuery}
               onChange={(value) => {
                 setSearchQuery(value);
@@ -310,7 +286,7 @@ export default function PayersPage() {
                         <SortHeader sortKey="outstanding" label={t('payers.table.outstanding')} current={currentSort} onSort={onSort} align="right" />
                         <SortHeader sortKey="openInvoices" label={t('payers.table.openInvoices')} current={currentSort} onSort={onSort} align="right" />
                         <SortHeader sortKey="lifetimePaid" label={t('payers.table.lifetimePaid')} current={currentSort} onSort={onSort} align="right" />
-                        <SortHeader sortKey="lastPayment" label={t('payers.table.lastPayment')} current={currentSort} onSort={onSort} />
+                        <SortHeader sortKey="lastPayment" label={t('payers.table.lastPayment', names)} current={currentSort} onSort={onSort} />
                         <th>{t('payers.table.tags')}</th>
                       </tr>
                     </DenseTHead>
@@ -380,7 +356,7 @@ export default function PayersPage() {
                               {p.lastPaymentAt ? (
                                 <CellStack>
                                   <CellTop>
-                                    <span className="dt-inline-label">{t('payers.table.lastPayment')}: </span>
+                                    <span className="dt-inline-label">{t('payers.table.lastPayment', names)}: </span>
                                     {formatTimestamp(p.lastPaymentAt)}
                                   </CellTop>
                                   {p.lastPaymentAmount != null && (

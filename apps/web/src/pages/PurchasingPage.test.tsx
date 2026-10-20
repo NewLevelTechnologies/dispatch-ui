@@ -52,7 +52,9 @@ describe('PurchasingPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Unique values so the header openCount/committedCost don't collide with row data.
-    mockSummary.mockResolvedValue({ openCount: 7, committedCost: 1592.26 });
+    mockSummary.mockImplementation((params: { overdue?: boolean } = {}) =>
+      Promise.resolve(params.overdue ? { openCount: 2, committedCost: 0 } : { openCount: 7, committedCost: 1592.26 }),
+    );
   });
 
   it('renders POs with number, type, vendor, status, cost, WO#/site + creator', async () => {
@@ -88,6 +90,18 @@ describe('PurchasingPage', () => {
 
     await user.click(await screen.findByText('PO-00001'));
     expect(await screen.findByText('PO detail page')).toBeInTheDocument();
+  });
+
+  it('sends no sort by default, then the column key when a header is clicked', async () => {
+    const user = userEvent.setup();
+    mockList.mockResolvedValue(page([po()]));
+    render();
+    await screen.findByText('PO-00001');
+    expect(mockList.mock.calls[0][0].sort).toBeUndefined();
+
+    await user.click(screen.getByRole('button', { name: /sort by cost/i }));
+
+    await waitFor(() => expect(mockList.mock.calls.some((c) => c[0]?.sort === 'totalCost,desc')).toBe(true));
   });
 
   it('clears an applied status filter via the chip ×', async () => {
@@ -139,5 +153,14 @@ describe('PurchasingPage', () => {
     await user.type(screen.getByPlaceholderText(/Search PO#/i), 'PO-000');
 
     await waitFor(() => expect(mockList.mock.calls.some((c) => c[0]?.q === 'PO-000')).toBe(true));
+  });
+
+  it('reads ?overdue=true (the home dashboard link) into the list and summary', async () => {
+    mockList.mockResolvedValue(page([po()]));
+    renderWithProviders(<div />, { routes, initialPath: '/purchasing?overdue=true' });
+
+    await screen.findByText('PO-00001');
+    expect(mockList.mock.calls.some((c) => c[0]?.overdue === true)).toBe(true);
+    expect(mockSummary.mock.calls.some((c) => c[0]?.overdue === true && c[0]?.status === undefined)).toBe(true);
   });
 });

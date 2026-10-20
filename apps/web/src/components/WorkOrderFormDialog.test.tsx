@@ -366,9 +366,73 @@ describe('WorkOrderFormDialog', () => {
       expect(patchCall).not.toHaveProperty('status');
       expect(patchCall).not.toHaveProperty('description');
       expect(patchCall).not.toHaveProperty('internalNotes');
+      // An untouched not-to-exceed is left alone.
+      expect(patchCall).not.toHaveProperty('notToExceed');
 
       // Dialog should close
       expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    describe('not-to-exceed', () => {
+      const wo = {
+        id: '1',
+        customer: { id: 'customer-1', name: 'John Doe' },
+        serviceLocation: {
+          id: 'location-1',
+          customerId: 'customer-1',
+          locationName: "John's House",
+          address: { streetAddress: '123 Main St', city: 'Atlanta', state: 'GA', zipCode: '30301' },
+        },
+        lifecycleState: 'ACTIVE' as const,
+        progressCategory: 'NOT_STARTED' as const,
+        priority: 'NORMAL' as const,
+        workItemCount: 0,
+        workItems: [],
+        createdAt: '2024-03-10T10:00:00Z',
+        updatedAt: '2024-03-10T10:00:00Z',
+      };
+      const open = (notToExceed: number | null) => {
+        const detail = { ...wo, notToExceed };
+        vi.mocked(apiClient.get).mockImplementation((url) =>
+          Promise.resolve({ data: url === '/work-orders/1' ? detail : mockServiceLocations }),
+        );
+        vi.mocked(apiClient.patch).mockResolvedValue({ data: detail });
+        renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={detail} />);
+      };
+
+      it('sets a limit', async () => {
+        const user = userEvent.setup();
+        open(null);
+        const input = screen.getByLabelText('Not-to-exceed ($)');
+        expect(input).toHaveAttribute('placeholder', 'No limit');
+        await user.type(input, '2,500');
+        await user.click(screen.getByRole('button', { name: /update/i }));
+        await waitFor(() =>
+          expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({ notToExceed: 2500 })),
+        );
+      });
+
+      it('clearing it removes the limit', async () => {
+        const user = userEvent.setup();
+        open(1500);
+        const input = await screen.findByDisplayValue('1500');
+        await user.clear(input);
+        await user.click(screen.getByRole('button', { name: /update/i }));
+        await waitFor(() =>
+          expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({ notToExceed: null })),
+        );
+      });
+
+      it('rejects zero', async () => {
+        const user = userEvent.setup();
+        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        open(null);
+        await user.type(screen.getByLabelText('Not-to-exceed ($)'), '0');
+        await user.click(screen.getByRole('button', { name: /update/i }));
+        expect(alertSpy).toHaveBeenCalledWith('Not-to-exceed must be a positive amount.');
+        expect(apiClient.patch).not.toHaveBeenCalled();
+        alertSpy.mockRestore();
+      });
     });
 
     it('displays error when create fails', async () => {

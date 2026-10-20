@@ -1,0 +1,226 @@
+/* Proposal builder (Proposal Builder.html): option cards the customer chooses
+   between, the add-ons table, and the right rail. Unlayered like the other
+   component CSS, so sizes here hold on bare <input>/<button> elements. */
+
+.pb-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (min-width: 1100px) { .pb-grid { grid-template-columns: minmax(0, 1fr) 290px; } }
+.pb-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; container-type: inline-size; }
+.pb-rail { display: flex; flex-direction: column; gap: 14px; }
+@media (min-width: 1100px) { .pb-rail { position: sticky; top: 12px; } }
+
+/* Options side by side, as many columns as options up to four, then they wrap
+   (no cap on how many). Narrow, they stack. */
+.pb-opts { display: grid; gap: 10px; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }
+@container (max-width: 640px) { .pb-opts { grid-template-columns: minmax(0, 1fr); } }
+
+.pb-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.pb-opt--popular {
+  border-color: color-mix(in oklch, var(--accent-500) 55%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--accent-500) 30%, transparent);
+}
+.pb-opt--chosen { border-color: var(--success-500); box-shadow: 0 0 0 1px var(--success-500); }
+.pb-opt--declined { opacity: 0.62; }
+
+.pb-optnum {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.pb-optname { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; color: var(--fg-strong); }
+.pb-tagline { font-size: 12px; color: var(--fg-muted); }
+
+/* Text that edits in place: reads as text until hovered or focused. */
+.pb-inline {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: -1px -4px;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-family: inherit;
+  outline: none;
+}
+.pb-inline:hover { background: var(--bg-hover); }
+.pb-inline:focus { background: var(--bg-elev); box-shadow: 0 0 0 1px var(--border-strong); }
+.pb-inline::placeholder { color: var(--fg-muted); }
+
+.pb-pop {
+  align-self: flex-start;
+  padding: 2px 7px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pb-pop--on {
+  border: 1px solid transparent;
+  background: color-mix(in oklch, var(--accent-500) 14%, transparent);
+  color: var(--fg-accent);
+}
+.pb-pop:disabled { cursor: default; }
+
+/* Pricebook search: a read-only input that opens the add-line panel. */
+.pb-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: text;
+}
+.pb-search:hover { border-color: var(--border-strong); }
+.pb-search:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent-500) 40%, transparent); }
+.pb-kbd {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-elev-2);
+  color: var(--fg-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  line-height: 16px;
+}
+
+.pb-sysmeta { display: flex; flex-direction: column; gap: 4px; padding: 0 0 6px; border-bottom: 1px solid var(--border-soft); }
+.pb-sysmeta-row { font-size: 10.5px; color: var(--fg-muted); }
+.pb-sysmeta-edit { border: 0; padding: 0; background: transparent; font-size: 10.5px; font-weight: 600; color: var(--fg-accent); cursor: pointer; }
+.pb-sysmeta-edit:hover { text-decoration: underline; }
+
+.pb-spec {
+  padding: 2px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.pb-lines { display: flex; flex-direction: column; margin-top: 2px; border-top: 1px solid var(--border-soft); }
+.pb-lines--flat { margin-top: 0; border-top: 0; }
+.pb-line {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.pb-line-name { font-size: 12px; font-weight: 500; line-height: 1.35; color: var(--fg-strong); overflow-wrap: anywhere; }
+.pb-line-sub { font-size: 10.5px; color: var(--fg-muted); }
+.pb-line-amt { font-size: 12.5px; color: var(--fg-strong); white-space: nowrap; text-align: right; }
+
+/* The system line, edit or read-only: [thumbnail] [name, sub, specs, meta] [amount].
+   After .pb-line so its columns win; the thumbnail always renders, dashed when there is no photo. */
+.pb-line--system { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 9px; align-items: start; }
+.pb-thumb { display: block; width: 44px; height: 44px; max-width: none; border: 1px solid var(--border-soft); border-radius: 6px; background: #fff; object-fit: cover; }
+.pb-thumb--empty { border-style: dashed; border-color: var(--border-strong); background: transparent; }
+.pb-line--system .pb-sysmeta { padding: 5px 0 0; border-bottom: 0; }
+.pb-line-x,
+.pb-row-x {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.pb-line-x { position: absolute; right: -4px; bottom: 3px; opacity: 0; }
+.pb-line:hover .pb-line-x,
+.pb-line-x:focus-visible { opacity: 1; }
+@media (hover: none) { .pb-line-x { opacity: 0.6; } }
+.pb-line-x:hover,
+.pb-row-x:hover { background: var(--bg-hover); color: var(--fg-strong); }
+
+.pb-opt-foot { display: flex; flex-direction: column; gap: 5px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border); }
+.pb-kv { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--fg-muted); }
+.pb-kv > span:last-child { color: var(--fg-strong); }
+.pb-kv--strong { font-weight: 600; }
+.pb-kv--strong > span:last-child { font-size: 14px; font-weight: 700; }
+.pb-kv--saving > span:last-child { color: var(--success-500); }
+.pb-warn { font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--warning-fg); }
+.pb-costnote { font-size: 10.5px; color: var(--fg-muted); }
+.pb-hint { margin-left: 4px; font-size: 10.5px; font-weight: 400; color: var(--fg-muted); text-transform: none; letter-spacing: 0; }
+
+.pb-money {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elev);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.pb-money input { width: 56px; border: 0; background: transparent; text-align: right; font-size: 12px; font-family: inherit; color: var(--fg-strong); outline: none; }
+
+/* Add-ons table: one column per option. */
+.pb-addons th.center,
+.pb-addons td.center { text-align: center; }
+.pb-mode {
+  box-sizing: border-box;
+  min-width: 70px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+.pb-mode:disabled { cursor: default; }
+.pb-mode--offer { border: 1px solid var(--border); background: var(--bg-elev-2); color: var(--fg); }
+.pb-mode--included {
+  border: 1px solid transparent;
+  background: color-mix(in oklch, var(--success-500) 12%, transparent);
+  color: var(--success-500);
+}
+.pb-mode--hidden { border: 1px dashed var(--border); background: transparent; color: var(--fg-muted); }
+.pb-noterow td { background: var(--bg-elev-2); }
+.pb-note { display: flex; flex-direction: column; gap: 5px; }
+.pb-note-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-muted); }
+
+.pb-rail-opt { padding: 10px 14px; border-bottom: 1px solid var(--border-soft); }
+.pb-signature { max-width: 100%; height: 72px; object-fit: contain; object-position: left center; border-bottom: 1px solid var(--border); background: #fff; }
+.pb-events { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.pb-events li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; font-size: 12px; color: var(--fg); }
+.pb-events li > span:first-child { font-size: 11px; color: var(--fg-muted); }
+.pb-srow { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border-soft); }
+.pb-srow:last-child { border-bottom: 0; }
+.pb-srow--wrap { align-items: flex-start; }
+.pb-srow-amt { min-width: 64px; font-size: 13px; font-weight: 600; text-align: right; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.pb-srow-amt--on { color: var(--success-500); }

@@ -1,7 +1,12 @@
 import apiClient from './client';
 import type { ProgressCategory } from './workOrderApi';
 
-export type ActivityCategory = 'DISPATCH' | 'STATUS' | 'NOTE' | 'FINANCIAL';
+/**
+ * `STATUS` is the work order's own lifecycle (created, completed, cancelled,
+ * callback links); work item rows are `WORK_ITEM`. Quotes, invoices, payments
+ * and purchase orders come from their own services' streams, not this feed.
+ */
+export type ActivityCategory = 'DISPATCH' | 'STATUS' | 'WORK_ITEM' | 'NOTE';
 
 /**
  * Server-assigned split between meaningful business events and field-level
@@ -22,24 +27,65 @@ export type ActivityKind =
   | 'WORK_ITEM_STATUS_CHANGED'
   | 'WORK_ITEM_DELETED'
   | 'DISPATCH_ASSIGNED'
+  | 'DISPATCH_EN_ROUTE'
   | 'DISPATCH_DEPARTED'
   | 'DISPATCH_ARRIVED'
   | 'DISPATCH_CHECKED_OUT'
   | 'DISPATCH_CANCELLED'
   | 'DISPATCH_NO_SHOW'
+  | 'DISPATCH_RESCHEDULED'
+  | 'DISPATCH_REASSIGNED'
+  | 'FILES_UPLOADED'
   | 'NOTE_ADDED'
   | 'NOTE_DELETED'
   | 'QUOTE_SENT'
+  | 'QUOTE_VIEWED'
   | 'QUOTE_ACCEPTED'
   | 'QUOTE_DECLINED'
+  /** The customer browsing a proposal: one entry per stretch of clicking (`data.path`, `added`, `removed`, `totalAmount`). */
+  | 'QUOTE_CHOICE_CHANGED'
+  /** Below the margin floor: asked, approved, rejected (`data`: revision, note or reason, lowestMargin, floor). */
+  | 'QUOTE_PRICE_APPROVAL_REQUESTED'
+  | 'QUOTE_PRICE_APPROVED'
+  | 'QUOTE_PRICE_REJECTED'
+  /** Signed with "join" on (`data.planId`, `planName`): the office sets the agreement up. */
+  | 'QUOTE_MEMBERSHIP_SIGNUP'
+  /** A never-sent draft deleted; its subject no longer loads, so it renders unlinked. */
+  | 'QUOTE_DELETED'
   | 'INVOICE_ISSUED'
+  | 'INVOICE_SENT'
   | 'INVOICE_PAID'
+  | 'INVOICE_VOIDED'
   | 'PAYMENT_RECEIVED'
-  | 'PO_CREATED';
+  | 'PO_CREATED'
+  | 'PO_STATUS_CHANGED'
+  | 'CALLBACK_LINKED'
+  | 'CALLBACK_UNLINKED'
+  | 'CALLBACK_CHANGED';
 
+/**
+ * `SYSTEM` moves (an item advancing when a dispatch arrives) carry a null
+ * `userId` and the name "System". There's no office/tech split: show the person.
+ */
 export interface ActivityActor {
-  userId: string;
+  /** `CUSTOMER` (financial stream only): a view, or an approval on the public page with the typed name. */
+  type?: 'USER' | 'SYSTEM' | 'CUSTOMER';
+  userId: string | null;
   userName: string;
+}
+
+/**
+ * What a row is about, as it was when written. Rows sharing `type` + `id` are
+ * one thing's steps (a dispatch's assigned → arrived → checked out).
+ * `number` is raw: a work item's sequence or a dispatch's trip number, so
+ * format it with the glossary abbreviation. `label` is a name (the work order
+ * number, a dispatch's own label), or null.
+ */
+export interface ActivitySubject {
+  type: 'WORK_ORDER' | 'WORK_ITEM' | 'DISPATCH' | 'NOTE' | 'FILE' | 'QUOTE' | 'INVOICE' | 'PAYMENT' | 'PURCHASE_ORDER';
+  id: string;
+  number: number | null;
+  label: string | null;
 }
 
 /**
@@ -51,10 +97,11 @@ export interface ActivityActor {
 export interface ActivityEvent {
   id: string;
   kind: ActivityKind;
-  category: ActivityCategory;
-  /** BUSINESS vs CHANGE; present on the location feed, optional on the WO rail. */
+  /** `FINANCIAL` and `PURCHASING` rows come from their services' streams, never this feed. */
+  category: ActivityCategory | 'FINANCIAL' | 'PURCHASING';
   classification?: ActivityClassification;
   timestamp: string;
+  subject?: ActivitySubject | null;
   actor: ActivityActor | null;
   data: Record<string, unknown>;
 }
@@ -75,6 +122,11 @@ export interface ListActivityParams {
   categories?: ActivityCategory[];
   /** BUSINESS (default) hides field-edit churn; ALL adds CHANGE rows. */
   classification?: ActivityClassification | 'ALL';
+}
+
+/** The tenant feed also takes a scope: work orders at locations in these regions. */
+export interface ListTenantActivityParams extends ListActivityParams {
+  regionIds?: string[];
 }
 
 /**
@@ -125,6 +177,32 @@ export const activityApi = {
   },
 
   /**
+   * The work order's quote, invoice and payment steps (financial-service), in
+   * the same row shape and envelope as `list`, for merging by timestamp.
+   * Quote and invoice rows carry their document as `subject` (label "Q-1882");
+   * a payment is a step on the invoice it paid. No category or classification
+   * filter.
+   */
+  listFinancial: async (workOrderId: string, params?: { cursor?: string; limit?: number }): Promise<ActivityPage> => {
+    const response = await apiClient.get<ActivityPage>(`/financial/work-orders/${workOrderId}/activity`, {
+      params: { cursor: params?.cursor, limit: params?.limit },
+    });
+    return response.data;
+  },
+
+  /**
+   * The work order's purchase order steps (inventory-service): created, then
+   * each status change (ordered, received, cancelled with reason, reopened).
+   * Same row shape and envelope as `list`; the PO is the `subject`.
+   */
+  listPurchasing: async (workOrderId: string, params?: { cursor?: string; limit?: number }): Promise<ActivityPage> => {
+    const response = await apiClient.get<ActivityPage>(`/inventory/work-orders/${workOrderId}/activity`, {
+      params: { cursor: params?.cursor, limit: params?.limit },
+    });
+    return response.data;
+  },
+
+  /**
    * The location-scoped business stream — every meaningful event at a site
    * across all its work orders. Same query contract as `list`; each row
    * carries a `workOrder` block for grouping + backlinks. 404 = unknown
@@ -169,6 +247,24 @@ export const activityApi = {
         },
       }
     );
+    return response.data;
+  },
+
+  /**
+   * The tenant-wide work-order activity stream (home dashboard). Identical
+   * row/page shape and query contract to {@link listForLocation}; the FE
+   * interleaves it with `financialActivityApi.getForTenant` by timestamp.
+   */
+  listForTenant: async (params?: ListTenantActivityParams): Promise<LocationActivityPage> => {
+    const response = await apiClient.get<LocationActivityPage>('/work-orders/activity', {
+      params: {
+        cursor: params?.cursor,
+        limit: params?.limit,
+        categories: params?.categories?.length ? params.categories.join(',') : undefined,
+        classification: params?.classification,
+        regionIds: params?.regionIds?.length ? params.regionIds : undefined,
+      },
+    });
     return response.data;
   },
 };

@@ -1,185 +1,194 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import FilterPullListReport from './FilterPullListReport';
 
-const mockFilterPullList = vi.fn();
-const mockTypesGetAll = vi.fn();
-const mockDivisionsGetAll = vi.fn();
+const mockPullList = vi.fn();
+const mockShowSuccess = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/setup')>();
   return {
     ...actual,
-    reportsApi: {
-      filterPullList: (...args: unknown[]) => mockFilterPullList(...args),
+    reportsApi: { filterPullList: (...a: unknown[]) => mockPullList(...a) },
+    dispatchRegionApi: {
+      ...actual.dispatchRegionApi,
+      getAll: () =>
+        Promise.resolve([
+          { id: 'r1', name: 'East Valley', isActive: true },
+          { id: 'r2', name: 'West Valley', isActive: true },
+        ]),
     },
-    workOrderTypesApi: { getAll: (...args: unknown[]) => mockTypesGetAll(...args) },
-    divisionsApi: { getAll: (...args: unknown[]) => mockDivisionsGetAll(...args) },
+    divisionsApi: { ...actual.divisionsApi, getAll: () => Promise.resolve([{ id: 'd1', name: 'HVAC', isActive: true }]) },
+    workOrderTypesApi: {
+      ...actual.workOrderTypesApi,
+      getAll: () => Promise.resolve([{ id: 't1', name: 'Maintenance', isActive: true }]),
+    },
+    tenantSettingsApi: { ...actual.tenantSettingsApi, getSettings: () => Promise.resolve({ timezone: 'UTC' }) },
   };
 });
 
-vi.mock('@dispatch/api/src/client');
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return { ...actual, showSuccess: (...a: unknown[]) => mockShowSuccess(...a) };
+});
 
-const mkTaxonomy = (id: string, name: string, isActive = true) => ({
-  id,
-  tenantId: 't',
-  name,
-  code: name.toUpperCase(),
-  description: null,
-  color: null,
-  icon: null,
-  isActive,
-  sortOrder: 0,
-  createdAt: '',
-  updatedAt: '',
+const filter = (lengthIn: number, quantity: number, equipmentName = 'RTU-1') => ({
+  lengthIn,
+  widthIn: 20,
+  thicknessIn: 1,
+  quantity,
+  equipmentName,
+});
+
+function stop(id: string, startHour: number, filters: ReturnType<typeof filter>[], day = '2026-10-09') {
+  return {
+    dispatchId: id,
+    workOrderId: `wo-${id}`,
+    workOrderNumber: `WO-${id}`,
+    arrivalWindowStart: `${day}T${String(startHour).padStart(2, '0')}:00:00Z`,
+    arrivalWindowEnd: `${day}T${String(startHour + 2).padStart(2, '0')}:00:00Z`,
+    customerName: `Customer ${id}`,
+    locationName: null,
+    streetAddress: '100 MAIN ST',
+    city: 'SPRINGFIELD',
+    filters,
+  };
+}
+
+function pullList(over: Record<string, unknown> = {}) {
+  return {
+    date: '2026-10-09',
+    dateTo: '2026-10-09',
+    techs: [
+      {
+        userId: 'u1',
+        name: 'Alice Adams',
+        stops: [stop('1', 8, [filter(16, 2)]), stop('2', 13, [])],
+        totals: [{ lengthIn: 16, widthIn: 20, thicknessIn: 1, quantity: 2 }],
+      },
+      {
+        userId: 'u2',
+        name: null,
+        stops: [stop('3', 9, [filter(16, 1, 'AHU'), filter(20, 4, 'AHU')])],
+        totals: [
+          { lengthIn: 16, widthIn: 20, thicknessIn: 1, quantity: 1 },
+          { lengthIn: 20, widthIn: 20, thicknessIn: 1, quantity: 4 },
+        ],
+      },
+    ],
+    totals: [
+      { lengthIn: 16, widthIn: 20, thicknessIn: 1, quantity: 3, equipmentCount: 2 },
+      { lengthIn: 20, widthIn: 20, thicknessIn: 1, quantity: 4, equipmentCount: 1 },
+    ],
+    regionIds: null,
+    ...over,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-08T15:00:00Z'));
+  mockPullList.mockResolvedValue(pullList());
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('FilterPullListReport', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockFilterPullList.mockResolvedValue([]);
-    mockTypesGetAll.mockResolvedValue([]);
-    mockDivisionsGetAll.mockResolvedValue([]);
+  it('opens on tomorrow: a card per tech with what to pull and the stops in board order', async () => {
+    renderWithProviders(<FilterPullListReport />, { initialPath: '/reports/filter-pull-list' });
+
+    await waitFor(() =>
+      expect(mockPullList).toHaveBeenLastCalledWith({
+        date: '2026-10-09',
+        dateTo: undefined,
+        regionIds: undefined,
+        workOrderTypeId: undefined,
+        divisionId: undefined,
+      }),
+    );
+    const techs = await screen.findAllByTestId('pull-tech');
+    expect(techs).toHaveLength(2);
+    expect(within(techs[0]).getByText('Alice Adams')).toBeInTheDocument();
+    // Unnamed techs still get a card.
+    expect(within(techs[1]).getByText('reports.pullList.unnamed')).toBeInTheDocument();
+
+    const stops = within(techs[0]).getAllByTestId('pull-stop');
+    expect(stops).toHaveLength(2);
+    expect(stops[0]).toHaveTextContent('8a–10a');
+    expect(within(stops[0]).getByRole('link', { name: 'WO-1' })).toHaveAttribute('href', '/work-orders/wo-1');
+    expect(stops[0]).toHaveTextContent('100 Main St, Springfield');
+    expect(stops[1]).toHaveTextContent('reports.pullList.noFiltersStop');
+
+    const pull = within(techs[0]).getAllByTestId('pull-size');
+    expect(pull).toHaveLength(1);
+    expect(pull[0]).toHaveTextContent('16×20×1');
+    expect(pull[0]).toHaveTextContent('2');
+
+    // The company total counts each job once, with the units carrying each size.
+    const totals = screen.getByTestId('pull-totals');
+    expect(within(totals).getAllByTestId('pull-size')).toHaveLength(2);
+    expect(within(totals).getByText('reports.pullList.companyTotal')).toBeInTheDocument();
   });
 
-  it('defaults to single-day mode for today and queries the backend', async () => {
-    renderWithProviders(<FilterPullListReport />);
-
-    await waitFor(() => {
-      expect(mockFilterPullList).toHaveBeenCalled();
+  it('asks for picked dates, the scope and the filters in the URL, and dates each stop', async () => {
+    mockPullList.mockResolvedValue(
+      pullList({
+        dateTo: '2026-10-12',
+        techs: [
+          {
+            userId: 'u1',
+            name: 'Alice Adams',
+            stops: [stop('1', 8, [filter(16, 2)], '2026-10-12')],
+            totals: [{ lengthIn: 16, widthIn: 20, thicknessIn: 1, quantity: 2 }],
+          },
+        ],
+        regionIds: ['r2'],
+      }),
+    );
+    renderWithProviders(<FilterPullListReport />, {
+      initialPath: '/reports/filter-pull-list?days=2026-10-09..2026-10-12&region=r2&type=t1&division=d1',
     });
-    const params = mockFilterPullList.mock.calls[0][0];
-    expect(params.scheduledDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(params).not.toHaveProperty('scheduledDateFrom');
+
+    await waitFor(() =>
+      expect(mockPullList).toHaveBeenLastCalledWith({
+        date: '2026-10-09',
+        dateTo: '2026-10-12',
+        regionIds: ['r2'],
+        workOrderTypeId: 't1',
+        divisionId: 'd1',
+      }),
+    );
+    const [s] = await screen.findAllByTestId('pull-stop');
+    expect(s).toHaveTextContent('Mon 12');
+    expect(await screen.findByText('reports.pullList.regionTotal')).toBeInTheDocument();
   });
 
-  it('renders the empty state when the backend returns no entries', async () => {
-    mockFilterPullList.mockResolvedValue([]);
-    renderWithProviders(<FilterPullListReport />);
-    await waitFor(() => {
-      expect(screen.getByText(/no filters needed for/i)).toBeInTheDocument();
-    });
+  it('says so when nothing is on the board, with nothing to print', async () => {
+    mockPullList.mockResolvedValue(pullList({ techs: [], totals: [] }));
+    renderWithProviders(<FilterPullListReport />, { initialPath: '/reports/filter-pull-list?days=today' });
+
+    expect(await screen.findByText('reports.pullList.empty.title')).toBeInTheDocument();
+    expect(mockPullList).toHaveBeenLastCalledWith(expect.objectContaining({ date: '2026-10-08' }));
+    expect(screen.getByRole('button', { name: 'reports.pullList.print' })).toBeDisabled();
   });
 
-  it('renders aggregated rows with size, quantity, and equipment count', async () => {
-    mockFilterPullList.mockResolvedValue([
-      { lengthIn: 16, widthIn: 20, thicknessIn: 1, totalQuantity: 12, equipmentCount: 4 },
-      { lengthIn: 20, widthIn: 25, thicknessIn: 1, totalQuantity: 8, equipmentCount: 3 },
-    ]);
-    renderWithProviders(<FilterPullListReport />);
-
-    await waitFor(() => {
-      expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument();
-    });
-    expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
-    expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('8')).toBeInTheDocument();
-    // Total filters footer (12 + 8 = 20)
-    expect(screen.getByText(/total filters: 20/i)).toBeInTheDocument();
-  });
-
-  it('switches to range mode and sends From/To params', async () => {
+  it('prints, and exports the list', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    const createObjectURL = vi.fn(() => 'blob:x');
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
     const user = userEvent.setup();
-    renderWithProviders(<FilterPullListReport />);
+    renderWithProviders(<FilterPullListReport />, { initialPath: '/reports/filter-pull-list' });
 
-    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
-    mockFilterPullList.mockClear();
+    await screen.findAllByTestId('pull-tech');
+    await user.click(screen.getByRole('button', { name: 'reports.pullList.print' }));
+    expect(print).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: /^range$/i }));
-
-    await waitFor(() => {
-      expect(mockFilterPullList).toHaveBeenCalled();
-    });
-    const lastCall = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
-    expect(lastCall).toHaveProperty('scheduledDateFrom');
-    expect(lastCall).toHaveProperty('scheduledDateTo');
-    expect(lastCall).not.toHaveProperty('scheduledDate');
-  });
-
-  it('shows an error banner when the fetch fails', async () => {
-    mockFilterPullList.mockRejectedValue(new Error('Backend down'));
-    renderWithProviders(<FilterPullListReport />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/error loading report/i)).toBeInTheDocument();
-    });
-  });
-
-  it('omits work order type and division dropdowns when no taxonomy items exist', async () => {
-    renderWithProviders(<FilterPullListReport />);
-    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
-    expect(screen.queryByRole('combobox', { name: /^type$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: /^division$/i })).not.toBeInTheDocument();
-    // The first request should not include the optional filters.
-    const params = mockFilterPullList.mock.calls[0][0];
-    expect(params).not.toHaveProperty('workOrderTypeId');
-    expect(params).not.toHaveProperty('divisionId');
-  });
-
-  it('sends workOrderTypeId when a type is picked', async () => {
-    mockTypesGetAll.mockResolvedValue([
-      mkTaxonomy('t-install', 'Install'),
-      mkTaxonomy('t-service', 'Service'),
-    ]);
-    const user = userEvent.setup();
-    renderWithProviders(<FilterPullListReport />);
-
-    const typeSelect = await screen.findByRole('combobox', { name: /^type$/i });
-    mockFilterPullList.mockClear();
-    await user.selectOptions(typeSelect, 't-install');
-
-    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
-    const lastCall = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
-    expect(lastCall.workOrderTypeId).toBe('t-install');
-  });
-
-  it('sends divisionId when a division is picked', async () => {
-    mockDivisionsGetAll.mockResolvedValue([
-      mkTaxonomy('d-hvac', 'HVAC'),
-      mkTaxonomy('d-plumbing', 'Plumbing'),
-    ]);
-    const user = userEvent.setup();
-    renderWithProviders(<FilterPullListReport />);
-
-    const divSelect = await screen.findByRole('combobox', { name: /^division$/i });
-    mockFilterPullList.mockClear();
-    await user.selectOptions(divSelect, 'd-hvac');
-
-    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
-    const lastCall = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
-    expect(lastCall.divisionId).toBe('d-hvac');
-  });
-
-  it('hides retired (inactive) taxonomy entries from the dropdowns', async () => {
-    mockTypesGetAll.mockResolvedValue([
-      mkTaxonomy('t-install', 'Install', true),
-      mkTaxonomy('t-old', 'Retired Type', false),
-    ]);
-    renderWithProviders(<FilterPullListReport />);
-
-    const typeSelect = await screen.findByRole('combobox', { name: /^type$/i });
-    expect(typeSelect).toHaveTextContent('Install');
-    expect(typeSelect).not.toHaveTextContent('Retired Type');
-  });
-
-  it('clears the type filter when "Any type" is reselected', async () => {
-    mockTypesGetAll.mockResolvedValue([mkTaxonomy('t-install', 'Install')]);
-    const user = userEvent.setup();
-    renderWithProviders(<FilterPullListReport />);
-
-    const typeSelect = await screen.findByRole('combobox', { name: /^type$/i });
-    await user.selectOptions(typeSelect, 't-install');
-    await waitFor(() => {
-      const last = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
-      expect(last.workOrderTypeId).toBe('t-install');
-    });
-
-    mockFilterPullList.mockClear();
-    await user.selectOptions(typeSelect, '');
-
-    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
-    const lastCall = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
-    expect(lastCall).not.toHaveProperty('workOrderTypeId');
+    await user.click(screen.getByRole('button', { name: 'reports.pullList.export' }));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(mockShowSuccess).toHaveBeenCalledWith('reports.pullList.exported');
   });
 });

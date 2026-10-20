@@ -21,20 +21,37 @@ const KIND_TEMPLATE_KEYS: Record<ActivityKind, string> = {
   WORK_ITEM_STATUS_CHANGED: 'workOrders.activity.kind.workItemStatusChanged',
   WORK_ITEM_DELETED: 'workOrders.activity.kind.workItemDeleted',
   DISPATCH_ASSIGNED: 'workOrders.activity.kind.dispatchAssigned',
+  DISPATCH_EN_ROUTE: 'workOrders.activity.kind.dispatchEnRoute',
   DISPATCH_DEPARTED: 'workOrders.activity.kind.dispatchDeparted',
   DISPATCH_ARRIVED: 'workOrders.activity.kind.dispatchArrived',
   DISPATCH_CHECKED_OUT: 'workOrders.activity.kind.dispatchCheckedOut',
   DISPATCH_CANCELLED: 'workOrders.activity.kind.dispatchCancelled',
   DISPATCH_NO_SHOW: 'workOrders.activity.kind.dispatchNoShow',
+  DISPATCH_RESCHEDULED: 'workOrders.activity.kind.dispatchRescheduled',
+  DISPATCH_REASSIGNED: 'workOrders.activity.kind.dispatchReassigned',
+  FILES_UPLOADED: 'workOrders.activity.kind.filesUploaded',
   NOTE_ADDED: 'workOrders.activity.kind.noteAdded',
   NOTE_DELETED: 'workOrders.activity.kind.noteDeleted',
   QUOTE_SENT: 'workOrders.activity.kind.quoteSent',
+  QUOTE_VIEWED: 'workOrders.activity.kind.quoteViewed',
   QUOTE_ACCEPTED: 'workOrders.activity.kind.quoteAccepted',
   QUOTE_DECLINED: 'workOrders.activity.kind.quoteDeclined',
+  QUOTE_DELETED: 'workOrders.activity.kind.quoteDeleted',
+  QUOTE_CHOICE_CHANGED: 'workOrders.activity.kind.quoteChoiceSame',
+  QUOTE_PRICE_APPROVAL_REQUESTED: 'workOrders.activity.kind.quotePriceRequested',
+  QUOTE_PRICE_APPROVED: 'workOrders.activity.kind.quotePriceApproved',
+  QUOTE_PRICE_REJECTED: 'workOrders.activity.kind.quotePriceRejected',
+  QUOTE_MEMBERSHIP_SIGNUP: 'workOrders.activity.kind.quoteMembershipSignup',
   INVOICE_ISSUED: 'workOrders.activity.kind.invoiceIssued',
+  INVOICE_SENT: 'workOrders.activity.kind.invoiceSent',
   INVOICE_PAID: 'workOrders.activity.kind.invoicePaid',
+  INVOICE_VOIDED: 'workOrders.activity.kind.invoiceVoided',
   PAYMENT_RECEIVED: 'workOrders.activity.kind.paymentReceived',
   PO_CREATED: 'workOrders.activity.kind.poCreated',
+  PO_STATUS_CHANGED: 'workOrders.activity.kind.poStatusChanged',
+  CALLBACK_LINKED: 'workOrders.activity.kind.callbackLinked',
+  CALLBACK_UNLINKED: 'workOrders.activity.kind.callbackUnlinked',
+  CALLBACK_CHANGED: 'workOrders.activity.kind.callbackChanged',
 };
 
 export const FALLBACK_TEMPLATE_KEY = 'workOrders.activity.kind.unknown';
@@ -229,9 +246,9 @@ function formatCurrency(amount: number): string {
  * Maps each category to a heroicon name (resolved at the component layer).
  * Used to give the activity row a glanceable left-edge marker.
  */
-export const CATEGORY_ICON_KEY: Record<string, 'note' | 'dispatch' | 'status' | 'financial'> = {
+export const CATEGORY_ICON_KEY: Record<string, 'note' | 'dispatch' | 'status'> = {
   NOTE: 'note',
   DISPATCH: 'dispatch',
   STATUS: 'status',
-  FINANCIAL: 'financial',
+  WORK_ITEM: 'status',
 };

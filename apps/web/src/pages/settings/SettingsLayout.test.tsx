@@ -1,7 +1,8 @@
 /* eslint-disable i18next/no-literal-string */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { renderWithProviders } from '../../test/utils';
+import { useHasAnyCapability } from '../../hooks/useCurrentUser';
 import SettingsLayout from './SettingsLayout';
 
 describe('SettingsLayout', () => {
@@ -35,6 +36,21 @@ describe('SettingsLayout', () => {
     expect(links).toContain('/settings/work-orders/item-statuses');
     expect(links).toContain('/settings/work-orders/workflows');
     expect(links).toContain('/settings/access/roles');
+  });
+
+  it('lists Revenue Targets only for someone who can set them', () => {
+    const { unmount } = renderWithProviders(<SettingsLayout />, { routes, initialPath: '/settings/general' });
+    const hrefs = () => within(getRail()).getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(hrefs()).not.toContain('/settings/revenue-targets');
+    unmount();
+
+    const original = vi.mocked(useHasAnyCapability).getMockImplementation();
+    vi.mocked(useHasAnyCapability).mockImplementation((...caps: string[]) =>
+      caps.some((c) => c === 'VIEW_USERS' || c === 'MANAGE_REVENUE_TARGETS'),
+    );
+    renderWithProviders(<SettingsLayout />, { routes, initialPath: '/settings/general' });
+    expect(hrefs()).toContain('/settings/revenue-targets');
+    if (original) vi.mocked(useHasAnyCapability).mockImplementation(original);
   });
 
   it('renders section headers in the rail', () => {

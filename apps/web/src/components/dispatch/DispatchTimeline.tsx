@@ -1,0 +1,628 @@
+// ─────────────────────────────────────────────────────────────────────
+// Spine A — the clock timeline. A RENDERER, not a page.
+//
+// Filters, grouping, date scope, density, selection and the drawer all live
+// in DispatchBoardPage and arrive here as one uniform prop bag. Adding the
+// capacity spine later must mean a new file plus one switch entry and
+// nothing else; if it needs to touch filter or drawer code, this seam is
+// wrong (handoff §3.2).
+//
+// The load-bearing idea: A BLOCK IS THE ARRIVAL WINDOW, and the estimate is
+// an inner fill. Our data has windows (a promise to the customer) and a
+// nullable labor estimate, not exact start/end times — drawing a hard bar
+// from 9:00 to 10:30 would assert precision we do not have. The gap between
+// box and fill is visible slack. Do not "fix" this into a start–end bar.
+// ─────────────────────────────────────────────────────────────────────
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from '@dispatch/i18n';
+import {
+  draggable,
+  dropTargetForElements,
+} from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import type { BoardDispatch, BoardTech } from '../../api/setup';
+import { useGlossary } from '../../contexts/GlossaryContext';
+import { DISPATCH_PRESENTATION, presentationFor, statusClass } from '../../lib/dispatchStatus';
+import { isOutOfDate } from '../../lib/releaseState';
+import { TechCell } from './BoardRows';
+import { DENSITY_METRICS, type Density, type SpineProps } from './spine';
+import { aimedHour, resolveDrop, type DropResolution } from '../../lib/boardDrop';
+import {
+  axisPct,
+  findClashes,
+  formatHour,
+  formatWindow,
+  zonedHour,
+} from '../../lib/boardTime';
+import { siteLabel } from '../../lib/siteLabel';
+
+interface Window {
+  start: number;
+  end: number;
+}
+
+/** Window bounds in tenant-local fractional hours, or null when either end
+ *  is unparseable — a block we cannot place is skipped rather than drawn at
+ *  hour zero. */
+function windowOf(dispatch: BoardDispatch, timeZone: string): Window | null {
+  const start = zonedHour(dispatch.arrivalWindowStart, timeZone);
+  const end = zonedHour(dispatch.arrivalWindowEnd, timeZone);
+  if (start === null || end === null || end <= start) return null;
+  return { start, end };
+}
+
+/** Absence spans as axis coordinates. An all-day span covers the whole axis,
+ *  which reproduces the old whole-row look without special-casing it. */
+function offSpans(
+  tech: BoardTech,
+  timeZone: string,
+  axis: SpineProps['axis'],
+): { start: number; end: number; label: string; allDay: boolean }[] {
+  return (tech.timeOff ?? []).map((span) => {
+    if (span.allDay) {
+      return { start: axis.start, end: axis.end, label: span.label, allDay: true };
+    }
+    const start = zonedHour(span.startsAt, timeZone);
+    const end = zonedHour(span.endsAt, timeZone);
+    // An unplaceable span is treated as all-day rather than dropped: a row
+    // exists, so the tech is off, and rendering them available is the one
+    // error this board cannot afford to make permissively.
+    if (start === null || end === null || end <= start) {
+      return { start: axis.start, end: axis.end, label: span.label, allDay: true };
+    }
+    return {
+      start: Math.max(axis.start, start),
+      end: Math.min(axis.end, end),
+      label: span.label,
+      allDay: false,
+    };
+  });
+}
+
+/** True only when the tech is out for the WHOLE axis — that is what earns the
+ *  hatched row and the suppressed load bar. A partial absence leaves the row
+ *  a working row. */
+function isOutAllDay(spans: { start: number; end: number; allDay: boolean }[], axis: SpineProps['axis']): boolean {
+  return spans.some((s) => s.allDay || (s.start <= axis.start && s.end >= axis.end));
+}
+
+function Block({
+  dispatch,
+  window,
+  axis,
+  density,
+  isToday,
+  outOfDivision,
+  onOffTech,
+  clash,
+  half,
+  onOpen,
+  workOrderHref,
+  onContext,
+}: {
+  dispatch: BoardDispatch;
+  window: Window;
+  axis: SpineProps['axis'];
+  density: Density;
+  /** Whether the board is showing today. Gates the "right now" pulse. */
+  isToday: boolean;
+  /** A real job, outside the active division filter. Still clickable, still
+   *  droppable — the filter narrows attention, not entitlement. */
+  outOfDivision: boolean;
+  /** Booked on a technician who is off at this time. */
+  onOffTech: boolean;
+  clash: boolean;
+  half: 'upper' | 'lower' | null;
+  onOpen: (dispatch: BoardDispatch) => void;
+  workOrderHref: SpineProps['workOrderHref'];
+  onContext: SpineProps['onContextDispatch'];
+}) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const ref = useRef<HTMLAnchorElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    // Once the tech has arrived the window is history; the server refuses to move it.
+    if (!el || dispatch.arrivedAt) return;
+    return draggable({
+      element: el,
+      getInitialData: ({ input, element }) => ({
+        boardDrag: true,
+        dispatchId: dispatch.id,
+        // Duration rides along so a deliberately-widened window keeps its
+        // length when it moves rows — only the start snaps.
+        durationHours: window.end - window.start,
+        // Where on the block it was grabbed, so the drop snaps on the block's
+        // left edge rather than on the pointer (see `aimedHour`).
+        grabOffsetPx: input.clientX - element.getBoundingClientRect().left,
+      }),
+      onDragStart: () => setDragging(true),
+      onDrop: () => setDragging(false),
+    });
+  }, [dispatch.id, dispatch.arrivedAt, window.start, window.end]);
+
+  const left = axisPct(window.start, axis);
+  const width = axisPct(window.end, axis) - left;
+
+  // The estimate is minutes; the window is hours. Only drawn when present —
+  // no estimate means an outline, which is the honest rendering of "we
+  // promised a window, we don't know how long the work takes".
+  const estHours = dispatch.estimatedDuration != null ? dispatch.estimatedDuration / 60 : null;
+  const fillPct =
+    estHours != null ? Math.min(100, (estHours / (window.end - window.start)) * 100) : null;
+
+  // Hollow = the tech's copy is out of date: never sent, OR changed since.
+  const released = !isOutOfDate(dispatch);
+  const urgent = dispatch.priority === 'URGENT';
+  const live = presentationFor(dispatch.status, { isToday }).live;
+
+  // Release state is decided HERE, first, and not left to the stylesheet.
+  // Filled = released, hollow = not released. A held block gets none of the
+  // status or priority classes that paint a fill or a tint — only `held` and
+  // the modifiers it genuinely needs — so no rule that happens to sit later
+  // in the cascade can colour it in. That is exactly how the mock rendered an
+  // unreleased URGENT job with a pink fill, and an urgent job nobody has sent
+  // is the one a dispatcher can least afford to misread as handed over.
+  //
+  // The outline hue comes from the shared status map, like every other
+  // surface; urgent overrides it with danger.
+  const heldHue = urgent ? 'var(--danger-500)' : DISPATCH_PRESENTATION[dispatch.status].accent;
+  const stateClasses = released
+    ? [statusClass(dispatch.status), urgent ? 'urgent' : '']
+    : [
+        'held',
+        urgent ? 'held-urgent' : '',
+        // What status still means on a hollow block: history fades or strikes
+        // through, and on site right now still pulses. No colour.
+        dispatch.status === 'COMPLETED' ? 'held-done' : '',
+        dispatch.status === 'CANCELLED' ? 'held-cancelled' : '',
+        dispatch.status === 'IN_PROGRESS' ? 'held-onsite' : '',
+      ];
+
+  const className = [
+    'db-block',
+    ...stateClasses,
+    // The pulse is a claim about RIGHT NOW, so it is only ever true on today's
+    // board. A dispatch left IN_PROGRESS from last Tuesday would otherwise
+    // pulse on every future date it is dragged to.
+    live ? 'live' : '',
+    // DIMMED, not ghosted. Division is a lens, not a permission: the
+    // dispatcher is fully entitled to this job and merely asked to look
+    // elsewhere, so redacting it would hide data from someone permitted to
+    // see it — and would teach that the hatch means two different things.
+    outOfDivision ? 'otherdiv' : '',
+    onOffTech ? 'offtech' : '',
+    clash ? 'clash' : '',
+    clash && half ? half : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const windowLabel = formatWindow(window.start, window.end);
+  const title = dispatch.workOrderSummary ?? dispatch.workOrderNumber ?? '';
+
+  return (
+    // The block IS a link to its work order, so cmd-click and middle-click get
+    // native new-tab behaviour — that is how a dispatcher reads a job without
+    // losing the board. A plain click is intercepted for the drawer, which is
+    // also what Enter does on a focused block. Dragging is unaffected: the
+    // drag source attaches its own payload.
+    <a
+      ref={ref}
+      href={workOrderHref(dispatch.workOrderId)}
+      className={dragging ? `${className} dragging` : className}
+      style={{
+        left: `${left}%`,
+        width: `${width}%`,
+        ...(released ? {} : ({ '--hc': heldHue } as React.CSSProperties)),
+      }}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        onOpen(dispatch);
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        // Shift-F10 and the menu key fire this too, with no pointer behind it
+        // — anchor to the block itself rather than the top-left of the screen.
+        const rect = e.currentTarget.getBoundingClientRect();
+        const keyboard = e.clientX === 0 && e.clientY === 0;
+        onContext(dispatch, {
+          x: keyboard ? rect.left : e.clientX,
+          y: keyboard ? rect.bottom : e.clientY,
+        });
+      }}
+      title={[
+        [title, siteLabel(dispatch), windowLabel].filter(Boolean).join(' · '),
+        t('dispatchBoard.grid.blockHint', { entity: getName('work_order') }),
+      ].join('\n')}
+    >
+      {/* Hollow means hollow: no estimate fill on held work either. */}
+      {released && fillPct != null && (
+        <span className="db-fill" style={{ width: `${fillPct}%` }} />
+      )}
+      <span className="db-block-t">
+        {dispatch.status === 'NO_SHOW' && <span className="text-danger-500">{'⊘ '}</span>}
+        {urgent && dispatch.status !== 'NO_SHOW' && (
+          <span className="text-danger-500">{'▲ '}</span>
+        )}
+        {dispatch.recurring && <span className="text-violet-500">{'⟳ '}</span>}
+        {title}
+      </span>
+      {density === 'comfortable' && siteLabel(dispatch) && (
+        <span className="db-block-s">{siteLabel(dispatch)}</span>
+      )}
+      {density !== 'dense' && (
+        <span className="db-block-m">
+          {[dispatch.workOrderNumber, windowLabel].filter(Boolean).join(' · ')}
+          {estHours != null
+            ? ` · ${t('dispatchBoard.grid.estimate', { hours: estHours.toFixed(1) })}`
+            : ` · ${t('dispatchBoard.grid.noEstimate')}`}
+        </span>
+      )}
+    </a>
+  );
+}
+
+/**
+ * One tech's lane, and the board's only drop target.
+ *
+ * Holds the geometry (x within the lane → an hour on the axis) and the drop
+ * RULE (snap to a preset, refuse a window overlapping time off) so both are
+ * written once and any future spine inherits them. What a drop DOES is the
+ * page's business — the resolved window goes back up.
+ */
+function Lane({
+  techId,
+  spans,
+  axis,
+  onDrop,
+  onDropOnTimeOff,
+  children,
+}: {
+  techId: string;
+  spans: { start: number; end: number; allDay: boolean }[];
+  axis: SpineProps['axis'];
+  onDrop: SpineProps['onDrop'];
+  onDropOnTimeOff: SpineProps['onDropOnTimeOff'];
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [over, setOver] = useState(false);
+  // The window the drop will book, drawn while dragging. Once windows start
+  // every hour the snap is to the hour, not to the pixel, so without this the
+  // board looks like it ignored where you let go.
+  const [preview, setPreview] = useState<{ start: number; end: number; ok: boolean } | null>(
+    null,
+  );
+
+  // Latest values for the drop handler without re-registering the target on
+  // every render — re-registering mid-drag drops the gesture. Written in an
+  // effect rather than during render, which React 19 forbids.
+  const latest = useRef({ spans, axis, onDrop, onDropOnTimeOff, techId });
+  useEffect(() => {
+    latest.current = { spans, axis, onDrop, onDropOnTimeOff, techId };
+  });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // One reading of the gesture, shared by the preview and the drop, so what
+    // the outline promised is exactly what gets booked.
+    const resolve = (
+      data: Record<string | symbol, unknown>,
+      clientX: number,
+    ): DropResolution => {
+      const cur = latest.current;
+      const rect = el.getBoundingClientRect();
+      const hour = aimedHour(
+        clientX,
+        { left: rect.left, width: rect.width },
+        cur.axis,
+        data.grabOffsetPx as number | undefined,
+      );
+      const duration = data.durationHours as number | undefined;
+      return resolveDrop(hour, cur.spans, cur.axis, undefined, duration);
+    };
+
+    const show = (data: Record<string | symbol, unknown>, clientX: number) => {
+      const resolved = resolve(data, clientX);
+      const duration = data.durationHours as number | undefined;
+      const next = resolved.ok
+        ? {
+            start: resolved.window.startHour,
+            end:
+              duration != null
+                ? resolved.window.startHour + duration
+                : resolved.window.endHour,
+            ok: true,
+          }
+        : // An all-day row is visibly undroppable already; outside the day
+          // there's nothing to outline.
+          resolved.reason === 'time-off' && !latest.current.spans.some((sp) => sp.allDay)
+          ? { start: resolved.window.startHour, end: resolved.window.endHour, ok: false }
+          : null;
+      setPreview((prev) =>
+        prev?.start === next?.start && prev?.end === next?.end && prev?.ok === next?.ok
+          ? prev
+          : next,
+      );
+    };
+
+    return dropTargetForElements({
+      element: el,
+      canDrop: ({ source }) => Boolean(latest.current.onDrop) && source.data?.boardDrag === true,
+      onDragEnter: ({ source, location }) => {
+        setOver(true);
+        show(source.data, location.current.input.clientX);
+      },
+      onDrag: ({ source, location }) => show(source.data, location.current.input.clientX),
+      onDragLeave: () => {
+        setOver(false);
+        setPreview(null);
+      },
+      onDrop: ({ source, location }) => {
+        setOver(false);
+        setPreview(null);
+        const cur = latest.current;
+        const resolved = resolve(source.data, location.current.input.clientX);
+        if (!resolved.ok) {
+          // An all-day row is visibly undroppable, so refusing it silently is
+          // right — a toast would scold someone for what they could see. A
+          // part-day slice is different: the pointer can be clear of it while
+          // the snapped window still lands on it, so say which times collided.
+          if (resolved.reason === 'time-off' && !cur.spans.some((s) => s.allDay)) {
+            cur.onDropOnTimeOff?.(cur.techId, resolved.window, resolved.off);
+          }
+          return;
+        }
+        cur.onDrop?.(cur.techId, resolved.window, source.data);
+      },
+    });
+  }, []);
+
+  const previewLeft = preview ? axisPct(preview.start, axis) : 0;
+  return (
+    <div ref={ref} className={`db-lane${over ? ' over' : ''}`}>
+      {children}
+      {preview && (
+        <span
+          className={`db-drop-preview${preview.ok ? '' : ' refused'}`}
+          style={{
+            left: `${previewLeft}%`,
+            width: `${axisPct(preview.end, axis) - previewLeft}%`,
+          }}
+          data-testid="drop-preview"
+          aria-hidden="true"
+        >
+          {formatWindow(preview.start, preview.end)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export default function DispatchTimeline({
+  techs,
+  byTech,
+  commitments,
+  divisionFilter,
+  density,
+  isToday,
+  regionLabel,
+  onOpenDispatch,
+  workOrderHref,
+  onContextDispatch,
+  onMarkTimeOff,
+  onClearTimeOff,
+  userHref,
+  offTechDispatchIds,
+  onDropOnTimeOff,
+  axis,
+  nowHour,
+  capacityStops,
+  timeZone,
+  onDrop,
+}: SpineProps) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const { rowH, techW } = DENSITY_METRICS[density];
+
+  const renderRow = (tech: BoardTech) => {
+    const stops = (byTech[tech.id] ?? []).slice();
+
+    // Placeable blocks only, ordered by window start. An unplaceable window
+    // is dropped from the lane rather than drawn at the axis origin.
+    const placed = stops
+      .map((dispatch) => ({ dispatch, window: windowOf(dispatch, timeZone) }))
+      .filter((entry): entry is { dispatch: BoardDispatch; window: Window } => entry.window !== null)
+      .sort((a, b) => a.window.start - b.window.start);
+
+    const clashing = findClashes(
+      placed.map((entry) => ({
+        id: entry.dispatch.id,
+        start: entry.window.start,
+        end: entry.window.end,
+      }))
+    );
+
+    // Alternate halves across the clashing set so two blocks that overlap
+    // can never claim the same pixels.
+    let clashSeen = 0;
+
+    // Absences are lane overlays, not a row state: a tech out 8–12 is still
+    // bookable at 2. Only an all-day absence hatches the whole row.
+    const spans = offSpans(tech, timeZone, axis);
+    const ghosts = commitments.filter((c) => c.assignedUserId === tech.id);
+    const outAllDay = isOutAllDay(spans, axis);
+
+    return (
+      <div
+        key={tech.id}
+        className={['db-row', outAllDay ? 'off' : '', clashing.size > 0 ? 'clashrow' : '']
+          .filter(Boolean)
+          .join(' ')}
+        style={{ height: rowH }}
+      >
+        <TechCell
+          tech={tech}
+          regionLabel={regionLabel(tech.regionIds)}
+          stops={tech.stopCount}
+          committedCount={tech.committedCount}
+          density={density}
+          capacityStops={capacityStops}
+          width={techW}
+          outAllDay={outAllDay}
+          // The absence takes the second line INSTEAD of the region list:
+          // "Sick" for a whole day, "Sick 1p–3p" for part of one. Which
+          // regions someone covers matters less than the fact they are out.
+          offLabel={
+            outAllDay
+              ? (spans[0]?.label ?? null)
+              : spans[0]
+                ? `${spans[0].label} ${formatWindow(spans[0].start, spans[0].end)}`
+                : null
+          }
+          onMarkTimeOff={onMarkTimeOff ? () => onMarkTimeOff(tech) : undefined}
+          onClearTimeOff={
+            onClearTimeOff && spans.length > 0 ? () => onClearTimeOff(tech) : undefined
+          }
+          profileHref={userHref?.(tech.id)}
+        />
+        <Lane
+          techId={tech.id}
+          spans={spans}
+          axis={axis}
+          onDrop={onDrop}
+          onDropOnTimeOff={onDropOnTimeOff}
+        >
+          <span className="db-lane-cells">
+            {axis.hours.map((hour) => (
+              <i key={hour} />
+            ))}
+          </span>
+
+          {/* One overlay per absence. Each rejects drops over its own slice;
+              the rest of the lane stays a normal drop target. */}
+          {spans.map((span, i) => {
+            const left = axisPct(span.start, axis);
+            const width = axisPct(span.end, axis) - left;
+            return (
+              <span
+                key={`${span.start}-${span.end}-${i}`}
+                className={`db-off${span.allDay ? ' allday' : ''}`}
+                style={{ left: `${left}%`, width: `${width}%` }}
+                title={span.label}
+              >
+                <span className="db-off-label">
+                  {span.allDay
+                    ? t('dispatchBoard.grid.offNotDroppable', { label: span.label })
+                    : span.label}
+                </span>
+              </span>
+            );
+          })}
+
+          {/* Work committed outside the REGION scope. Three fields arrive —
+              who, start, end — and nothing else, because the redaction is
+              structural on the server rather than a nulling rule here.
+
+              It occupies its slot on purpose: a narrowed board that hides
+              these invites booking into time that is already gone. Hatched
+              because it means exactly what time off means to this dispatcher —
+              not yours to book — and the hatch/dashed split is the board's one
+              answer to "can I drop here". */}
+          {ghosts.map((commitment) => {
+            const start = zonedHour(commitment.start, timeZone) ?? axis.start;
+            const end = zonedHour(commitment.end, timeZone) ?? start;
+            const left = axisPct(start, axis);
+            const width = Math.max(0, axisPct(end, axis) - left);
+            if (width <= 0) return null;
+            return (
+              <span
+                key={`${commitment.start}-${commitment.end}`}
+                className="db-ghost"
+                style={{ left: `${left}%`, width: `${width}%` }}
+                title={t('dispatchBoard.grid.committedElsewhere')}
+              />
+            );
+          })}
+
+          {placed.map((entry, index) => {
+            const prev = placed[index - 1];
+            const drive = entry.dispatch.driveMinFromPrev;
+            // Spans prev.windowEnd → this.windowStart. Suppressed when the
+            // gap is too narrow to letter, and absent on the first stop.
+            const gap = prev ? entry.window.start - prev.window.end : 0;
+            const showDrive = prev != null && drive != null && gap > 0.05;
+
+            const clash = clashing.has(entry.dispatch.id);
+            const half = clash ? (clashSeen++ % 2 === 0 ? 'upper' : 'lower') : null;
+
+            return (
+              <div key={entry.dispatch.id} className="contents">
+                {showDrive && (
+                  <span
+                    className={`db-drive${drive > 30 ? ' long' : ''}`}
+                    style={{
+                      left: `${axisPct(prev.window.end, axis)}%`,
+                      width: `${axisPct(entry.window.start, axis) - axisPct(prev.window.end, axis)}%`,
+                      top: rowH / 2,
+                    }}
+                  >
+                    {rowH > 34 && (
+                      <span>{t('dispatchBoard.grid.driveMinutes', { minutes: drive })}</span>
+                    )}
+                  </span>
+                )}
+                <Block
+                  dispatch={entry.dispatch}
+                  window={entry.window}
+                  axis={axis}
+                  density={density}
+                  isToday={isToday}
+                  outOfDivision={
+                    divisionFilter != null &&
+                    entry.dispatch.divisionId !== null &&
+                    entry.dispatch.divisionId !== divisionFilter
+                  }
+                  onOffTech={offTechDispatchIds?.has(entry.dispatch.id) ?? false}
+                  clash={clash}
+                  half={half}
+                  onOpen={onOpenDispatch}
+                  workOrderHref={workOrderHref}
+                  onContext={onContextDispatch}
+                />
+              </div>
+            );
+          })}
+
+          {nowHour != null && nowHour >= axis.start && nowHour <= axis.end && (
+            <span className="db-now" style={{ left: `${axisPct(nowHour, axis)}%` }} />
+          )}
+        </Lane>
+      </div>
+    );
+  };
+
+  return (
+    <div className="db-grid">
+      <div className="db-head">
+        <div className="db-techcol" style={{ width: techW }}>
+          {getName('technician')}
+        </div>
+        <div className="db-hours">
+          {axis.hours.map((hour) => (
+            <div className="db-hour" key={hour}>
+              {formatHour(hour)}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {techs.map(renderRow)}
+    </div>
+  );
+}

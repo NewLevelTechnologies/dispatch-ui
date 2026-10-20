@@ -14,6 +14,7 @@ import type {
 import { getDayBucket } from './activityDayBucket';
 import { glyphFor, type ActivityTone } from './activityGlyph';
 import { resolveEventSummary } from '../components/activityFormatters';
+import { actorOf as financialActor, builtText, subjectLink } from './workOrderActivityRows';
 import { formatExactTimestamp, formatTimestamp } from '@dispatch/utils';
 
 export type ChipId = 'all' | 'job' | 'visit' | 'invoice' | 'payment' | 'note' | 'change';
@@ -81,25 +82,15 @@ export function buildDays({
   events,
   financial,
   audit,
-  chip,
   t,
   getName,
 }: {
   events: LocationActivityEvent[];
   financial: FinancialActivityEvent[];
   audit: ServiceLocationAuditEntry[];
-  chip: ChipId;
   t: TFunc;
   getName: GetName;
 }): DayGroup[] {
-  // The financial stream carries both kinds; the Invoices/Payments chips split
-  // it client-side (Invoices = sent, Payments = paid).
-  const fin =
-    chip === 'invoice'
-      ? financial.filter((f) => f.kind === 'INVOICE_SENT')
-      : chip === 'payment'
-        ? financial.filter((f) => f.kind === 'INVOICE_PAID')
-        : financial;
 
   // A save that touched nothing isn't an event — drop UPDATE audit rows with no
   // field deltas defensively (CREATE/DELETE legitimately carry none, so only
@@ -132,7 +123,7 @@ export function buildDays({
       };
   const timeline: TimelineItem[] = [
     ...events.map((event): TimelineItem => ({ type: 'event', ts: event.timestamp, event })),
-    ...fin.map((f): TimelineItem => ({ type: 'financial', ts: f.timestamp, fin: f })),
+    ...financial.map((f): TimelineItem => ({ type: 'financial', ts: f.timestamp, fin: f })),
     ...visibleAudit.map(
       (a): TimelineItem => ({
         type: 'audit',
@@ -174,7 +165,7 @@ export function buildDays({
     }
     const evt = item.event;
     const wo = evt.workOrder;
-    const isLifecycle = !!wo && (evt.category === 'STATUS' || evt.category === 'DISPATCH');
+    const isLifecycle = !!wo && (evt.category === 'STATUS' || evt.category === 'WORK_ITEM' || evt.category === 'DISPATCH');
     if (isLifecycle && wo!.activityCount > 1) {
       // The WO's lifecycle collapses to one group; later events fold in silently.
       if (groupedWos.has(wo!.id)) continue;
@@ -234,7 +225,7 @@ function auditRowModel(
   if (reverted) {
     // Toggle-and-undo: name the field/object that was put back; carry both steps
     // (the original edit, then this undo) for the expandable detail.
-    const fieldName = single ? single.label : t(objectLabelKey(a.changes));
+    const fieldName = single ? single.label : t(objectLabelKey(a.changes), { location: getName('service_location') });
     text = t('serviceLocations.activity.audit.editedReverted', { field: fieldName });
     changes = [...revertedOf.changes, ...a.changes];
   } else if (a.action === 'CREATE') {
@@ -247,7 +238,7 @@ function auditRowModel(
     // Several fields → lead with the object touched, not a count. The deltas
     // below say which fields; the count is secondary.
     text = t('serviceLocations.activity.audit.editedObject', {
-      object: t(objectLabelKey(a.changes)),
+      object: t(objectLabelKey(a.changes), { location: getName('service_location') }),
     });
   }
   return {
@@ -287,33 +278,23 @@ function objectLabelKey(changes: ServiceLocationAuditEntry['changes']): string {
   return 'serviceLocations.activity.audit.object.location';
 }
 
-function formatMoney(amount: string): string {
-  const n = Number(amount);
-  if (!Number.isFinite(n)) return amount;
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
-}
-
+// A quote or invoice step: the work order tab's sentence ("Invoice paid in
+// full · $640.00"), by whoever took it (a customer approving on the public page
+// included), linking to the document itself.
 function financialRowModel(f: FinancialActivityEvent, t: TFunc, getName: GetName): FinancialRow {
-  const paid = f.kind === 'INVOICE_PAID';
-  const key = paid
-    ? 'serviceLocations.activity.financial.paid'
-    : 'serviceLocations.activity.financial.sent';
-  const text = t(key, { invoice: f.invoiceNumber, amount: formatMoney(f.amount) });
-  const { actor, isPerson } = actorOf(f.actor?.userName ?? undefined, t);
+  const { glyph, tone } = glyphFor(f);
+  const { actor, isPerson } = financialActor(f, t, getName);
+  const { obj, objHref } = subjectLink(f.subject, getName, () => '');
   return {
     kind: 'financial',
     id: f.id,
-    glyph: '$',
-    // Money events read green pre-attentively — both sent and paid. (paid is
-    // retained above for the summary copy, not the tone.)
-    tone: 'success',
+    glyph,
+    tone,
     actor,
     isPerson,
-    text,
-    // The invoice number reads in the summary; when a WO is attached, backlink
-    // to it (financial rows carry only the WO id, not its number).
-    obj: f.workOrderId ? t('serviceLocations.activity.financial.viewJob', { entity: getName('work_order') }) : null,
-    objHref: f.workOrderId ? `/work-orders/${f.workOrderId}` : null,
+    text: builtText(f, t) ?? t('workOrders.activity.kind.unknown'),
+    obj,
+    objHref,
     ts: formatTimestamp(f.timestamp),
     tsExact: formatExactTimestamp(f.timestamp),
   };

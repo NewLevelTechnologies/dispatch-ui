@@ -1,0 +1,1566 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { renderWithProviders, userEvent } from '../test/utils';
+import DispatchBoardPage from './DispatchBoardPage';
+
+/** Release state follows releasedAt unless a test sets it. */
+const withRelease = (d: Record<string, unknown>) => ({
+  released: null,
+  ...d,
+  releaseState: d.releaseState ?? (d.releasedAt == null ? 'UNRELEASED' : 'RELEASED'),
+});
+
+const mockGetBoard = vi.fn();
+const mockGetUnscheduled = vi.fn();
+const mockGetWeek = vi.fn();
+const mockRegionsGetAll = vi.fn();
+const mockDivisionsGetAll = vi.fn();
+const mockRelease = vi.fn();
+const mockReleaseOne = vi.fn();
+const mockScheduleRelease = vi.fn();
+const mockCancelScheduled = vi.fn();
+const mockReleaseScheduled = vi.fn();
+const mockDeleteDispatch = vi.fn();
+const mockGetWorkOrder = vi.fn();
+const mockShowSuccess = vi.fn();
+const mockShowError = vi.fn();
+
+vi.mock('../api/setup', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/setup')>();
+  return {
+    ...actual,
+    dispatchBoardApi: {
+      ...actual.dispatchBoardApi,
+      getBoard: (...a: unknown[]) => mockGetBoard(...a),
+      getUnscheduled: (...a: unknown[]) => mockGetUnscheduled(...a),
+      getWeek: (...a: unknown[]) => mockGetWeek(...a),
+      release: (...a: unknown[]) => mockRelease(...a),
+      scheduleRelease: (...a: unknown[]) => mockScheduleRelease(...a),
+      cancelScheduledRelease: (...a: unknown[]) => mockCancelScheduled(...a),
+      releaseScheduled: (...a: unknown[]) => mockReleaseScheduled(...a),
+    },
+
+    dispatchRegionApi: {
+      ...actual.dispatchRegionApi,
+      getAll: (...a: unknown[]) => mockRegionsGetAll(...a),
+    },
+    divisionsApi: {
+      ...actual.divisionsApi,
+      getAll: (...a: unknown[]) => mockDivisionsGetAll(...a),
+    },
+    dispatchesApi: {
+      ...actual.dispatchesApi,
+      release: (...a: unknown[]) => mockReleaseOne(...a),
+      delete: (...a: unknown[]) => mockDeleteDispatch(...a),
+    },
+    workOrderApi: {
+      ...actual.workOrderApi,
+      getById: (...a: unknown[]) => mockGetWorkOrder(...a),
+    },
+  };
+});
+
+vi.mock('@dispatch/api/src/client');
+
+// Toasts render through the <Toaster> in App.tsx, which isn't in this
+// harness — so assert the call, which is the intent anyway.
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return {
+    ...actual,
+    showSuccess: (...a: unknown[]) => mockShowSuccess(...a),
+    showError: (...a: unknown[]) => mockShowError(...a),
+  };
+});
+
+const tech = (id: string, name: string, regionIds: string[]) => ({
+  id,
+  name,
+  regionIds,
+  stopCount: 0,
+  committedCount: 0,
+  divisionIds: [],
+});
+
+const railWorkOrder = (over: Record<string, unknown> = {}) => ({
+  workOrderId: 'wo-1',
+  workOrderNumber: 'WO-3911',
+  workOrderSummary: 'No cooling — full system',
+  workOrderTypeId: null,
+  customerId: 'c1',
+  customerName: 'Pham, A.',
+  serviceLocationId: 'l1',
+  serviceLocationName: null,
+  serviceLocationStreet: '1284 W THOMAS RD',
+  serviceLocationCity: 'Phoenix',
+  serviceLocationState: 'AZ',
+  serviceLocationZip: '85015',
+  latitude: null,
+  longitude: null,
+  priority: 'NORMAL',
+  itemCount: 1,
+  recurring: false,
+  dispatchRegionId: 'r1',
+  divisionId: null,
+  createdAt: new Date(Date.now() - 41 * 60_000).toISOString(),
+  ...over,
+});
+
+const railWith = (rows: Record<string, unknown>[]) => ({
+  ...emptyRail,
+  content: rows,
+  totalElements: rows.length,
+  totalPages: 1,
+});
+
+const emptyRail = {
+  content: [],
+  page: 0,
+  size: 50,
+  totalElements: 0,
+  totalPages: 0,
+  first: true,
+  last: true,
+};
+
+describe('DispatchBoardPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetBoard.mockResolvedValue({ techs: [], dispatches: [] });
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockRegionsGetAll.mockResolvedValue([]);
+  });
+
+  // The sidebar item and the page heading share one i18n key, so they render
+  // the same string and cannot drift apart. Assert both by role rather than by
+  // text — a bare text query matches both, which is the point.
+  it('titles the page from the glossary and matches the nav label', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Dispatch Board', level: 1 })
+    ).toBeInTheDocument();
+
+    const navLink = screen.getByRole('link', { name: 'Dispatch Board' });
+    expect(navLink).toHaveAttribute('href', '/dispatch');
+  });
+
+  // The structural empty state: no rows at all, which is different from
+  // "nothing is scheduled today". It names the rule rather than diagnosing,
+  // because the client can't tell a tenant with no field staff from a cache
+  // that hasn't synced.
+  it('shows the no-technicians state when the board has no rows', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    expect(await screen.findByText('No technicians on this board')).toBeInTheDocument();
+    expect(
+      screen.getByText(/A user appears here when one of their roles is marked/)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Review roles' })).toBeInTheDocument();
+  });
+
+  // Rows ARE the board: they're the drop targets and they say who's free.
+  // An empty state here would hide both and leave nowhere to drop work.
+  // An empty day is a legitimate board, not an error: the rows ARE the drop
+  // targets, and a banner saying "nothing is scheduled" above a grid that
+  // plainly shows nothing scheduled is the same sentence twice.
+  it('renders the rows and no banner when nothing is scheduled', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    expect(await screen.findByText('Maya Alvarez')).toBeInTheDocument();
+    expect(screen.queryByText(/are scheduled for this day/)).not.toBeInTheDocument();
+  });
+
+  it('distinguishes a filtered board from an unscheduled one, keeping the rows', async () => {
+    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
+
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?region=r1' });
+
+    expect(await screen.findByText('No dispatches match these filters')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeInTheDocument();
+    // The lanes survive the filter.
+    expect(screen.getByText('Maya Alvarez')).toBeInTheDocument();
+  });
+
+  it('surfaces a failed board read without blanking the rail', async () => {
+    mockGetBoard.mockRejectedValue(new Error('boom'));
+
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    expect(await screen.findByText("Couldn't load the board")).toBeInTheDocument();
+    // The rail is a separate read and must still render its own state.
+    expect(screen.getByText('Unscheduled')).toBeInTheDocument();
+    expect(screen.getByText('Nothing unscheduled')).toBeInTheDocument();
+  });
+
+  // Self-hide (§3.1): the control keys off regions actually COVERED by the
+  // board's techs, not the tenant's region registry — so a one-region shop
+  // never sees it.
+  it('hides the region filter when only one region is covered', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Phoenix' },
+      { id: 'r2', name: 'Tucson' },
+    ]);
+    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
+
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('combobox', { name: /Region/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the region filter once a second region is covered', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Phoenix' },
+      { id: 'r2', name: 'Tucson' },
+    ]);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1']), tech('u2', 'Kenji Tran', ['r2'])],
+      dispatches: [],
+    });
+
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('Maya Alvarez');
+    expect(screen.getByRole('combobox', { name: /Region/ })).toBeInTheDocument();
+  });
+
+  // Coverage, not primary: a tech whose PRIMARY is Phoenix but who also
+  // covers Tucson makes this a two-region board for filtering purposes.
+  it('counts covered regions, not just primaries', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Phoenix' },
+      { id: 'r2', name: 'Tucson' },
+    ]);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1', 'r2'])],
+      dispatches: [],
+    });
+
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('Maya Alvarez');
+    expect(screen.getByRole('combobox', { name: /Region/ })).toBeInTheDocument();
+  });
+
+  it('scopes the board read to the region in the URL', async () => {
+    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
+
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?region=r2' });
+
+    await screen.findByText('No dispatches match these filters');
+    expect(mockGetBoard).toHaveBeenCalledWith(
+      expect.objectContaining({ regionIds: ['r2'] })
+    );
+  });
+
+  it('reads the date from the URL and steps it a day at a time', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-15' });
+
+    await screen.findByText('No technicians on this board');
+    expect(mockGetBoard).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-03-15' }));
+
+    await user.click(screen.getByRole('button', { name: 'Next day' }));
+    expect(mockGetBoard).toHaveBeenLastCalledWith(
+      expect.objectContaining({ date: '2026-03-16' })
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Previous day' }));
+    await user.click(screen.getByRole('button', { name: 'Previous day' }));
+    expect(mockGetBoard).toHaveBeenLastCalledWith(
+      expect.objectContaining({ date: '2026-03-14' })
+    );
+  });
+
+  // Month/DST boundaries: local-midnight arithmetic drifts here, UTC parts
+  // math does not.
+  it('steps across a month boundary without drifting', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-01' });
+
+    await screen.findByText('No technicians on this board');
+    await user.click(screen.getByRole('button', { name: 'Previous day' }));
+
+    expect(mockGetBoard).toHaveBeenLastCalledWith(
+      expect.objectContaining({ date: '2026-02-28' })
+    );
+  });
+
+  it('ignores a malformed date param rather than querying garbage', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=not-a-date' });
+
+    await screen.findByText('No technicians on this board');
+    expect(mockGetBoard).toHaveBeenCalledWith(
+      expect.objectContaining({ date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) })
+    );
+  });
+});
+
+// The rail's whole job is to be the work-order picker: a count with no cards
+// is the bug this suite exists to prevent.
+describe('DispatchBoardPage unscheduled rail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
+    mockRegionsGetAll.mockResolvedValue([{ id: 'r1', name: 'Phoenix' }]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+  });
+
+  it('renders a card per work order, not just a count', async () => {
+    mockGetUnscheduled.mockResolvedValue(
+      railWith([
+        railWorkOrder(),
+        railWorkOrder({
+          workOrderId: 'wo-2',
+          workOrderNumber: 'WO-3912',
+          workOrderSummary: 'Capacitor / contactor',
+          customerName: 'Eastlake HOA',
+        }),
+      ])
+    );
+
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    expect(await screen.findByText('WO-3911')).toBeInTheDocument();
+    expect(screen.getByText('WO-3912')).toBeInTheDocument();
+    expect(screen.getByText('No cooling — full system')).toBeInTheDocument();
+    expect(screen.getByText('Pham, A.')).toBeInTheDocument();
+  });
+
+  it('shows the age, which is the rail\u2019s tiebreak after priority', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('41m')).toBeInTheDocument();
+  });
+
+  it('flags an urgent card', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ priority: 'URGENT' })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('Urgent')).toBeInTheDocument();
+  });
+
+  it('joins the region id to a name client-side', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('Phoenix')).toBeInTheDocument();
+  });
+
+  // "1 item" on every card is noise; the count only matters when it implies
+  // more than one visit might be needed. It rides the identity row as "×3" —
+  // five characters cheaper than "3 items" on the row where width is scarcest.
+  it('names the item count only above one', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ itemCount: 1 })]));
+    const { unmount } = renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('WO-3911');
+    expect(screen.queryByText(/×/)).not.toBeInTheDocument();
+    unmount();
+
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ itemCount: 3 })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText(/×3/)).toBeInTheDocument();
+  });
+
+  it('falls back to the number when the summary has not synced', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ workOrderSummary: null })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    // Once as the identifier, once as the title — never a blank card.
+    expect(await screen.findAllByText('WO-3911')).toHaveLength(2);
+  });
+
+  // A coloured bar on every card — info-blue for the routine majority —
+  // flattens the one distinction that has to be instant.
+  it('draws the priority bar only when priority means something', async () => {
+    mockGetUnscheduled.mockResolvedValue(
+      railWith([
+        railWorkOrder(),
+        railWorkOrder({ workOrderId: 'wo-2', workOrderNumber: 'WO-3912', priority: 'URGENT' }),
+        railWorkOrder({ workOrderId: 'wo-3', workOrderNumber: 'WO-3913', priority: 'HIGH' }),
+      ]),
+    );
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('WO-3911');
+    const cards = Array.from(document.querySelectorAll('.db-wo'));
+    expect(cards[0].className).toBe('db-wo');
+    expect(cards[1]).toHaveClass('urgent');
+    expect(cards[2]).toHaveClass('high');
+  });
+
+  // The complete address on every card. A card whose shape changes with its
+  // content is harder to scan than one that repeats a word, and this is the
+  // datum a dispatcher reads aloud and verifies against what a customer just
+  // said — a partial one is one they must open the work order to trust.
+  it('shows the complete address on the card', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(
+      await screen.findByText('1284 W Thomas Rd · Phoenix, AZ 85015'),
+    ).toBeInTheDocument();
+  });
+
+  // Region is scope metadata, not part of the address — a different kind of
+  // fact, not a shorter version of the same one. It sits on the meta row with
+  // division, which is why the old `region !== city` guard is gone: on that
+  // row the duplication it protected against cannot occur.
+  it('keeps the region off the address line', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'East Valley' },
+      { id: 'r2', name: 'North' },
+    ]);
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    expect(
+      await screen.findByText('1284 W Thomas Rd · Phoenix, AZ 85015'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('East Valley')).toBeInTheDocument();
+  });
+
+  // Printing one region on all eleven cards of an already-filtered board is
+  // noise — the board scope already said it.
+  it('drops the region entirely when the board is scoped to one', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'East Valley' },
+      { id: 'r2', name: 'North' },
+    ]);
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?region=r1' });
+
+    await screen.findByText('WO-3911');
+    expect(screen.queryByText(/East Valley/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the empty message when there is genuinely nothing waiting', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('Nothing unscheduled')).toBeInTheDocument();
+  });
+});
+
+// "Stage the morning, release at 7am" — the reason on-deck is first-class,
+// and the one thing the board could render but not act on.
+describe('DispatchBoardPage release', () => {
+  const held = (over: Record<string, unknown> = {}) => withRelease({
+    id: 'd1',
+    seq: 1,
+    status: 'SCHEDULED',
+    arrivalWindowStart: '2026-03-15T08:00:00Z',
+    arrivalWindowEnd: '2026-03-15T10:00:00Z',
+    estimatedDuration: null,
+    releasedAt: null,
+    divisionId: null,
+    version: 1,
+    assignedUserId: 'u1',
+    assignedUserName: 'Maya Alvarez',
+    workOrderId: 'wo1',
+    workOrderNumber: 'WO-1',
+    workOrderTypeId: null,
+    workOrderSummary: 'No cooling',
+    customerId: 'c1',
+    customerName: 'Pham, A.',
+    priority: 'NORMAL',
+    recurring: false,
+    serviceLocationId: 'l1',
+    serviceLocationName: null,
+    serviceLocationStreet: null,
+    serviceLocationCity: null,
+    serviceLocationState: null,
+    serviceLocationZip: null,
+    latitude: null,
+    longitude: null,
+    driveMinFromPrev: null,
+    arrivedAt: null,
+    departedAt: null,
+    addressedWorkItemIds: [],
+    ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockRelease.mockResolvedValue({ released: 2, newCount: 2, changedCount: 0, removedCount: 0 });
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [held(), held({ id: 'd2' })],
+      pendingRelease: { newCount: 2, changedCount: 0, removedCount: 0, total: 2 },
+    });
+  });
+
+  it('offers the action only when something is owed', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByRole('button', { name: 'Release 2' })).toBeInTheDocument();
+  });
+
+  // The server's count, not a count of blocks: a removal has no block, and a
+  // name search is a lens on screen the release knows nothing about.
+  it('counts what the server says is owed, removals included', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [held()],
+      pendingRelease: { newCount: 1, changedCount: 2, removedCount: 1, total: 4 },
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    const button = await screen.findByRole('button', { name: 'Release 4' });
+    expect(button).toHaveAttribute(
+      'title',
+      '1 new · 2 changed · 1 removed — every technician row showing',
+    );
+    // "Changed, not sent" = changes + removals.
+    expect(screen.getByRole('button', { name: /Changed, not sent/ })).toHaveTextContent('3');
+  });
+
+  // Stays, disabled: scheduling a release for an empty day is legitimate —
+  // work added later goes out with it — so the group can't vanish at 0.
+  it('keeps the action, disabled, when nothing is owed', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [held({ releasedAt: '2026-03-15T07:00:00Z' })],
+      pendingRelease: { newCount: 0, changedCount: 0, removedCount: 0, total: 0 },
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    const button = await screen.findByRole('button', { name: 'Release' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'Nothing pending to send');
+  });
+
+  it('offers no release on a past day', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2020-03-15' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('button', { name: /^Release/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Release at a scheduled time' }),
+    ).not.toBeInTheDocument();
+  });
+
+  // Texting N technicians can't be un-sent, so unlike the drag operations
+  // this one asks before acting.
+  it('confirms before texting anyone, and does nothing on cancel', async () => {
+    const u = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 2' }));
+    expect(await screen.findByText('Release 2 changes?')).toBeInTheDocument();
+    expect(screen.getByText(/This sends 2 new/)).toBeInTheDocument();
+    expect(screen.getByText(/can't be undone/)).toBeInTheDocument();
+
+    await u.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  // Scope, not an id list — the server recomputes the unreleased set, so this
+  // can't reach outside the caller's regions or act on a stale board.
+  // Same regionIds AND divisionIds the board read used, so it releases
+  // exactly the tech rows the board draws.
+  it('sends the date and the board scope, never a list of ids', async () => {
+    const u = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, {
+      // A future day: a past one offers no release at all.
+      initialPath: '/dispatch?date=2099-03-15&region=r1&division=dv1',
+    });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 2' }));
+    await u.click(screen.getByRole('button', { name: 'Release' }));
+
+    expect(mockRelease).toHaveBeenCalledWith({
+      date: '2099-03-15',
+      regionIds: ['r1'],
+      divisionIds: ['dv1'],
+    });
+  });
+
+  it('reports the count the SERVER released, not the one on screen', async () => {
+    const u = userEvent.setup();
+    // The server recomputes, so its answer can differ from a stale board.
+    mockRelease.mockResolvedValue({ released: 5, newCount: 3, changedCount: 1, removedCount: 1 });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 2' }));
+    await u.click(screen.getByRole('button', { name: 'Release' }));
+
+    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith('Released 3 new · 1 changed · 1 removed'));
+  });
+
+  it('surfaces a failure instead of pretending it worked', async () => {
+    const u = userEvent.setup();
+    mockRelease.mockRejectedValue(new Error('nope'));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 2' }));
+    await u.click(screen.getByRole('button', { name: 'Release' }));
+
+    await waitFor(() =>
+      expect(mockShowError).toHaveBeenCalledWith("Couldn't release", expect.anything())
+    );
+  });
+});
+
+// A dispatch is a VISIT; the work order is the job — and "what is actually
+// happening with this job" is a question the board gets constantly, usually
+// with a customer on the phone. So the job is one action away from every place
+// a dispatch appears, and always as a real link.
+// Scheduled release (§2.3b): a timer on the Release button, not a snapshot.
+describe('DispatchBoardPage scheduled release', () => {
+  // A future day, so no time floor from the real clock gets in the way.
+  const DAY = '2099-03-15';
+  // The signed-in user, as test/setup.ts mocks useCurrentUser.
+  const ME = 'test-user-id';
+  const record = (over: Record<string, unknown> = {}) => ({
+    id: 'sr1',
+    date: DAY,
+    releaseAt: '2099-03-15T14:00:00Z', // 7a Phoenix
+    status: 'SCHEDULED',
+    overdue: false,
+    regionIds: null,
+    divisionIds: [],
+    createdByUserId: 'u-dana',
+    createdByName: 'Dana Ortiz',
+    sentAt: null,
+    newCount: null,
+    changedCount: null,
+    removedCount: null,
+    ...over,
+  });
+  const board = (scheduledReleases: unknown[], total = 2) => ({
+    date: DAY,
+    timeZone: 'America/Phoenix',
+    techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+    dispatches: [],
+    pendingRelease: { newCount: total, changedCount: 0, removedCount: 0, total },
+    scheduledReleases,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockDivisionsGetAll.mockResolvedValue([{ id: 'dv1', name: 'HVAC' }]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockScheduleRelease.mockResolvedValue(
+      record({ id: 'sr-me', createdByUserId: ME, createdByName: 'Me Dispatcher' }),
+    );
+    mockCancelScheduled.mockResolvedValue(undefined);
+  });
+
+  it("names another dispatcher's release and offers Cancel only", async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([record({ divisionIds: ['dv1'] })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    const pill = await screen.findByRole('button', { name: /Releases 7a · Dana/ });
+    // Scoped narrower than every row, so it says so.
+    await waitFor(() => expect(pill).toHaveTextContent('· HVAC'));
+    await u.click(pill);
+    expect(screen.queryByRole('menuitem', { name: 'Change time…' })).not.toBeInTheDocument();
+    await u.click(screen.getByRole('menuitem', { name: 'Cancel Dana’s scheduled release' }));
+
+    await waitFor(() => expect(mockCancelScheduled).toHaveBeenCalledWith('sr1'));
+    expect(mockShowSuccess).toHaveBeenCalledWith('Scheduled release cancelled · nothing was sent');
+  });
+
+  it('offers Change time on your own', async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([record({ createdByUserId: ME })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    await u.click(await screen.findByRole('button', { name: /Releases 7a · You/ }));
+    await u.click(screen.getByRole('menuitem', { name: 'Change time…' }));
+    expect(screen.getByRole('dialog', { name: 'Move your scheduled release' })).toBeInTheDocument();
+  });
+
+  it('schedules the view\'s scope at the usual start, in board time', async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([]));
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: `/dispatch?date=${DAY}&division=dv1`,
+    });
+
+    await u.click(await screen.findByRole('button', { name: 'Release at a scheduled time' }));
+    const panel = screen.getByRole('dialog');
+    // A future day offers the evening before; the scope is stated.
+    expect(within(panel).getByRole('radio', { name: 'Sat evening' })).toBeInTheDocument();
+    expect(within(panel).getByText('HVAC')).toBeInTheDocument();
+    expect(within(panel).getByText('Board time · MST')).toBeInTheDocument();
+    expect(within(panel).getByText('Other time')).toBeInTheDocument();
+    // The usual start is the pick it opens on.
+    expect(within(panel).getByRole('radio', { name: '7a' })).toBeChecked();
+
+    await u.click(within(panel).getByRole('button', { name: 'Schedule for 7a' }));
+    await waitFor(() =>
+      expect(mockScheduleRelease).toHaveBeenCalledWith({
+        date: DAY,
+        releaseAt: '2099-03-15T14:00:00.000Z',
+        regionIds: undefined,
+        divisionIds: ['dv1'],
+      }),
+    );
+    expect(mockShowSuccess).toHaveBeenCalledWith(
+      'Release scheduled for 7a · sends what’s pending then',
+    );
+  });
+
+  it('schedules the evening before when picked', async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    await u.click(await screen.findByRole('button', { name: 'Release at a scheduled time' }));
+    const panel = screen.getByRole('dialog');
+    await u.click(within(panel).getByRole('radio', { name: 'Sat evening' }));
+    // Evening picks replace the morning ones.
+    expect(within(panel).queryByRole('radio', { name: '7a' })).not.toBeInTheDocument();
+    await u.click(within(panel).getByRole('radio', { name: '9p' }));
+    await u.click(within(panel).getByRole('button', { name: 'Schedule for Sat 9p' }));
+
+    await waitFor(() =>
+      expect(mockScheduleRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ date: DAY, releaseAt: '2099-03-15T04:00:00.000Z' }),
+      ),
+    );
+  });
+
+  // The 15-minute step is the spinner's increment, not a rule: any minute
+  // schedules. Only the range — after now — refuses.
+  it('schedules any typed minute, and refuses only a time that has passed', async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    await u.click(await screen.findByRole('button', { name: 'Release at a scheduled time' }));
+    const panel = screen.getByRole('dialog');
+    const field = panel.querySelector('input[type="time"]') as HTMLInputElement;
+
+    fireEvent.change(field, { target: { value: '07:10' } });
+    expect(within(panel).getByRole('radio', { name: '7a' })).not.toBeChecked();
+    await u.click(within(panel).getByRole('button', { name: 'Schedule for 7:10a' }));
+    await waitFor(() =>
+      expect(mockScheduleRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ releaseAt: '2099-03-15T14:10:00.000Z' }),
+      ),
+    );
+  });
+
+  it('says why the evening before refuses an afternoon time', async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    await u.click(await screen.findByRole('button', { name: 'Release at a scheduled time' }));
+    const panel = screen.getByRole('dialog');
+    await u.click(within(panel).getByRole('radio', { name: 'Sat evening' }));
+    fireEvent.change(panel.querySelector('input[type="time"]') as HTMLInputElement, {
+      target: { value: '15:00' },
+    });
+
+    expect(within(panel).getByText('Evening-before releases start at 5p.')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Schedule for Sat 3p' })).toBeDisabled();
+  });
+
+  it('says it moved your release when you schedule again', async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([record({ createdByUserId: ME })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    await u.click(await screen.findByRole('button', { name: 'Release at a scheduled time' }));
+    await u.click(screen.getByRole('button', { name: 'Move to 7a' }));
+    await waitFor(() =>
+      expect(mockShowSuccess).toHaveBeenCalledWith(
+        'Moved your release to 7a · sends what’s pending then',
+      ),
+    );
+  });
+
+  // Nothing retries an overdue run, so it escalates out of the pill. Its
+  // count and its send are the RECORD's scope, not the view's.
+  it('raises the overdue strip, and Release now sends the record, not the view', async () => {
+    const u = userEvent.setup();
+    mockReleaseScheduled.mockResolvedValue(
+      record({ status: 'SENT', sentBy: 'MANUAL', newCount: 3, changedCount: 0, removedCount: 0 }),
+    );
+    mockGetBoard.mockResolvedValue(
+      board([
+        record({
+          status: 'FAILED',
+          overdue: true,
+          pendingRelease: { newCount: 3, changedCount: 0, removedCount: 0, total: 3, techCount: 2 },
+          callerCoversScope: false,
+        }),
+      ]),
+    );
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    const strip = await screen.findByRole('alert');
+    expect(strip).toHaveTextContent("The 7a scheduled release didn't send.");
+    expect(strip).toHaveTextContent('Set by Dana Ortiz.');
+    expect(screen.getByText('Scheduled for 7a · not sent')).toBeInTheDocument();
+
+    // 3 for the record, though the view has 2 pending.
+    await u.click(within(strip).getByRole('button', { name: 'Release now · 3' }));
+    expect(await screen.findByText('Release 3 changes?')).toBeInTheDocument();
+    expect(screen.getByText(/the rest stays not sent/)).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: 'Release' }));
+
+    await waitFor(() => expect(mockReleaseScheduled).toHaveBeenCalledWith('sr1'));
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  // It never outlives the problem.
+  it('drops the strip once nothing is pending for the record', async () => {
+    mockGetBoard.mockResolvedValue(
+      board([
+        record({
+          status: 'MISSED',
+          overdue: true,
+          pendingRelease: { newCount: 0, changedCount: 0, removedCount: 0, total: 0, techCount: 0 },
+        }),
+      ]),
+    );
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    expect(await screen.findByText('Scheduled for 7a · not sent')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('says a release sent by hand was not the schedule', async () => {
+    mockGetBoard.mockResolvedValue(
+      board([
+        record({
+          status: 'SENT',
+          sentBy: 'MANUAL',
+          sentAt: '2099-03-15T17:32:00Z',
+          newCount: 4,
+          changedCount: 0,
+          removedCount: 0,
+        }),
+      ]),
+    );
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    expect(await screen.findByText(/Released at 10:32a · 4 new/)).toBeInTheDocument();
+    expect(screen.getByText('· released by hand · due 7a')).toBeInTheDocument();
+  });
+
+  it('shows the real time of a late send, and when it was due', async () => {
+    mockGetBoard.mockResolvedValue(
+      board([
+        record({
+          status: 'SENT',
+          sentAt: '2099-03-15T17:30:00Z',
+          newCount: 12,
+          changedCount: 3,
+          removedCount: 0,
+        }),
+      ]),
+    );
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    expect(await screen.findByText(/Released at 10:30a · 12 new · 3 changed/)).toBeInTheDocument();
+    expect(screen.getByText('· due 7a')).toBeInTheDocument();
+  });
+
+  it('says a release already sending can no longer be cancelled', async () => {
+    const u = userEvent.setup();
+    mockCancelScheduled.mockRejectedValue({
+      response: { status: 409, data: { code: 'SCHEDULED_RELEASE_NOT_CANCELLABLE' } },
+    });
+    mockGetBoard.mockResolvedValue(board([record({ createdByUserId: ME })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    await u.click(await screen.findByRole('button', { name: /Releases 7a · You/ }));
+    await u.click(screen.getByRole('menuitem', { name: 'Cancel my scheduled release' }));
+    await waitFor(() =>
+      expect(mockShowError).toHaveBeenCalledWith(
+        'That release has already started sending',
+        undefined,
+      ),
+    );
+  });
+});
+
+describe('DispatchBoardPage reaching the work order', () => {
+  const scheduled = (over: Record<string, unknown> = {}) => withRelease({
+    id: 'd1',
+    seq: 1,
+    status: 'SCHEDULED',
+    arrivalWindowStart: '2026-03-15T08:00:00Z',
+    arrivalWindowEnd: '2026-03-15T10:00:00Z',
+    estimatedDuration: null,
+    releasedAt: null,
+    divisionId: null,
+    version: 1,
+    assignedUserId: 'u1',
+    assignedUserName: 'Maya Alvarez',
+    workOrderId: 'wo1',
+    workOrderNumber: 'WO-1',
+    workOrderTypeId: null,
+    workOrderSummary: 'No cooling',
+    customerId: 'c1',
+    customerName: 'Pham, A.',
+    priority: 'NORMAL',
+    recurring: false,
+    serviceLocationId: 'l1',
+    serviceLocationName: null,
+    serviceLocationStreet: null,
+    serviceLocationCity: null,
+    serviceLocationState: null,
+    serviceLocationZip: null,
+    latitude: null,
+    longitude: null,
+    driveMinFromPrev: null,
+    arrivedAt: null,
+    departedAt: null,
+    addressedWorkItemIds: [],
+    ...over,
+  });
+
+  const block = () => screen.findByRole('link', { name: /No cooling/ });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    mockReleaseOne.mockResolvedValue({});
+    mockDeleteDispatch.mockResolvedValue(undefined);
+    mockGetWorkOrder.mockResolvedValue({ id: 'wo-1', workItems: [] });
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [scheduled()],
+    });
+  });
+
+  // Smart back carries the board's own query, so the dispatcher returns to the
+  // day and scope they were working rather than a reset board.
+  it('links a block to its work order and carries the board back', async () => {
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?date=2026-03-15&region=r1',
+    });
+    expect(await block()).toHaveAttribute(
+      'href',
+      '/work-orders/wo1?from=dispatch&back=date%3D2026-03-15%26region%3Dr1',
+    );
+  });
+
+  it('links the rail card number to the work order', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByRole('link', { name: 'WO-3911' })).toHaveAttribute(
+      'href',
+      '/work-orders/wo-1?from=dispatch',
+    );
+  });
+
+  // The card body still schedules — the number is the only part that navigates.
+  it('keeps the rail card itself opening the composer, from the keyboard too', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    const card = (await screen.findByText('No cooling — full system')).closest(
+      '[role="button"]',
+    ) as HTMLElement;
+    card.focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(mockGetWorkOrder).toHaveBeenCalledWith('wo-1'));
+  });
+
+  it('opens the work order first in the right-click menu', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+
+    const items = await screen.findAllByRole('menuitem');
+    expect(items[0]).toHaveTextContent('Open Work Order');
+    expect(items[0]).toHaveAttribute('href', '/work-orders/wo1?from=dispatch');
+  });
+
+  it('releases just that visit from the menu', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await user.click(await screen.findByRole('menuitem', { name: /Release to/ }));
+
+    await waitFor(() => expect(mockReleaseOne).toHaveBeenCalledWith('d1'));
+    // Never the bulk endpoint: that one takes a scope and would release the
+    // whole day.
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  it('drops release from the menu once the visit is already released', async () => {
+    const user = userEvent.setup();
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [scheduled({ releasedAt: '2026-03-15T07:00:00Z' })],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await screen.findByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: /Release to/ })).not.toBeInTheDocument();
+  });
+
+  // A tech already driving has a real-world commitment; retracting it is a
+  // cancellation, which is a different verb with different consequences.
+  it('drops unschedule from the menu once the tech is en route', async () => {
+    const user = userEvent.setup();
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [scheduled({ status: 'EN_ROUTE' })],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await screen.findByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: 'Unschedule' })).not.toBeInTheDocument();
+  });
+
+  // Changed since release: same verb, but it sends a change.
+  it('offers Send update for a changed visit, and nothing for one that matches', async () => {
+    const user = userEvent.setup();
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [scheduled({ releasedAt: '2026-03-15T07:00:00Z', releaseState: 'CHANGED' })],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await user.click(await screen.findByRole('menuitem', { name: 'Send update' }));
+    await waitFor(() => expect(mockReleaseOne).toHaveBeenCalledWith('d1'));
+  });
+
+  it('unschedules from the menu', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await user.click(await screen.findByRole('menuitem', { name: 'Unschedule' }));
+
+    await waitFor(() => expect(mockDeleteDispatch).toHaveBeenCalledWith('d1'));
+  });
+
+  it('closes the menu on Escape without acting', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await screen.findByRole('menu');
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    expect(mockReleaseOne).not.toHaveBeenCalled();
+    expect(mockDeleteDispatch).not.toHaveBeenCalled();
+  });
+});
+
+// Week is a different GRANULARITY on the same rows — a separate read, because
+// seven days of a 60-tech shop is ~2,000 dispatches and the grid renders none
+// of them individually.
+describe('DispatchBoardPage week', () => {
+  const DAYS = [
+    '2026-03-16',
+    '2026-03-17',
+    '2026-03-18',
+    '2026-03-19',
+    '2026-03-20',
+    '2026-03-21',
+    '2026-03-22',
+  ];
+
+  const weekCell = (date: string, over: Record<string, unknown> = {}) => ({
+    date,
+    stopCount: 0,
+    committedCount: 0,
+    divisionIds: [],
+    hasUrgent: false,
+    hasUnreleased: false,
+    off: false,
+    timeOff: [],
+    ...over,
+  });
+
+  const weekTech = (over: Record<string, unknown> = {}) => ({
+    id: 'u1',
+    name: 'Maya Alvarez',
+    regionIds: ['r1'],
+    cells: DAYS.map((d) => weekCell(d)),
+    ...over,
+  });
+
+  const weekResponse = (over: Record<string, unknown> = {}) => ({
+    weekStart: DAYS[0],
+    weekEnd: '2026-03-23',
+    timeZone: 'America/Phoenix',
+    days: DAYS,
+    defaultStopsPerDay: 6,
+    techs: [weekTech()],
+    ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
+    mockGetWeek.mockResolvedValue(weekResponse());
+  });
+
+  // Two reads, and only ever one of them: the day grid and the week grid
+  // answer different questions at different volumes.
+  it('runs the week read instead of the day read', async () => {
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    expect(mockGetBoard).not.toHaveBeenCalled();
+    expect(mockGetWeek).toHaveBeenCalledWith(
+      expect.objectContaining({ weekStart: '2026-03-16' }),
+    );
+  });
+
+  // The backend takes whatever first day it is handed, so the client owns the
+  // convention — Monday, with the weekend at the end of the work week.
+  it('snaps any day in the week back to its Monday', async () => {
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-22',
+    });
+
+    await screen.findByText('Mon 16');
+    expect(mockGetWeek).toHaveBeenCalledWith(
+      expect.objectContaining({ weekStart: '2026-03-16' }),
+    );
+  });
+
+  it('stays on the day read in day view', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(mockGetWeek).not.toHaveBeenCalled();
+  });
+
+  it('switches granularity from the toggle, and keeps the date', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+
+    await screen.findByText('Maya Alvarez');
+    await user.click(screen.getByRole('radio', { name: 'Week' }));
+
+    await waitFor(() =>
+      expect(mockGetWeek).toHaveBeenCalledWith(
+        expect.objectContaining({ weekStart: '2026-03-16' }),
+      ),
+    );
+  });
+
+  // The week's job is to route you to the right day.
+  // The peek reads ONE day — that day's board, on open — never seven days of
+  // dispatches to draw counts.
+  it('peeks at a tech-day by reading just that day', async () => {
+    const user = userEvent.setup();
+    mockGetWeek.mockResolvedValue(
+      weekResponse({
+        techs: [weekTech({ cells: DAYS.map((d) => weekCell(d, d === '2026-03-18' ? { stopCount: 1, committedCount: 1 } : {})) })],
+      }),
+    );
+    mockGetBoard.mockResolvedValue({
+      date: '2026-03-18',
+      timeZone: 'America/Phoenix',
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [
+        withRelease({
+          id: 'd1',
+          status: 'SCHEDULED',
+          arrivalWindowStart: '2026-03-18T16:00:00Z',
+          arrivalWindowEnd: '2026-03-18T18:00:00Z',
+          releasedAt: null,
+          assignedUserId: 'u1',
+          workOrderId: 'wo1',
+          workOrderNumber: 'WO-1',
+          workOrderSummary: 'No cooling',
+          priority: 'NORMAL',
+        }),
+      ],
+      commitments: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await user.click(await screen.findByRole('button', { name: /Maya Alvarez, Wed 18/ }));
+    await waitFor(() =>
+      expect(mockGetBoard).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-03-18' })),
+    );
+    const peek = await screen.findByRole('dialog', { name: /Maya Alvarez · Wed 18/ });
+    // 16:00Z is 9am in Phoenix — the tenant's zone, not the runner's.
+    expect(await within(peek).findByText('9a–11a')).toBeInTheDocument();
+    expect(within(peek).getByText('No cooling')).toBeInTheDocument();
+  });
+
+  // The column header opens the day; a cell opens a peek of that tech-day.
+  it('opens a day’s board from its column header', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    await user.click(screen.getByRole('button', { name: /^Wed 18/ }));
+
+    await waitFor(() =>
+      expect(mockGetBoard).toHaveBeenCalledWith(
+        expect.objectContaining({ date: '2026-03-18' }),
+      ),
+    );
+  });
+
+  // Every chip is a predicate over individual dispatches, and release takes a
+  // single day's scope — neither can act on an aggregate.
+  it('drops the exception chips and the release action in week view', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=week' });
+
+    await screen.findByText('Mon 16');
+    expect(screen.queryByRole('button', { name: /Urgent/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Release/ })).not.toBeInTheDocument();
+  });
+
+  it('steps a week at a time', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    await user.click(screen.getByRole('button', { name: 'Next week' }));
+
+    await waitFor(() =>
+      expect(mockGetWeek).toHaveBeenCalledWith(
+        expect.objectContaining({ weekStart: '2026-03-23' }),
+      ),
+    );
+  });
+
+  // Release is per day from the week (§3.8a), and it confirms first: the
+  // dispatcher isn't looking at that day's work.
+  it("releases one column's day through the day endpoint, after a confirm", async () => {
+    const u = userEvent.setup();
+    const FUTURE = DAYS.map((d) => d.replace('2026', '2099'));
+    mockRelease.mockResolvedValue({ released: 5, newCount: 3, changedCount: 2, removedCount: 0 });
+    mockGetWeek.mockResolvedValue(
+      weekResponse({
+        weekStart: FUTURE[0],
+        days: FUTURE,
+        techs: [weekTech({ cells: FUTURE.map((d) => weekCell(d)) })],
+        pendingReleaseByDay: FUTURE.map((date, i) => ({
+          date,
+          pendingRelease:
+            i === 1
+              ? { newCount: 3, changedCount: 2, removedCount: 0, total: 5, techCount: 4 }
+              : { newCount: 0, changedCount: 0, removedCount: 0, total: 0, techCount: 0 },
+        })),
+      }),
+    );
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: `/dispatch?view=week&date=${FUTURE[0]}&division=dv1`,
+    });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 5' }));
+    expect(await screen.findByText(/^Release Tue, Mar 17 to 4 /)).toBeInTheDocument();
+    expect(screen.getByText(/3 new · 2 changed — for Tue only/)).toBeInTheDocument();
+    // The whole dialog's own button, not the column's.
+    await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Release 5' }));
+
+    await waitFor(() =>
+      expect(mockRelease).toHaveBeenCalledWith({
+        date: FUTURE[1],
+        regionIds: undefined,
+        divisionIds: ['dv1'],
+      }),
+    );
+  });
+});
+
+// The board never said which day it was showing: stepping forward with a
+// chevron left the dispatcher guessing.
+describe('DispatchBoardPage date label', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+      timeZone: 'America/Phoenix',
+    });
+  });
+
+  // The date moved into the subtitle, where it has room to be a real date
+  // rather than a label wedged between two chevrons.
+  it('names the day, the rows and the work in the subtitle', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    expect(await screen.findByText(/Wed, Mar 18/)).toBeInTheDocument();
+    expect(screen.getByText(/in scope/)).toBeInTheDocument();
+  });
+
+  // A now-time on Thursday's board would be a lie, the same way the now-line
+  // would be.
+  it('gives the time only while the board is showing today', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    await screen.findByText(/Wed, Mar 18/);
+    expect(screen.queryByText(/now /)).not.toBeInTheDocument();
+  });
+
+  it('offers no Today while the board is already showing today', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    // Self-hiding, like the filters: there is nowhere to go back to.
+    expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument();
+  });
+
+  // The date is in the nav where you step through days, and Today appearing
+  // beside it is the clearest cue that the board is on another day.
+  it('names the day and offers Today once you step off it', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    expect(await screen.findByRole('button', { name: 'Mar 18' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Today' })).toBeEnabled();
+  });
+
+  it('walks back to today from it', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+
+    await user.click(await screen.findByRole('button', { name: 'Today' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('reaches an arbitrary date from the nav', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByLabelText('Pick a date')).toHaveAttribute('type', 'date');
+  });
+});
+
+describe('DispatchBoardPage chrome', () => {
+  const chromeDispatch = (over: Record<string, unknown> = {}) => withRelease({
+    id: 'd1',
+    seq: 1,
+    status: 'SCHEDULED',
+    arrivalWindowStart: '2026-03-15T08:00:00Z',
+    arrivalWindowEnd: '2026-03-15T10:00:00Z',
+    estimatedDuration: null,
+    releasedAt: null,
+    divisionId: null,
+    version: 1,
+    assignedUserId: 'u1',
+    assignedUserName: 'Maya Alvarez',
+    workOrderId: 'wo1',
+    workOrderNumber: 'WO-1',
+    workOrderTypeId: null,
+    workOrderSummary: 'No cooling',
+    customerId: 'c1',
+    customerName: 'Pham, A.',
+    priority: 'NORMAL',
+    recurring: false,
+    serviceLocationId: 'l1',
+    serviceLocationName: null,
+    serviceLocationStreet: null,
+    serviceLocationCity: null,
+    serviceLocationState: null,
+    serviceLocationZip: null,
+    latitude: null,
+    longitude: null,
+    driveMinFromPrev: null,
+    arrivedAt: null,
+    departedAt: null,
+    addressedWorkItemIds: [],
+    ...over,
+  });
+
+  // Zero-count chips stay — "Urgent 0" is information — but an all-zeros row
+  // with nothing active is six controls that do nothing, so the band goes.
+  it('drops the whole chip band when there is nothing to except', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('button', { name: /Urgent/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps zero-count chips once anything is non-zero', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [chromeDispatch()],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    // Unreleased is 1, so the band shows — and Urgent stays at 0 rather than
+    // vanishing and making the row jump.
+    expect(await screen.findByRole('button', { name: /Urgent/ })).toBeInTheDocument();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockDivisionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+  });
+
+  it('counts the rows on screen', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('1 rows')).toBeInTheDocument();
+  });
+
+  // A dispatcher learns the grid's encoding from here, not from a tooltip on
+  // every block. It lives in the chip band, so it comes and goes with it.
+  it('explains the grid’s colours', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [chromeDispatch()],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    // Present in the DOM; a media query hides it below ~1100px, where the
+    // chip row already carries the colour vocabulary.
+    expect(screen.getByText('No estimate')).toBeInTheDocument();
+    expect(screen.getByText('On site now')).toBeInTheDocument();
+  });
+
+  // Division is a property of the WORK, so the tenant needs more than one
+  // before the filter is worth its width — same self-hiding rule as the rest.
+  it('hides the division filter for a single-division tenant', async () => {
+    mockDivisionsGetAll.mockResolvedValue([{ id: 'dv1', name: 'HVAC' }]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('combobox', { name: /Division/ })).not.toBeInTheDocument();
+  });
+
+  it('offers the division filter once there are two', async () => {
+    mockDivisionsGetAll.mockResolvedValue([
+      { id: 'dv1', name: 'HVAC' },
+      { id: 'dv2', name: 'Plumbing' },
+    ]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    // Closed, the picker reads as its own label — "All divisions" is the reset
+    // row inside it, per the house listbox rather than the mock's <select>.
+    expect(await screen.findByRole('combobox', { name: /Division/ })).toBeInTheDocument();
+  });
+
+  // It filters the WORK, not the rows — and the server is what enforces that,
+  // so the id has to reach all three reads or the rail would still offer work
+  // the grid is hiding.
+  it('scopes every read to the division in the URL', async () => {
+    mockDivisionsGetAll.mockResolvedValue([
+      { id: 'dv1', name: 'HVAC' },
+      { id: 'dv2', name: 'Plumbing' },
+    ]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?division=dv1' });
+
+    await screen.findByText('Maya Alvarez');
+    expect(mockGetBoard).toHaveBeenCalledWith(expect.objectContaining({ divisionIds: ['dv1'] }));
+    expect(mockGetUnscheduled).toHaveBeenCalledWith(
+      expect.objectContaining({ divisionIds: ['dv1'] }),
+    );
+  });
+});
+
+// The map is a view mode, and the control that entered it has to keep saying
+// so — aria-pressed alone announced the state to a screen reader and rendered
+// identically for everyone else, because Catalyst's Button has no pressed
+// styling of its own.
+describe('DispatchBoardPage map toggle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockRegionsGetAll.mockResolvedValue([]);
+  });
+
+  it('is unpressed on the day board', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    const button = await screen.findByRole('button', { name: /Map/ });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('stays pressed while the map is up, and carries the styling with it', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=map' });
+    const button = await screen.findByRole('button', { name: /Map/ });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    // The visual state rides on the same attribute rather than a second
+    // source of truth, so the two cannot disagree.
+    expect(button.className).toContain('aria-pressed:bg-bg-active');
+  });
+
+  it('shows Day on the horizon toggle, since a route is a day of work', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=map' });
+    await screen.findByRole('button', { name: /Map/ });
+    expect(screen.getByRole('radio', { name: 'Day' })).toBeChecked();
+  });
+});
+
+// Two technicians covering the same regions must read as covering the same
+// regions. A tech's `regionIds` arrive in whatever order an admin ticked the
+// boxes — the same artifact that made primaryRegionId meaningless.
+describe('DispatchBoardPage technician coverage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Georgia', abbreviation: 'GA', sortOrder: 1 },
+      { id: 'r2', name: 'North Carolina', abbreviation: 'NC', sortOrder: 2 },
+      { id: 'r3', name: 'Florida', abbreviation: 'FL', sortOrder: 3 },
+    ]);
+  });
+
+  it('orders coverage by the tenant registry, not the user array', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [
+        tech('u1', 'Maya Alvarez', ['r3', 'r1', 'r2']),
+        tech('u2', 'Kenji Tran', ['r2', 'r3', 'r1']),
+      ],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('Maya Alvarez');
+    // Identical coverage, identical line — regardless of how each was stored.
+    expect(screen.getAllByText('GA · NC · FL')).toHaveLength(2);
+  });
+
+  it('honours a tenant that ordered its regions north-to-south', async () => {
+    // sortOrder is tenant data. Alphabetising it would be the board imposing
+    // its own idea of order on someone who already expressed one.
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Alpha', abbreviation: 'AL', sortOrder: 9 },
+      { id: 'r2', name: 'Beta', abbreviation: 'BE', sortOrder: 1 },
+    ]);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1', 'r2'])],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('BE · AL')).toBeInTheDocument();
+  });
+
+  it('says nothing when the tenant has one region', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Georgia', abbreviation: 'GA', sortOrder: 1 },
+    ]);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByText('GA')).not.toBeInTheDocument();
+  });
+});

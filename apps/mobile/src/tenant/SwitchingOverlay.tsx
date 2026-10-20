@@ -29,8 +29,12 @@ export function SwitchingOverlay({ companyName }: { companyName: string }) {
       <Text style={{ color: colors.fgStrong, fontWeight: '600', marginTop: spacing.sm }}>
         {t('workspace.switching.title', { company: companyName })}
       </Text>
+      {/* Web interpolates these from the tenant's glossary (getName()), which
+          lets a tenant rename "Work Orders" to "Jobs" etc. Mobile has no
+          GlossaryProvider yet, so these are the plain defaults — revisit once
+          one exists. */}
       <Text style={{ color: colors.fgMuted, fontSize: 12, marginTop: 2 }}>
-        {t('workspace.switching.body')}
+        {t('workspace.switching.body', { workOrders: 'work orders', customers: 'customers' })}
       </Text>
     </View>
   );

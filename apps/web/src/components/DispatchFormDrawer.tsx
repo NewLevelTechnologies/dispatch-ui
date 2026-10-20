@@ -1,14 +1,15 @@
 /* eslint-disable i18next/no-literal-string -- dense operational composer; short scheduling labels stay literal (same convention as WorkOrderFileUploadDialog / WorkOrderFilesTab). Entity names still route through getName(). */
 // Dispatch create / edit — the compose+edit counterpart to the read-only trip
 // drawer (DispatchDetailDrawer). Same right-side SlideOver chrome, so scheduling
-// or editing a dispatch feels like the same object you view. Replaces the legacy
-// AssignTechnicianDialog. Sections: Work addressed → When → Assign tech → Release.
+// or editing a dispatch feels like the same object you view. Sections: Work
+// addressed → When → Assign tech → Release.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { CalendarDaysIcon, CheckIcon, ChevronUpDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import {
   dispatchesApi,
+  divisionsApi,
   userApi,
   type Dispatch,
   type ProgressCategory,
@@ -16,10 +17,18 @@ import {
   type WorkItemResponse,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { errorCode, isConflict } from '../lib/toast';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
 import { Avatar } from './ui/Avatar';
 import ConfirmDialog from './ConfirmDialog';
+import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
+import { zonedDateOf, zonedHourOf, zonedIso } from '../lib/zonedTime';
+import { PRESET_WINDOWS } from '../lib/arrivalWindows';
+import { Pill } from './ui/Pill';
+import DispatchJobSection from './dispatch/DispatchJobSection';
+import type { DispatchSeed } from './DispatchDetailDrawer';
 import { workItemLabel } from '@dispatch/utils';
 
 interface Props {
@@ -29,8 +38,50 @@ interface Props {
   workItems: WorkItemResponse[];
   locationName?: string;
   workOrderNumber?: string;
+  /** The job behind the visit, when the caller is somewhere the job is NOT
+   *  already on screen — the dispatch board, today. Omitted by the work
+   *  order's own page, where a link back to the page you are standing on is
+   *  noise.
+   *
+   *  A real href, not a click handler: middle-click and cmd-click to a new tab
+   *  are how a dispatcher reads a job without losing the board. */
+  workOrderHref?: string;
   // Present = edit mode (prefilled); absent = create.
-  dispatch?: Dispatch | null;
+  /** The visit being edited. A SEED rather than a full `Dispatch`: the form
+   *  reads only the assignment, the window, the addressed items and the
+   *  version, all of which a board row carries — so the board can open this
+   *  straight off the grid without a round-trip for notes/createdAt/updatedAt
+   *  it would never look at. */
+  dispatch?: DispatchSeed | null;
+  /** Create-mode seed from a surface that knows WHO and WHICH DAY but not the
+   *  window — today, only the dispatch board's map.
+   *
+   *  The window is deliberately left unchosen. Every window the board creates
+   *  must be one of the tenant's presets, so auto-picking one here would
+   *  fabricate a promise to a customer that nobody made — and an undo toast
+   *  does not undo a phone call. The general rule the board follows: a drag
+   *  commits silently only where the gesture itself carries a time. The
+   *  timeline lane does (x is the clock); a map drop carries a person and
+   *  nothing else. */
+  prefill?: MapPrefill | null;
+  /** Create-mode seed for the addressed items — a work item's own "Schedule"
+   *  opens the form with just that item ticked. Absent = the default (every
+   *  item that still needs a visit). */
+  initialWorkItemIds?: string[] | null;
+  /** The job's division, when the caller knows it — every caller does today.
+   *
+   *  It ORDERS the technician picker and nothing else. A tech's divisions are a
+   *  strength ("the kinds of work they're good at taking on"), not a
+   *  qualification: no row is hidden, no row is disabled, and assigning across
+   *  divisions raises no warning and no confirm. Certification is a separate
+   *  model with real blocking semantics, and this must not be mistaken for it. */
+  divisionId?: string | null;
+}
+
+export interface MapPrefill {
+  assignedUserId: string;
+  /** The date the board is VIEWING, not tomorrow. */
+  date: string;
 }
 
 // Work items that still want a trip — pre-selected on create.
@@ -45,16 +96,20 @@ interface Win {
   em: number;
 }
 
-// Standard 2-hour arrival windows. Fast, CSR-friendly picking; a non-standard
-// existing window is preserved on edit via a synthetic "current" option.
-const PRESETS: Win[] = [
-  { key: '08-10', label: '8:00 – 10:00 AM', sh: 8, sm: 0, eh: 10, em: 0 },
-  { key: '09-11', label: '9:00 – 11:00 AM', sh: 9, sm: 0, eh: 11, em: 0 },
-  { key: '10-12', label: '10:00 AM – 12:00 PM', sh: 10, sm: 0, eh: 12, em: 0 },
-  { key: '12-14', label: '12:00 – 2:00 PM', sh: 12, sm: 0, eh: 14, em: 0 },
-  { key: '14-16', label: '2:00 – 4:00 PM', sh: 14, sm: 0, eh: 16, em: 0 },
-  { key: '16-18', label: '4:00 – 6:00 PM', sh: 16, sm: 0, eh: 18, em: 0 },
-];
+// The tenant's arrival windows — the same list the board snaps drops to, so
+// anything dragged there can be picked here. A non-standard existing window is
+// preserved on edit via a synthetic "current" option.
+const PRESETS: Win[] = PRESET_WINDOWS.map((w) => ({
+  key: w.key,
+  label: w.label,
+  sh: w.startHour,
+  sm: 0,
+  eh: w.endHour,
+  em: 0,
+}));
+
+// The window a new visit opens on.
+const DEFAULT_WIN_KEY = '09-11';
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
@@ -64,27 +119,49 @@ function localDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function toIso(dateStr: string, h: number, m: number): string {
-  const [y, mo, d] = dateStr.split('-').map(Number);
-  return new Date(y, mo - 1, d, h, m, 0, 0).toISOString();
+// Every conversion here runs through the TENANT's zone, not the browser's.
+// An arrival window of "8–10a" means 8am where the truck is going; built from
+// browser-local midnight it lands at whatever hour the offset makes of it,
+// and the board — which reads the day back in the tenant's zone — then draws
+// it on the wrong row.
+function toIso(dateStr: string, h: number, m: number, timeZone: string): string {
+  return zonedIso(dateStr, h + m / 60, timeZone);
 }
 
-function fmtTime(d: Date): string {
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+function fmtTime(hour: number): string {
+  const h = Math.floor(hour);
+  const m = Math.round((hour - h) * 60);
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${pad(m)} ${suffix}`;
 }
 
 // Match an existing window to a preset (or build a "current" option for it).
-function windowFromDispatch(d: Dispatch): { date: string; win: Win } {
-  const start = new Date(d.arrivalWindowStart);
-  const end = new Date(d.arrivalWindowEnd);
-  const sh = start.getHours();
-  const sm = start.getMinutes();
-  const eh = end.getHours();
-  const em = end.getMinutes();
+// Takes only the two fields it reads, so it works on a full dispatch and on
+// the board row the grid already holds.
+function windowFromDispatch(
+  d: Pick<Dispatch, 'arrivalWindowStart' | 'arrivalWindowEnd'>,
+  timeZone: string,
+): { date: string; win: Win } {
+  // Read back through the same zone it was written in, or editing a dispatch
+  // would silently shift its window by the offset every time it was saved.
+  const startHour = zonedHourOf(d.arrivalWindowStart, timeZone) ?? 0;
+  const endHour = zonedHourOf(d.arrivalWindowEnd, timeZone) ?? 0;
+  const sh = Math.floor(startHour);
+  const sm = Math.round((startHour - sh) * 60);
+  const eh = Math.floor(endHour);
+  const em = Math.round((endHour - eh) * 60);
   const preset = PRESETS.find((w) => w.sh === sh && w.sm === sm && w.eh === eh && w.em === em);
   return {
-    date: localDate(start),
-    win: preset ?? { key: 'current', label: `${fmtTime(start)} – ${fmtTime(end)}`, sh, sm, eh, em },
+    date: zonedDateOf(d.arrivalWindowStart, timeZone) ?? localDate(new Date()),
+    win: preset ?? {
+      key: 'current',
+      label: `${fmtTime(startHour)} – ${fmtTime(endHour)}`,
+      sh,
+      sm,
+      eh,
+      em,
+    },
   };
 }
 
@@ -101,18 +178,26 @@ export default function DispatchFormDrawer({
   workItems,
   locationName,
   workOrderNumber,
+  workOrderHref,
   dispatch,
+  prefill,
+  initialWorkItemIds,
+  divisionId,
 }: Props) {
   const { t } = useTranslation();
+  // Windows are tenant-local: "8–10a" means 8am where the truck is going.
+  const timeZone = useTenantTimeZone();
   const { getName, getAbbrev } = useGlossary();
   const queryClient = useQueryClient();
   const editing = !!dispatch;
+  // The server refuses to move a window once the tech has arrived.
+  const windowLocked = editing && Boolean(dispatch?.arrivedAt);
   const dispatchWord = getName('dispatch').toLowerCase();
   const techWord = getName('technician').toLowerCase();
 
   const [assignedUserId, setAssignedUserId] = useState('');
   const [date, setDate] = useState(defaultDate);
-  const [winKey, setWinKey] = useState(PRESETS[1].key);
+  const [winKey, setWinKey] = useState(DEFAULT_WIN_KEY);
   const [addressed, setAddressed] = useState<string[]>([]);
   const [release, setRelease] = useState<'now' | 'deck'>('now');
   const [notifyCustomer, setNotifyCustomer] = useState(true);
@@ -122,18 +207,18 @@ export default function DispatchFormDrawer({
   // A non-standard existing window becomes a selectable "current" option.
   const winOptions = useMemo<Win[]>(() => {
     if (editing && dispatch) {
-      const { win } = windowFromDispatch(dispatch);
+      const { win } = windowFromDispatch(dispatch, timeZone);
       if (win.key === 'current') return [win, ...PRESETS];
     }
     return PRESETS;
-  }, [editing, dispatch]);
+  }, [editing, dispatch, timeZone]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- re-seed transient form state on open (same pattern as the other *FormDialog components). */
   useEffect(() => {
     if (!open) return;
     setError(null);
     if (dispatch) {
-      const { date: d, win } = windowFromDispatch(dispatch);
+      const { date: d, win } = windowFromDispatch(dispatch, timeZone);
       setAssignedUserId(dispatch.assignedUserId);
       setDate(d);
       setWinKey(win.key);
@@ -142,40 +227,112 @@ export default function DispatchFormDrawer({
       // save. Switching either on is an explicit release/re-notify action.
       setRelease('deck');
       setNotifyCustomer(false);
-    } else {
-      setAssignedUserId('');
-      setDate(defaultDate());
-      setWinKey(PRESETS[1].key);
+    } else if (prefill) {
+      setAssignedUserId(prefill.assignedUserId);
+      setDate(prefill.date);
+      // Empty, not a preset — see `MapPrefill`. `canSave` is false until the
+      // dispatcher picks, so the form cannot be submitted with an invented
+      // window even by mashing the primary button.
+      setWinKey('');
       setAddressed(workItems.filter((wi) => NEEDY.has(wi.statusCategory)).map((wi) => wi.id));
       setRelease('now');
       setNotifyCustomer(true);
+    } else {
+      setAssignedUserId('');
+      setDate(defaultDate());
+      setWinKey(DEFAULT_WIN_KEY);
+      setAddressed(
+        initialWorkItemIds?.length
+          ? initialWorkItemIds
+          : workItems.filter((wi) => NEEDY.has(wi.statusCategory)).map((wi) => wi.id),
+      );
+      setRelease('now');
+      setNotifyCustomer(true);
     }
-  }, [open, dispatch, workItems]);
+  }, [open, dispatch, prefill, initialWorkItemIds, workItems, timeZone]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => userApi.getAll() });
+  // Field workers only. This is a PICKER, so it must offer exactly who can be
+  // assigned — listing every enabled user put admins and CSRs in a
+  // "technician" dropdown. Filtered server-side on the resolved answer, so it
+  // matches the dispatch board's rows precisely.
+  const { data: users = [] } = useQuery({
+    queryKey: ['users', 'field-work'],
+    queryFn: () => userApi.getFieldWorkers(),
+  });
+  // Only to NAME the group in the picker. Shares the board's and the work order
+  // list's key, so it is a cache read wherever either has been open. (Note the
+  // job section below reads the same divisions under `['work-order-config',
+  // 'divisions']` — a second entry for identical data, predating this.)
+  const { data: divisions } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: () => divisionsApi.getAll(),
+    enabled: !!divisionId,
+  });
+
+  // The techs who SAY they do this kind of work. Empty divisions is "nothing
+  // stated", never "good at nothing" — so an unset tech is not marked (the
+  // record doesn't support the claim) and is not hidden either. The practical
+  // consequence: a tenant that has configured no divisions gets an empty set
+  // here and therefore the plain alphabetical list it has always had.
+  const preferredIds = useMemo(() => {
+    if (!divisionId) return new Set<string>();
+    // Enabled only, so this set and `techs` below are counted against the same
+    // population — the heading suppression compares their sizes.
+    return new Set(
+      users
+        .filter((u) => u.enabled && (u.divisionIds ?? []).includes(divisionId))
+        .map((u) => u.id),
+    );
+  }, [users, divisionId]);
+
   const techs = useMemo(
     () =>
       [...users]
         .filter((u) => u.enabled)
-        .sort((a, b) =>
-          `${a.lastName} ${a.firstName}`.trim().localeCompare(`${b.lastName} ${b.firstName}`.trim()),
-        ),
-    [users],
+        // Preferred first, alphabetical inside each group. This is the whole
+        // extent of the feature in this picker: an ordering, never a gate.
+        .sort((a, b) => {
+          const rank = Number(preferredIds.has(b.id)) - Number(preferredIds.has(a.id));
+          if (rank !== 0) return rank;
+          return `${a.lastName} ${a.firstName}`
+            .trim()
+            .localeCompare(`${b.lastName} ${b.firstName}`.trim());
+        }),
+    [users, preferredIds],
   );
-  const selectedWin = winOptions.find((w) => w.key === winKey) ?? winOptions[0];
+
+  // Headed only when the split says something. All-preferred or none-preferred
+  // is a constant on every row — the same defect as printing the state on an
+  // address — so the picker falls back to one unlabelled list.
+  const preferredLabel =
+    divisionId && preferredIds.size > 0 && preferredIds.size < techs.length
+      ? (divisions?.find((d) => d.id === divisionId)?.name ?? null)
+      : null;
+  // No `?? winOptions[0]` fallback: an unset key means unset, and resolving it
+  // to the first preset is exactly the invented promise the map path exists to
+  // avoid. `canSave` already gates on this being present.
+  const selectedWin = winOptions.find((w) => w.key === winKey) ?? null;
   const blocked = addressed.some((id) => workItems.find((wi) => wi.id === id)?.statusCategory === 'BLOCKED');
   const canSave = !!assignedUserId && !!date && !!selectedWin;
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['dispatches'] });
-    queryClient.invalidateQueries({ queryKey: ['dispatch'] });
-    queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
-    queryClient.invalidateQueries({ queryKey: ['location-tech'] });
-    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
-    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-  };
+  // Shared with the board's drag writes, so both reach the same caches.
+  const invalidate = () => invalidateDispatchConsumers(queryClient, workOrderId);
   const onError = (err: unknown) => {
+    // A version conflict isn't a validation failure — the form is fine, the
+    // record moved underneath it. Refetch so the next attempt is against
+    // current data instead of retrying into the same wall.
+    if (isConflict(err) && errorCode(err) === 'DISPATCH_VERSION_CONFLICT') {
+      invalidate();
+      setError(t('workOrders.dispatches.form.versionConflict', { entity: getName('dispatch') }));
+      return;
+    }
+    // The tech arrived while this was open: the window is fixed now.
+    if (isConflict(err) && errorCode(err) === 'DISPATCH_WINDOW_LOCKED') {
+      invalidate();
+      setError(t('dispatchBoard.drag.windowLocked', { tech: techWord.toLowerCase() }));
+      return;
+    }
     const msg =
       err instanceof Error && 'response' in err
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
@@ -185,8 +342,13 @@ export default function DispatchFormDrawer({
 
   const save = useMutation({
     mutationFn: async () => {
-      const startIso = toIso(date, selectedWin.sh, selectedWin.sm);
-      const endIso = toIso(date, selectedWin.eh, selectedWin.em);
+      // Not defensive noise: the map path opens this form with NO window
+      // chosen, so an unset window is a reachable state rather than an
+      // impossible one. Refusing here means the invariant holds even if a
+      // future caller bypasses the disabled button.
+      if (!selectedWin) throw new Error('An arrival window must be chosen.');
+      const startIso = toIso(date, selectedWin.sh, selectedWin.sm, timeZone);
+      const endIso = toIso(date, selectedWin.eh, selectedWin.em, timeZone);
       // One notification path for both create + edit: an explicit, logged
       // notify by audience (never a create/update side effect). Doing the tech
       // notify via /notify — not the create `notifyAssignedUser` flag — so it
@@ -200,6 +362,10 @@ export default function DispatchFormDrawer({
           arrivalWindowStart: startIso,
           arrivalWindowEnd: endIso,
           addressedWorkItemIds: addressed,
+          // The version this form was opened against. Omitting it turns off
+          // stale-read detection, and two dispatchers on one board is the
+          // normal case, not an edge one.
+          version: dispatch.version,
         });
         if (audience) await dispatchesApi.notify(dispatch.id, audience);
       } else {
@@ -223,7 +389,10 @@ export default function DispatchFormDrawer({
   const cancelDispatch = useMutation({
     mutationFn: () => {
       if (!dispatch) throw new Error('cancel without dispatch');
-      return dispatchesApi.update(dispatch.id, { status: 'CANCELLED' });
+      return dispatchesApi.update(dispatch.id, {
+        status: 'CANCELLED',
+        version: dispatch.version,
+      });
     },
     onSuccess: () => {
       invalidate();
@@ -322,7 +491,8 @@ export default function DispatchFormDrawer({
                   aria-label="Date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+                  disabled={windowLocked}
+                  className="h-[34px] disabled:opacity-60 w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
                 />
               </label>
               <label className="flex-[1.2]">
@@ -333,8 +503,13 @@ export default function DispatchFormDrawer({
                   aria-label="Arrival window"
                   value={winKey}
                   onChange={(e) => setWinKey(e.target.value)}
-                  className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+                  disabled={windowLocked}
+                  className="h-[34px] disabled:opacity-60 w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
                 >
+                  {/* Only present while nothing is chosen, and it cannot be
+                      re-selected once a window is: an empty option that stays
+                      in the list reads as a valid answer. */}
+                  {!winKey && <option value="">{t('common.form.select')}</option>}
                   {winOptions.map((w) => (
                     <option key={w.key} value={w.key}>
                       {w.label}
@@ -343,11 +518,35 @@ export default function DispatchFormDrawer({
                 </select>
               </label>
             </div>
+            {prefill && !winKey && (
+              <p className="mt-1.5 text-[11px] leading-snug text-fg-muted">
+                {t('dispatchBoard.map.windowUnset')}
+              </p>
+            )}
+            {windowLocked && (
+              <p className="mt-1.5 text-[11px] leading-snug text-fg-muted">
+                {t('dispatchBoard.drag.windowLockedHint', { tech: techWord.toLowerCase() })}
+              </p>
+            )}
           </Section>
 
           {/* Assign tech */}
           <Section title={`Assign ${techWord}`}>
-            <TechPicker techs={techs} value={assignedUserId} onChange={setAssignedUserId} techWord={techWord} />
+            {/* Says where the selection came from. A picker that arrives
+                pre-answered with no explanation reads as a bug. */}
+            {prefill && (
+              <Pill tone="info" className="mb-2">
+                {t('dispatchBoard.map.prefilledTech')}
+              </Pill>
+            )}
+            <TechPicker
+              techs={techs}
+              value={assignedUserId}
+              onChange={setAssignedUserId}
+              techWord={techWord}
+              preferredIds={preferredIds}
+              preferredLabel={preferredLabel}
+            />
             {!assignedUserId && (
               <div className="mt-1.5 text-[11px] text-fg-dim">
                 A {techWord} is required — an unassigned {dispatchWord} is just unscheduled work.
@@ -392,7 +591,7 @@ export default function DispatchFormDrawer({
           {/* Customer — text the customer their arrival window. Explicit,
               logged send (POST /notify?audience=CUSTOMER after save); the
               backend respects the customer's per-type SMS opt-in. */}
-          <Section title="Customer" last>
+          <Section title={getName('customer')} last>
             <button
               type="button"
               role="switch"
@@ -401,8 +600,8 @@ export default function DispatchFormDrawer({
               className="flex w-full items-center gap-3 text-left"
             >
               <div className="min-w-0 grow">
-                <div className="text-[12.5px] font-semibold text-fg-strong">Text the customer</div>
-                <div className="text-[11px] text-fg-muted">Send the customer the date + arrival window</div>
+                <div className="text-[12.5px] font-semibold text-fg-strong">{`Text the ${getName('customer').toLowerCase()}`}</div>
+                <div className="text-[11px] text-fg-muted">{`Send the ${getName('customer').toLowerCase()} the date + arrival window`}</div>
               </div>
               <span
                 className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${notifyCustomer ? 'bg-accent-500' : 'bg-bg-active'}`}
@@ -413,6 +612,28 @@ export default function DispatchFormDrawer({
               </span>
             </button>
           </Section>
+
+          {/* The job behind the visit — the SAME section the detail drawer
+              renders, not a smaller copy of it. A dispatcher about to promise
+              a customer an arrival window is asking exactly what a dispatcher
+              looking at a booked visit asks: is this job blocked, is there a
+              balance, have we been to this site before, did the last tech
+              leave a note. Two answers to one question is how they drift.
+
+              Reads are shared by query key with the board and the drawer, so
+              opening this usually hits a warm cache rather than a new fetch. */}
+          {workOrderHref && (
+            <DispatchJobSection
+              workOrderId={workOrderId}
+              workOrderNumber={workOrderNumber ?? null}
+              href={workOrderHref}
+              // No dispatch id or window: on the create path the visit does
+              // not exist yet, so nothing is "this visit" and the site count
+              // runs to now.
+              currentDispatchId={dispatch?.id}
+              currentWindowStart={dispatch?.arrivalWindowStart}
+            />
+          )}
         </div>
 
         {/* Footer */}
@@ -477,11 +698,17 @@ function TechPicker({
   value,
   onChange,
   techWord,
+  preferredIds,
+  preferredLabel,
 }: {
   techs: User[];
   value: string;
   onChange: (id: string) => void;
   techWord: string;
+  /** Who states this job's kind of work. Marks and orders; never gates. */
+  preferredIds: Set<string>;
+  /** The division's name, or null to render one unlabelled list. */
+  preferredLabel: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -507,6 +734,23 @@ function TechPicker({
   const filtered = q.trim()
     ? techs.filter((u) => techName(u).toLowerCase().includes(q.trim().toLowerCase()))
     : techs;
+
+  // The mark is a heading printed ONCE, not a chip repeated down the list: the
+  // dispatcher already knows what kind of job this is — it is why they opened
+  // the drawer — so stamping the division on twelve rows restates the question
+  // instead of answering it. Printed once, it also explains why the order
+  // isn't alphabetical, which an unexplained reshuffle reads as a bug.
+  // A group empties itself out of existence under search rather than leaving a
+  // heading with nothing beneath it.
+  const groups: { label: string | null; items: User[] }[] = preferredLabel
+    ? [
+        // "Takes", not "Does": the division name is the TENANT's word, and
+        // "Does Plumbing work" reads as a question. "Takes" survives every
+        // name and is the spec's own framing — work they're good at taking on.
+        { label: `Takes ${preferredLabel} work`, items: filtered.filter((u) => preferredIds.has(u.id)) },
+        { label: `Other ${techWord}s`, items: filtered.filter((u) => !preferredIds.has(u.id)) },
+      ].filter((g) => g.items.length > 0)
+    : [{ label: null, items: filtered }];
 
   return (
     <div ref={ref} className="relative">
@@ -544,30 +788,50 @@ function TechPicker({
               onChange={(e) => setQ(e.target.value)}
               placeholder={`Search ${techWord}s…`}
               aria-label={`Search ${techWord}s`}
-              className="h-8 w-full rounded-sm border border-border bg-bg px-2.5 text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+              className="h-8 w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
             />
           </div>
           <div role="listbox" className="max-h-[240px] overflow-y-auto">
-            {filtered.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                role="option"
-                aria-selected={u.id === value}
-                onClick={() => {
-                  onChange(u.id);
-                  setOpen(false);
-                  setQ('');
-                }}
-                className="flex w-full items-center gap-2.5 border-b border-border-soft px-2.5 py-2 text-left last:border-b-0 hover:bg-bg-hover aria-selected:bg-accent-500/8"
+            {groups.map((group, gi) => (
+              // `presentation` on the unlabelled case so a single flat list
+              // doesn't grow a pointless group wrapper in the a11y tree.
+              <div
+                key={group.label ?? 'all'}
+                role={group.label ? 'group' : 'presentation'}
+                aria-label={group.label ?? undefined}
               >
-                <Avatar name={techName(u)} size="sm" />
-                <div className="min-w-0 grow">
-                  <div className="truncate text-[12.5px] font-semibold text-fg-strong">{techName(u)}</div>
-                  {techMeta(u) && <div className="truncate text-[11px] text-fg-muted">{techMeta(u)}</div>}
-                </div>
-                {u.id === value && <CheckIcon className="size-4 shrink-0 text-fg-accent" />}
-              </button>
+                {group.label && (
+                  <div
+                    className={[
+                      'bg-bg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-fg-dim',
+                      gi > 0 ? 'border-y border-border-soft' : 'border-b border-border-soft',
+                    ].join(' ')}
+                  >
+                    {group.label}
+                  </div>
+                )}
+                {group.items.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    role="option"
+                    aria-selected={u.id === value}
+                    onClick={() => {
+                      onChange(u.id);
+                      setOpen(false);
+                      setQ('');
+                    }}
+                    className="flex w-full items-center gap-2.5 border-b border-border-soft px-2.5 py-2 text-left last:border-b-0 hover:bg-bg-hover aria-selected:bg-accent-500/8"
+                  >
+                    <Avatar name={techName(u)} size="sm" />
+                    <div className="min-w-0 grow">
+                      <div className="truncate text-[12.5px] font-semibold text-fg-strong">{techName(u)}</div>
+                      {techMeta(u) && <div className="truncate text-[11px] text-fg-muted">{techMeta(u)}</div>}
+                    </div>
+                    {u.id === value && <CheckIcon className="size-4 shrink-0 text-fg-accent" />}
+                  </button>
+                ))}
+              </div>
             ))}
             {filtered.length === 0 && (
               <div className="px-3 py-4 text-center text-[12px] text-fg-muted">No {techWord}s match “{q}”.</div>

@@ -200,10 +200,14 @@ export interface ListEquipmentParams {
   size?: number;
 }
 
+// The BE takes Spring's native `sort=field,dir` (sortBy/sortDir are ignored on
+// the wire), so fold the typed pair into that.
 function cleanParams(params?: ListEquipmentParams): Record<string, string | number | boolean> {
   if (!params) return {};
+  const { sortBy, sortDir, ...rest } = params;
   const out: Record<string, string | number | boolean> = {};
-  for (const [key, value] of Object.entries(params)) {
+  if (sortBy) out.sort = `${sortBy},${sortDir ?? 'asc'}`;
+  for (const [key, value] of Object.entries(rest)) {
     if (value === undefined || value === null || value === '') continue;
     out[key] = value;
   }
@@ -663,37 +667,73 @@ export const tenantFilterSizesApi = {
 };
 
 // ========== FILTER PULL LIST (REPORT) ==========
-// Aggregates equipment_filters across all equipment attached to non-cancelled
-// work orders scheduled in the requested date window. Backend requires either
-// scheduledDate (single day) or scheduledDateFrom (range).
+// Built from the board's dispatches: every non-cancelled, non-no-show dispatch
+// whose arrival window starts on a day in the range (tenant-local, the board's
+// day rule), grouped by tech in board order. Filters are those on the
+// equipment the work order's items service.
 
-export interface FilterPullListEntry {
+/** A filter size. Inches, as numbers (16.00 → 16). */
+export interface FilterPullListSize {
   lengthIn: number;
   widthIn: number;
   thicknessIn: number;
-  totalQuantity: number;
-  equipmentCount: number;
+  quantity: number;
+}
+
+export interface FilterPullListStopFilter extends FilterPullListSize {
+  equipmentName: string | null;
+}
+
+export interface FilterPullListStop {
+  dispatchId: string;
+  workOrderId: string;
+  workOrderNumber: string | null;
+  arrivalWindowStart: string;
+  arrivalWindowEnd: string | null;
+  /** Null when work-order-service has no copy of the customer or location yet. */
+  customerName: string | null;
+  locationName: string | null;
+  streetAddress: string | null;
+  city: string | null;
+  /** Sorted by size; empty when the stop's equipment has no filters on file. */
+  filters: FilterPullListStopFilter[];
+}
+
+export interface FilterPullListTech {
+  userId: string;
+  name: string | null;
+  /** Board order (arrival window start). Two dispatches to one job are two stops. */
+  stops: FilterPullListStop[];
+  /** What this tech pulls: each work order counted once for them. */
+  totals: FilterPullListSize[];
+}
+
+export interface FilterPullList {
+  date: string;
+  dateTo: string;
+  /** Sorted by name, unnamed last. */
+  techs: FilterPullListTech[];
+  /** Company-wide: each work order counted once however many techs it has. */
+  totals: (FilterPullListSize & { equipmentCount: number })[];
+  /** Null means the whole company. */
+  regionIds: string[] | null;
 }
 
 export interface FilterPullListParams {
-  /** Single-day mode (YYYY-MM-DD). Mutually exclusive with the From/To pair. */
-  scheduledDate?: string;
-  /** Range start (YYYY-MM-DD). Required if scheduledDate is omitted. */
-  scheduledDateFrom?: string;
-  /** Range end (YYYY-MM-DD). Inclusive on the backend side. */
-  scheduledDateTo?: string;
-  /** Optional work order type UUID — when set, only equipment on work orders of this type are aggregated. */
+  /** YYYY-MM-DD, tenant-local. */
+  date: string;
+  /** Inclusive; defaults to `date` on the server. At most 31 days from `date`. */
+  dateTo?: string;
+  regionIds?: string[];
   workOrderTypeId?: string;
-  /** Optional division UUID — when set, only equipment on work orders in this division are aggregated. */
   divisionId?: string;
 }
 
 export const reportsApi = {
-  filterPullList: async (params: FilterPullListParams): Promise<FilterPullListEntry[]> => {
-    const response = await apiClient.get<FilterPullListEntry[]>(
-      '/equipment/filter-pull-list',
-      { params }
-    );
+  filterPullList: async ({ regionIds, ...params }: FilterPullListParams): Promise<FilterPullList> => {
+    const response = await apiClient.get<FilterPullList>('/equipment/filter-pull-list', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
+    });
     return response.data;
   },
 };
@@ -855,6 +895,10 @@ export const EQUIPMENT_NOTE_BODY_MAX_CHARS = 4000;
 export interface EquipmentNote {
   id: string;
   body: string;
+  /** The job the note was written on, and its number as it was. Null for
+   *  notes written elsewhere and for every note from before this was kept. */
+  workOrderId?: string | null;
+  workOrderNumber?: string | null;
   authorUserId: string | null;
   authorName: string | null;
   // Server-maintained; pinned notes sort first. Returns false until the
@@ -872,6 +916,8 @@ export interface SaveEquipmentNoteRequest {
   body: string;
   /** Optional — pin at creation. Defaults to false server-side. */
   pinned?: boolean;
+  /** Create only: the work order the note is written from (404 if unknown). */
+  workOrderId?: string;
 }
 
 // PATCH is partial: send `body` to edit text, `pinned` to toggle the pin, or

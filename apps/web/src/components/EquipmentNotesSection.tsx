@@ -180,7 +180,7 @@ export default function EquipmentNotesSection({
           <button
             type="button"
             onClick={handleAddClick}
-            className="inline-flex shrink-0 items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
+            className="inline-flex shrink-0 items-center gap-1 !text-sm text-blue-600 hover:underline dark:text-blue-400"
           >
             <PlusIcon className="size-4" />
             {t('equipment.notes.addNote')}
@@ -355,7 +355,7 @@ function NoteRow({ note, readOnly, onSave, onDelete, isPending }: NoteRowProps) 
           // reference material, not the primary row content. Dropping
           // brightness (not size) keeps multi-sentence service notes
           // readable while letting them recede visually.
-          className="flex-1 rounded text-left text-sm text-zinc-600 hover:bg-zinc-50 disabled:cursor-default disabled:hover:bg-transparent dark:text-zinc-400 dark:hover:bg-white/5"
+          className="flex-1 rounded text-left !text-sm text-zinc-600 hover:bg-zinc-50 disabled:cursor-default disabled:hover:bg-transparent dark:text-zinc-400 dark:hover:bg-white/5"
           title={readOnly ? undefined : t('equipment.notes.editHover')}
         >
           <span className="whitespace-pre-wrap">{note.body}</span>

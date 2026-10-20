@@ -79,6 +79,14 @@ describe('UserDetailPage', () => {
       if (url === '/tenant/dispatch-regions?includeInactive=true') {
         return Promise.resolve({ data: mockDispatchRegions });
       }
+      if (url.endsWith('/config/divisions')) {
+        return Promise.resolve({
+          data: [
+            { id: 'div-1', name: 'HVAC' },
+            { id: 'div-2', name: 'Plumbing' },
+          ],
+        });
+      }
       // v1.5 backs the activity card with the new curated feed at
       // /audit/account-activity/{userId}. Keep the legacy entity-history
       // URLs mocked too in case some path still touches them.
@@ -101,6 +109,13 @@ describe('UserDetailPage', () => {
       // Names the workspace in the remove-access dialog.
       if (url === '/tenant-settings') {
         return Promise.resolve({ data: { companyName: 'ACME HVAC Services' } });
+      }
+      // Pre-flight the deactivate confirm reads. Defaults to no sign-in
+      // impact; tests that care about the other states override it.
+      if (url === `/users/${user.id}/removal-impact`) {
+        return Promise.resolve({
+          data: { deactivateEndsSignIn: false, deleteEndsSignIn: false },
+        });
       }
 
       // Fallback for unmatched URLs
@@ -335,16 +350,14 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // The v1.5 lifecycle footer renames the destructive action from
-    // "Disable" → "Deactivate" to match the spec.
-    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
+    // Footer trigger and dialog confirm both read "Remove access" now: the
+    // trigger states the same scope as the dialog behind it. Trigger renders
+    // first, dialog second.
+    const disableButton = screen.getByRole('button', { name: /^remove access$/i });
     await user.click(disableButton);
 
-    // The confirm is now "Remove access" — deactivation is scoped to this
-    // workspace, not the person's account. That also disambiguates it from the
-    // footer trigger, which the old /^deactivate$/ lookup had to work around.
-    const confirmButton = await screen.findByRole('button', { name: /^remove access$/i });
-    await user.click(confirmButton);
+    const confirms = await screen.findAllByRole('button', { name: /^remove access$/i });
+    await user.click(confirms[confirms.length - 1]);
 
     await waitFor(() => {
       expect(postSpy).toHaveBeenCalledWith('/users/user-123/deactivate');
@@ -365,7 +378,7 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
+    const disableButton = screen.getByRole('button', { name: /^remove access$/i });
     await user.click(disableButton);
 
     // Cancel in the ConfirmDialog
@@ -395,17 +408,16 @@ describe('UserDetailPage', () => {
     });
 
     // The inline status line shows "Disabled" for non-enabled users.
-    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    expect(screen.getByText('Removed')).toBeInTheDocument();
 
-    // The lifecycle footer surfaces a "Reactivate" button when the user
-    // is disabled (was "Enable" in the prior layout).
-    const reactivateButton = screen.getByRole('button', { name: /^reactivate$/i });
+    // Removal is a membership status, so the way back is "Restore access".
+    const reactivateButton = screen.getByRole('button', { name: /^restore access$/i });
     await user.click(reactivateButton);
 
     // Confirm in the dialog — page button + dialog button can both match;
     // dialog renders second.
-    await screen.findByRole('button', { name: /^reactivate$/i });
-    const buttons = screen.getAllByRole('button', { name: /^reactivate$/i });
+    await screen.findByRole('button', { name: /^restore access$/i });
+    const buttons = screen.getAllByRole('button', { name: /^restore access$/i });
     await user.click(buttons[buttons.length - 1]);
 
     await waitFor(() => {
@@ -570,7 +582,7 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
+    const disableButton = screen.getByRole('button', { name: /^remove access$/i });
     await user.click(disableButton);
 
     // Cancel in the ConfirmDialog
@@ -731,10 +743,11 @@ describe('UserDetailPage', () => {
     const ts = (offsetSec: number) => new Date(now - offsetSec * 1000).toISOString();
     const actor = { id: 'u-9', name: 'Maria Chen' };
 
-    // Cover each branch of classifyEvent: lifecycle (created/activated/
-    // deactivated/invitation_resent), access (role added/removed), security
-    // (password reset / mfa reset / global signout), and the forward-compat
-    // default for an unknown actionType.
+    // Every value in the backend's AccountChangeAction enum, plus the
+    // forward-compat default. This list is the guard against a new enum value
+    // rendering as an unlabelled row — which is how TWO_FA_DISABLED shipped
+    // looking like a blank "Activity" entry. Keep it in sync with
+    // shared-events/.../AccountChangeEvent.kt.
     const mockActivity = [
       { id: 'a-1', occurredAt: ts(10),  actionType: 'USER_CREATED',        payload: null, actor: null, ip: null, userAgent: null },
       { id: 'a-2', occurredAt: ts(20),  actionType: 'USER_ACTIVATED',      payload: null, actor, ip: null, userAgent: null },
@@ -746,6 +759,12 @@ describe('UserDetailPage', () => {
       { id: 'a-7', occurredAt: ts(70),  actionType: 'PASSWORD_RESET_SENT', payload: null, actor, ip: null, userAgent: null },
       { id: 'a-8', occurredAt: ts(80),  actionType: 'MFA_RESET',           payload: null, actor, ip: null, userAgent: null },
       { id: 'a-9', occurredAt: ts(90),  actionType: 'GLOBAL_SIGNOUT',      payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-9a', occurredAt: ts(91), actionType: 'TWO_FA_ENABLED',       payload: { method: 'TOTP' }, actor, ip: null, userAgent: null },
+      // Emitted with no payload, so there is no method to name.
+      { id: 'a-9b', occurredAt: ts(92), actionType: 'TWO_FA_DISABLED',      payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-9c', occurredAt: ts(93), actionType: 'TWO_FA_METHOD_CHANGED', payload: { method: 'SMS' }, actor, ip: null, userAgent: null },
+      { id: 'a-9d', occurredAt: ts(94), actionType: 'DEVICE_TRUSTED',       payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-9e', occurredAt: ts(95), actionType: 'DEVICE_UNTRUSTED',     payload: null, actor, ip: null, userAgent: null },
       // Forward-compat: unknown values must render with a generic label.
       { id: 'a-10', occurredAt: ts(100), actionType: 'SOMETHING_NEW',      payload: null, actor, ip: null, userAgent: null },
     ];
@@ -772,8 +791,15 @@ describe('UserDetailPage', () => {
       expect(screen.getByText('Password reset link sent')).toBeInTheDocument();
       expect(screen.getByText('2FA reset')).toBeInTheDocument();
       expect(screen.getByText('Signed out of all sessions')).toBeInTheDocument();
-      // Unknown actionType falls through to the generic "Activity" label.
-      expect(screen.getByText('Activity')).toBeInTheDocument();
+      expect(screen.getByText('2FA enabled (TOTP)')).toBeInTheDocument();
+      expect(screen.getByText('2FA disabled')).toBeInTheDocument();
+      expect(screen.getByText('2FA method changed to SMS')).toBeInTheDocument();
+      expect(screen.getByText('Device trusted')).toBeInTheDocument();
+      expect(screen.getByText('Device no longer trusted')).toBeInTheDocument();
+      // Unknown actionType names itself rather than rendering a label with no
+      // information in it — a bare "Activity" row is indistinguishable from a
+      // broken one.
+      expect(screen.getByText('Something new')).toBeInTheDocument();
     });
   });
 
@@ -866,7 +892,7 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const reactivateButton = screen.getByRole('button', { name: /^reactivate$/i });
+    const reactivateButton = screen.getByRole('button', { name: /^restore access$/i });
     await user.click(reactivateButton);
 
     const cancelButton = await screen.findByRole('button', { name: /^cancel$/i });
@@ -1023,4 +1049,131 @@ describe('UserDetailPage', () => {
     });
   });
 
+
+  describe('Removal footer copy', () => {
+    // The footer is the always-visible surface — the one an admin reads before
+    // deciding to click anything. It must say what the dialog behind it says.
+    function withImpact(deactivateEndsSignIn: boolean | 'fail') {
+      const base = vi.mocked(apiClient.get).getMockImplementation()!;
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (/\/removal-impact$/.test(url)) {
+          return deactivateEndsSignIn === 'fail'
+            ? Promise.reject(new Error('pre-flight down'))
+            : Promise.resolve({
+                data: { deactivateEndsSignIn, deleteEndsSignIn: deactivateEndsSignIn },
+              });
+        }
+        return base(url);
+      });
+    }
+
+    async function renderPage() {
+      renderWithProviders(<UserDetailPage />, {
+        initialEntries: ['/users/user-123'],
+        path: '/users/:id',
+      });
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+      });
+    }
+
+    it('states the sign-in dies without waiting for the dialog', async () => {
+      setupStandardMocks();
+      withImpact(true);
+      await renderPage();
+
+      // Definite copy, on the card, before anything is clicked.
+      await waitFor(() => {
+        expect(
+          screen.getByText(/ends their access and disables their sign-in/i)
+        ).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/may also disable their sign-in/i)).not.toBeInTheDocument();
+    });
+
+    it('states the sign-in survives when they belong elsewhere', async () => {
+      setupStandardMocks();
+      withImpact(false);
+      await renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByText(/ends their access now, including any open session/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/disables their sign-in/i)).not.toBeInTheDocument();
+    });
+
+    it('hedges only when the pre-flight fails', async () => {
+      setupStandardMocks();
+      withImpact('fail');
+      await renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByText(/may also disable their sign-in/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  // Divisions are a STRENGTH — what someone is good at taking on. Empty means
+  // nothing was stated, so the board offers them for everything.
+  describe('UserDetailPage divisions', () => {
+    it('names the divisions a user is assigned to', async () => {
+      setupStandardMocks({ user: { ...mockUser, divisionIds: ['div-1'] } });
+      renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+      expect(await screen.findByText('Divisions')).toBeInTheDocument();
+      expect(screen.getByText('HVAC')).toBeInTheDocument();
+      expect(screen.queryByText('Plumbing')).not.toBeInTheDocument();
+    });
+
+    it('reads an empty assignment as offered for everything, not as a gap', async () => {
+      // "None assigned" and "offered for all work" say opposite things. A
+      // deficit-shaped label would invite an admin to "fix" it by narrowing
+      // someone who is in fact available for anything.
+      setupStandardMocks({ user: { ...mockUser, divisionIds: [] } });
+      renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+      expect(await screen.findByText('Offered for all work')).toBeInTheDocument();
+      expect(screen.queryByText(/none assigned/i)).not.toBeInTheDocument();
+    });
+
+    it('drops an id the tenant no longer has, rather than printing a uuid', async () => {
+      // The backend does not validate these against work-order-service, so a
+      // stale id is reachable and inert.
+      setupStandardMocks({ user: { ...mockUser, divisionIds: ['div-1', 'gone'] } });
+      renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+      expect(await screen.findByText('HVAC')).toBeInTheDocument();
+      expect(screen.queryByText('gone')).not.toBeInTheDocument();
+    });
+
+    it('hides the row entirely for a tenant with no divisions configured', async () => {
+      setupStandardMocks({ user: { ...mockUser, divisionIds: [] } });
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url === `/users/${mockUser.id}`) return Promise.resolve({ data: mockUser });
+        if (url === '/users/roles') return Promise.resolve({ data: mockRoles });
+        if (url === '/tenant/dispatch-regions?includeInactive=true') {
+          return Promise.resolve({ data: mockDispatchRegions });
+        }
+        if (url.endsWith('/config/divisions')) return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: [] });
+      });
+      renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+      // A row about a feature this tenant does not use is noise on every user.
+      await screen.findByText('Regions');
+      expect(screen.queryByText('Divisions')).not.toBeInTheDocument();
+    });
+  });
 });

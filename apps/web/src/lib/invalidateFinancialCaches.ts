@@ -3,14 +3,12 @@ import type { QueryClient } from '@tanstack/react-query';
 /**
  * Invalidate caches that derive from invoice / payment state but live OUTSIDE
  * the work-order-scoped financial queries:
- *   - `['location-invoices', locId]`         — Location detail Invoices tab list + tab-count badge
- *   - `['location-invoice-summary', locId]`  — Location detail Invoices tab summary strip
+ *   - `['documents', scope]`                 — Location and customer detail Quotes & invoices tab
+ *                                              list, counts and tab-count badge
  *   - `['service-location', locId]`          — Location detail overview "Billed to" card
  *                                              (openInvoiceAmount/Count + customerOutstandingBalance
  *                                              ride the detail payload)
- *   - `['invoices']`                         — global Invoices page list AND the customer detail
- *                                              Invoices tab body (`['invoices','customer',…]`) +
- *                                              tab-count badge (`['invoices','customer-count',…]`)
+ *   - `['invoices']`                         — global Invoices page list
  *   - `['customer-ar-summary', custId]`      — customer detail Billing & AR card + attention strip
  *                                              (FIN-1 outstanding / aging / LTV rollup)
  *
@@ -25,8 +23,7 @@ import type { QueryClient } from '@tanstack/react-query';
  * woId]` invalidations, not instead of them.
  */
 export function invalidateLocationInvoiceCaches(queryClient: QueryClient): void {
-  queryClient.invalidateQueries({ queryKey: ['location-invoices'] });
-  queryClient.invalidateQueries({ queryKey: ['location-invoice-summary'] });
+  queryClient.invalidateQueries({ queryKey: ['documents'] });
   queryClient.invalidateQueries({ queryKey: ['service-location'] });
   queryClient.invalidateQueries({ queryKey: ['invoices'] });
   queryClient.invalidateQueries({ queryKey: ['customer-ar-summary'] });

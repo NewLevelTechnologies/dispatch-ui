@@ -148,6 +148,10 @@ const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentP
       onEdit={props.onEdit ?? vi.fn()}
       onDelete={props.onDelete ?? vi.fn()}
       onViewWorkItems={props.onViewWorkItems}
+      workOrder={props.workOrder}
+      moveFrom={props.moveFrom}
+      onMoveTo={props.onMoveTo}
+      release={props.release}
     />,
   );
 };
@@ -183,7 +187,7 @@ describe('DispatchDetailDrawer', () => {
     // read-only: no inline actions, so pending steps render as hollow "—".
     renderDrawer(mockDispatch(), { readOnly: true });
     expect(await screen.findByText('Dispatch timeline')).toBeInTheDocument();
-    expect(screen.getByText('Tech notified')).toBeInTheDocument();
+    expect(screen.getByText('Technician notified')).toBeInTheDocument();
     expect(screen.getByText('Customer notified')).toBeInTheDocument();
     expect(screen.getByText('En route')).toBeInTheDocument();
     expect(screen.getByText('Arrived on site')).toBeInTheDocument();
@@ -500,3 +504,150 @@ describe('DispatchDetailDrawer', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+// A dispatch is a visit; the work order is the job. A caller that reached this
+// drawer from somewhere other than the job — the dispatch board — hands it the
+// way back, and nothing renders for callers already on the work order.
+describe('DispatchDetailDrawer work order link', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserGetAll.mockResolvedValue([mockUser('u1', 'Jason', 'Smith')]);
+    mockGetNotificationLogs.mockResolvedValue(emptyLogsPage);
+    mockFilesList.mockResolvedValue(filesPage([]));
+    mockGetById.mockResolvedValue(mockDispatch());
+    mockNotesList.mockResolvedValue([]);
+  });
+
+  it('renders no work order link when the caller is already on the work order', async () => {
+    renderDrawer(mockDispatch());
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByRole('link', { name: /WO-1/ })).not.toBeInTheDocument();
+  });
+
+  it('links the header number and the footer to the work order', async () => {
+    renderDrawer(mockDispatch(), {
+      workOrder: { number: 'WO-1', href: '/work-orders/wo1?from=dispatch' },
+    });
+
+    const header = await screen.findByRole('link', { name: 'WO-1' });
+    expect(header).toHaveAttribute('href', '/work-orders/wo1?from=dispatch');
+    expect(screen.getByRole('link', { name: /Open Work Order/ })).toHaveAttribute(
+      'href',
+      '/work-orders/wo1?from=dispatch',
+    );
+  });
+
+  // The job outlives the visit, so a completed dispatch still links to it —
+  // that footer is state-aware and the link must not be trapped in one branch.
+  it('keeps the link on a completed visit', async () => {
+    const done = mockDispatch({ status: 'COMPLETED' });
+    renderDrawer(done, {
+      workOrder: { number: 'WO-1', href: '/work-orders/wo1?from=dispatch' },
+    });
+    expect(await screen.findByRole('link', { name: /Open Work Order/ })).toBeInTheDocument();
+  });
+
+  // Board-only: the WO page's Dispatches tab passes no move handler.
+  it('offers Move to only where a caller handles it', async () => {
+    renderDrawer(mockDispatch());
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByRole('button', { name: 'Move to…' })).not.toBeInTheDocument();
+  });
+
+  it('moves from the footer to the next business day', async () => {
+    const user = userEvent.setup();
+    const onMoveTo = vi.fn();
+    // A Friday: next business day is the Monday.
+    renderDrawer(mockDispatch(), { moveFrom: '2026-03-20', onMoveTo });
+
+    await user.click(await screen.findByRole('button', { name: 'Move to…' }));
+    const next = await screen.findByRole('menuitem', { name: /Next business day/ });
+    expect(next).toHaveTextContent('Mon, Mar 23');
+    expect(screen.getByRole('menuitem', { name: /Tomorrow/ })).toHaveTextContent('Sat, Mar 21');
+    await user.click(next);
+    expect(onMoveTo).toHaveBeenCalledWith('2026-03-23');
+  });
+
+  it('only moves SCHEDULED work', async () => {
+    renderDrawer(mockDispatch({ status: 'EN_ROUTE' }), { moveFrom: '2026-03-20', onMoveTo: vi.fn() });
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByRole('button', { name: 'Move to…' })).not.toBeInTheDocument();
+  });
+
+  // A notice about the old date says nothing about the new one: after a move
+  // the customer step goes back to pending and offers the notify again.
+  it('treats a customer notice from before the window changed as not notified', async () => {
+    mockGetNotificationLogs.mockResolvedValue({
+      ...emptyLogsPage,
+      empty: false,
+      numberOfElements: 1,
+      totalElements: 1,
+      content: [
+        {
+          id: 'nc',
+          notificationId: 'x',
+          notificationTypeId: 'x',
+          notificationTypeName: 'T',
+          channel: 'SMS',
+          recipientName: 'R',
+          status: 'DELIVERED',
+          entityType: 'DISPATCH',
+          entityId: 'd1',
+          audience: 'CUSTOMER',
+          createdAt: '2099-05-14T16:00:00Z',
+          sentAt: '2099-05-14T16:02:00Z',
+          retryCount: 0,
+        },
+      ],
+    });
+    renderDrawer(mockDispatch({ windowChangedAt: '2099-05-14T18:00:00Z' }));
+    expect(await screen.findByRole('button', { name: /notify customer/i })).toBeInTheDocument();
+  });
+
+  describe('release state (board only)', () => {
+    const copy = {
+      dispatchId: 'd1',
+      assignedUserId: 'u1',
+      assignedUserName: 'Jason Smith',
+      arrivalWindowStart: '2099-05-15T09:00:00Z',
+      arrivalWindowEnd: '2099-05-15T11:00:00Z',
+      sentAt: '2099-05-15T07:02:00Z',
+    };
+    const release = (over = {}) => ({
+      state: 'CHANGED' as const,
+      copy,
+      timeZone: 'UTC',
+      pending: false,
+      onRelease: vi.fn(),
+      ...over,
+    });
+
+    it('says what the tech still has, and offers Send update', async () => {
+      const user = userEvent.setup();
+      const r = release();
+      renderDrawer(mockDispatch(), { release: r });
+      expect(await screen.findByText('Released 7:02a · Jason Smith still has 9a–11a')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Send update' }));
+      expect(r.onRelease).toHaveBeenCalled();
+    });
+
+    it('warns that sending takes it off the previous tech’s schedule', async () => {
+      renderDrawer(mockDispatch(), {
+        release: release({ copy: { ...copy, assignedUserId: 'u-previous', assignedUserName: 'Robert Chen' } }),
+      });
+      expect(
+        await screen.findByText(/Robert Chen still has 9a–11a — sending tells them it's off their schedule/),
+      ).toBeInTheDocument();
+    });
+
+    it('offers Release to tech for never-sent work, and nothing once it matches', async () => {
+      const { unmount } = renderDrawer(mockDispatch(), { release: release({ state: 'UNRELEASED', copy: null }) });
+      expect(await screen.findByRole('button', { name: /Release to/ })).toBeInTheDocument();
+      unmount();
+      renderDrawer(mockDispatch(), { release: release({ state: 'RELEASED' }) });
+      await screen.findByText('Jason Smith');
+      expect(screen.queryByRole('button', { name: /Release to|Send update/ })).not.toBeInTheDocument();
+    });
+  });
+});
+

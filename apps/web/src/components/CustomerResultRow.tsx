@@ -1,6 +1,6 @@
-/* eslint-disable i18next/no-literal-string -- short operational labels (Payer / N locations) kept literal to match the dense list rows. */
 import type { ReactNode } from 'react';
 import { Pill } from './ui/Pill';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 // Shared customer "result row" identity cluster — used by the Add-Customer
 // duplicate guard and the Add-Location customer picker so a match reads the
@@ -26,11 +26,12 @@ export function CustomerResultRow({
   locationCount?: number | null;
   isPayer?: boolean;
 }) {
+  const { getName } = useGlossary();
   const meta: ReactNode[] = [];
   if (addressLine) meta.push(addressLine);
   // A payer has no service locations by definition — show the flag instead of a count.
   if (!isPayer && typeof locationCount === 'number') {
-    meta.push(`${locationCount} location${locationCount === 1 ? '' : 's'}`);
+    meta.push(`${locationCount} ${getName('service_location', locationCount !== 1).toLowerCase()}`);
   }
   if (customerNumber) meta.push(<span className="font-mono">{customerNumber}</span>);
 
@@ -38,7 +39,7 @@ export function CustomerResultRow({
     <div className="min-w-0">
       <div className="flex items-center gap-1.5">
         <span className="truncate text-[12.5px] font-semibold text-fg-strong">{name}</span>
-        {isPayer && <Pill tone="warning">Payer</Pill>}
+        {isPayer && <Pill tone="warning">{getName('payer')}</Pill>}
       </div>
       {meta.length > 0 && (
         <div className="mt-0.5 truncate text-[11px] text-fg-muted">

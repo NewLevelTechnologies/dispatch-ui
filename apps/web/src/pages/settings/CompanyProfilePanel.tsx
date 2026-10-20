@@ -11,6 +11,7 @@ import {
   HomeIcon,
 } from '@heroicons/react/24/outline';
 import {
+  tenantApi,
   tenantSettingsApi,
   type TenantSettings,
   type UpdateTenantSettingsRequest,
@@ -18,6 +19,7 @@ import {
   type RecognitionBasis,
 } from '../../api/setup';
 import { useHasCapability } from '../../hooks/useCurrentUser';
+import { useOptionalTenant } from '../../contexts/TenantContext';
 import { PageHead } from '../../components/ui/PageHead';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { EditableCard } from '../../components/ui/EditableCard';
@@ -126,6 +128,7 @@ export default function CompanyProfilePanel() {
         )
       ) : (
         <div className="flex max-w-[920px] flex-col gap-3.5">
+          <WorkspaceNameCard canEdit={canEdit} />
           <IdentityCard settings={settings} canEdit={canEdit} />
           <OperatingCard settings={settings} canEdit={canEdit} />
           <BrandingCard settings={settings} canEdit={canEdit} />
@@ -133,6 +136,83 @@ export default function CompanyProfilePanel() {
         </div>
       )}
     </>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Card 0 — Workspace name
+//
+// Its own card rather than a field on Identity, because it is a different
+// resource with a different endpoint: one Save per resource, so a failure
+// cannot half-apply across two of them.
+//
+// The name here is internal. Identity below owns the customer-facing one.
+// "Atech" versus "Atech Incorporated, Inc".
+// ──────────────────────────────────────────────────────────────────
+function WorkspaceNameCard({ canEdit }: { canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  // Straight from the membership list — no extra request, and it is the exact
+  // string the switcher renders, so what you edit here is what you saw there.
+  const tenant = useOptionalTenant();
+  const current = tenant?.activeMembership?.companyName ?? '';
+
+  // Seeded when edit starts rather than synced by an effect. The draft only
+  // matters while editing — view mode renders `current` directly — so there is
+  // nothing to keep in step.
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+
+  const trimmed = value.trim();
+  const dirty = trimmed !== current;
+
+  const saveMutation = useMutation({
+    mutationFn: () => tenantApi.renameCurrentWorkspace({ companyName: trimmed }),
+    onSuccess: () => {
+      // The switcher, picker and access-removed list all read this name from
+      // the membership list, so that is what has to be refetched — not
+      // tenant-settings, which does not carry it.
+      queryClient.invalidateQueries({ queryKey: ['me', 'tenants'] });
+      setEditing(false);
+      showSuccess('Workspace name updated');
+    },
+    onError: (err) => showError("Couldn't update the workspace name", extractApiError(err)),
+  });
+
+  return (
+    <EditableCard
+      title="Workspace"
+      subtitle="What you and your team see in the app. Customers never see this name."
+      editing={editing}
+      onEdit={
+        canEdit
+          ? () => {
+              setValue(current);
+              setEditing(true);
+            }
+          : () => {}
+      }
+      onCancel={() => setEditing(false)}
+      onSave={() => saveMutation.mutate()}
+      saving={saveMutation.isPending}
+      saveDisabled={!dirty || !trimmed || saveMutation.isPending}
+    >
+      {editing ? (
+        <div className="max-w-sm">
+          <Field size="xs">
+            <Label size="xs" required>Workspace name</Label>
+            <Input size="xs" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Atech" />
+            <Description size="xs">
+              Shown in the workspace switcher and picker. Keep it short — it sits in a
+              narrow sidebar.
+            </Description>
+          </Field>
+        </div>
+      ) : (
+        <Kv label="Workspace name" empty={!current}>
+          {current || 'Not set'}
+        </Kv>
+      )}
+    </EditableCard>
   );
 }
 
@@ -512,6 +592,7 @@ function PreferencesCard({ settings, canEdit }: { settings: TenantSettings; canE
   // Absent on older responses — undefined ⇒ off / straight-line.
   const recognitionOn = settings.revenueRecognitionEnabled ?? false;
   const aiOn = settings.enableAiFeatures ?? false;
+  const inventoryOn = settings.enableInventory ?? false;
   const notificationsOn = settings.enableExternalNotifications;
   const basis = settings.revenueRecognitionBasis ?? 'STRAIGHT_LINE';
 
@@ -561,6 +642,13 @@ function PreferencesCard({ settings, canEdit }: { settings: TenantSettings; canE
             checked={aiOn}
             disabled={!canEdit}
             onChange={(next) => save.mutate({ enableAiFeatures: next })}
+          />
+          <ToggleRow
+            label="Inventory"
+            help="Parts and warehouses in the sidebar."
+            checked={inventoryOn}
+            disabled={!canEdit}
+            onChange={(next) => save.mutate({ enableInventory: next })}
           />
           <ToggleRow
             label="Notifications"
@@ -705,8 +793,20 @@ function RecognitionBasisDialog({
 // the server. Upload and removal are mutually exclusive: choosing one clears
 // the other.
 // ──────────────────────────────────────────────────────────────────
-const LOGO_MAX_BYTES = 1 * 1024 * 1024;
-const LOGO_MIME_TYPES = ['image/png', 'image/svg+xml'];
+// Mirrors LogoProcessingService's own limits. These used to disagree with the
+// server in both directions: SVG was offered here and rejected there, and JPEG
+// was accepted there but blocked here.
+//
+// No SVG. The processing step rasterises to fixed-size PNG renditions, so there
+// is nothing to render an SVG with — and user-uploaded SVG can carry script, so
+// serving it from the CDN would want sanitising too. Supporting it is backend
+// work for a format almost no tenant brings.
+//
+// `image/jpg` is not a registered type and browsers report `image/jpeg` for
+// .jpg files, but the server accepts both, so both are tolerated here rather
+// than rejecting something the server would have taken.
+const LOGO_MAX_BYTES = 5 * 1024 * 1024;
+const LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
 
 function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
   const queryClient = useQueryClient();
@@ -761,11 +861,11 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
     e.target.value = '';
     if (!picked) return;
     if (!LOGO_MIME_TYPES.includes(picked.type)) {
-      showError("Couldn't use that file", 'Logo must be a PNG or SVG.');
+      showError("Couldn't use that file", 'Logo must be a PNG or JPEG.');
       return;
     }
     if (picked.size > LOGO_MAX_BYTES) {
-      showError("Couldn't use that file", 'Logo must be 1 MB or smaller.');
+      showError("Couldn't use that file", 'Logo must be 5 MB or smaller.');
       return;
     }
     setRemoveRequested(false);
@@ -854,7 +954,7 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
               <Text size="xs" tone="dim" className="mt-1.5">{file.name} — save to apply</Text>
             ) : (
               <Text size="xs" tone="muted" className="mt-1.5 leading-[1.5]">
-                PNG or SVG recommended · transparent background · square or wide formats · max 1 MB.
+                PNG or JPEG · a square mark works best · transparent background · max 5 MB.
               </Text>
             )}
           </div>

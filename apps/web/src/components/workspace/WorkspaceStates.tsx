@@ -16,29 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import type { TenantMembership } from '../../api/setup';
 import { Button } from '../catalyst/button';
-import { tenantMark } from './tenantMark';
-
-// Tint mixes over `transparent`, never over `--bg-elev`: mixing against the
-// surface washes out on any warm or tinted ground.
-const MARK_TINT = 'color-mix(in oklch, var(--accent-500) 16%, transparent)';
-
-function TenantMark({ name, size = 30 }: { name: string; size?: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="grid shrink-0 place-items-center rounded-lg font-bold"
-      style={{
-        width: size,
-        height: size,
-        background: MARK_TINT,
-        color: 'var(--accent-700)',
-        fontSize: Math.round(size * 0.38),
-      }}
-    >
-      {tenantMark(name)}
-    </span>
-  );
-}
+import TenantMark from './TenantMark';
 
 /** Centred card on the sunken ground. No sidebar, no topbar. */
 function WorkspaceShell({ children }: { children: ReactNode }) {

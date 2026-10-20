@@ -59,7 +59,7 @@ function RailContent({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('settings.searchPlaceholder')}
-            className="block h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-2 text-[12px] text-fg placeholder:text-fg-dim focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500/30"
+            className="block h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-2 !text-[12px] text-fg placeholder:text-fg-dim focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500/30"
           />
         </div>
       </div>
@@ -67,7 +67,7 @@ function RailContent({
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
         {filteredSections.map((section) => (
           <div key={section.label}>
-            <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+            <div className="px-2 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
               {section.label}
             </div>
             <ul className="space-y-0.5">
@@ -78,7 +78,7 @@ function RailContent({
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       [
-                        'group relative flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12.5px] transition-colors',
+                        'group relative flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[12.5px] leading-[1.35] transition-colors',
                         isActive
                           ? 'bg-bg-active font-semibold text-fg-strong'
                           : 'text-fg hover:bg-bg-hover hover:text-fg-strong',
@@ -119,6 +119,7 @@ export default function SettingsLayout() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const canViewUsers = useHasAnyCapability('VIEW_USERS');
+  const canManageTargets = useHasAnyCapability('MANAGE_REVENUE_TARGETS');
   const { data: currentUser } = useCurrentUser();
   const [query, setQuery] = useState('');
   const [navOpen, setNavOpen] = useState(false);
@@ -128,9 +129,25 @@ export default function SettingsLayout() {
       label: t('settings.sections.organization'),
       items: [
         { label: t('settings.nav.companyProfile'), to: '/settings/company-profile' },
+        ...(canManageTargets ? [{ label: t('settings.nav.revenueTargets'), to: '/settings/revenue-targets' }] : []),
         { label: t('settings.nav.terminology'), to: '/settings/terminology' },
         { label: t('settings.nav.notificationTemplates'), to: '/settings/notifications' },
       ],
+    },
+    {
+      label: t('settings.sections.pricing'),
+      items: [
+        { label: t('settings.nav.pricebook'), to: '/settings/pricebook' },
+        { label: t('settings.nav.laborRates'), to: '/settings/labor-rates' },
+        { label: t('settings.nav.ratePlans'), to: '/settings/rate-plans' },
+        { label: t('settings.nav.tax'), to: '/settings/tax' },
+        { label: t('settings.nav.promotions'), to: '/settings/promotions' },
+        { label: t('settings.nav.financing'), to: '/settings/financing' },
+      ],
+    },
+    {
+      label: t('settings.sections.billing'),
+      items: [{ label: t('settings.nav.documents', { quotes: getName('quote', true), invoices: getName('invoice', true) }), to: '/settings/quotes-invoices' }],
     },
     {
       label: t('settings.sections.dispatch', { dispatch: getName('dispatch') }),
@@ -169,7 +186,7 @@ export default function SettingsLayout() {
         { label: getName('role', true), to: '/settings/access/roles' },
       ],
     },
-  ], [t, getName, canViewUsers]);
+  ], [t, getName, canViewUsers, canManageTargets]);
 
   const filteredSections = useMemo(() => {
     const q = query.trim().toLowerCase();

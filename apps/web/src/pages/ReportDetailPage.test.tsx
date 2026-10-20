@@ -39,6 +39,12 @@ describe('ReportDetailPage', () => {
     );
   });
 
+  it('answers a report the user can’t open as if it didn’t exist', () => {
+    // The default test user has no VIEW_ALL_INVOICES.
+    renderAt('revenue');
+    expect(screen.getByText(/that report does not exist/i)).toBeInTheDocument();
+  });
+
   it('renders the not-found surface when the slug is unknown', () => {
     renderAt('does-not-exist');
     expect(screen.getByText(/that report does not exist/i)).toBeInTheDocument();

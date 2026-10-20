@@ -21,6 +21,9 @@ import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { useGlossary } from '../contexts/GlossaryContext';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 
 // Purchasing — records-level list of POs across every job + vendor (the office
 // companion to the WO Purchasing tab). Server-side paged + filtered
@@ -35,21 +38,33 @@ const TO_BILL: PurchaseOrderStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED', 'RECEIV
 const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
 const PAGE_SIZE = 50;
+// BE sort whitelist (PurchaseOrderController): poNumber, vendorName, createdAt,
+// totalCost. Default createdAt,desc = the "no sort param" state.
+const DEFAULT_SORT: SortState = { key: 'createdAt', dir: 'desc' };
+const SORT_KEYS = ['poNumber', 'vendorName', 'createdAt', 'totalCost'] as const;
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const money = (n?: number | null) => currency.format(n ?? 0);
 const formatDate = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
 
 export default function PurchasingPage() {
+  const { getName } = useGlossary();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const { current: currentSort, sortParam, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['createdAt', 'totalCost'],
+    allowed: SORT_KEYS,
+  });
   // Status is multi (repeated ?status=…); memoize so the query key is stable per URL.
   const statusSel = useMemo(() => searchParams.getAll('status') as PurchaseOrderStatus[], [searchParams]);
   const type = (searchParams.get('type') as PurchaseOrderType | null) || null;
+  // Still-expected POs past their ETA — the home dashboard links here with it.
+  const overdue = searchParams.get('overdue') === 'true';
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
@@ -84,15 +99,16 @@ export default function PurchasingPage() {
     q: deferredSearch || undefined,
     status: statusSel.length ? statusSel : undefined,
     type: type || undefined,
+    overdue: overdue || undefined,
   };
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['purchase-orders', 'list', page, deferredSearch, statusSel, type],
-    queryFn: () => purchaseOrderApi.list({ page: page - 1, size: PAGE_SIZE, ...filterArgs }),
+    queryKey: ['purchase-orders', 'list', page, deferredSearch, statusSel, type, overdue, sortParam],
+    queryFn: () => purchaseOrderApi.list({ page: page - 1, size: PAGE_SIZE, sort: sortParam, ...filterArgs }),
   });
   // Header aggregate over the whole filtered set (open count + committed cost).
   const { data: summary } = useQuery({
-    queryKey: ['purchase-orders', 'summary', deferredSearch, statusSel, type],
+    queryKey: ['purchase-orders', 'summary', deferredSearch, statusSel, type, overdue],
     queryFn: () => purchaseOrderApi.summary(filterArgs),
   });
 
@@ -105,6 +121,10 @@ export default function PurchasingPage() {
   const { data: fieldCount } = useQuery({
     queryKey: ['purchase-orders', 'chip-count', 'field'],
     queryFn: () => purchaseOrderApi.list({ type: 'FIELD', size: 1 }).then((p) => p.totalElements),
+  });
+  const { data: overdueCount } = useQuery({
+    queryKey: ['purchase-orders', 'overdue-count'],
+    queryFn: () => purchaseOrderApi.summary({ overdue: true }).then((s) => s.openCount),
   });
   const { data: toBillCount } = useQuery({
     queryKey: ['purchase-orders', 'chip-count', 'tobill'],
@@ -120,7 +140,7 @@ export default function PurchasingPage() {
   const awaitingActive = sameSet(statusSel, AWAITING);
   const toBillActive = sameSet(statusSel, TO_BILL);
 
-  const hasFilters = !!deferredSearch || statusSel.length > 0 || !!type;
+  const hasFilters = !!deferredSearch || statusSel.length > 0 || !!type || overdue;
   const clearFilters = () => {
     setSearchQuery('');
     setSearchParams(new URLSearchParams(), { replace: false });
@@ -159,7 +179,7 @@ export default function PurchasingPage() {
         <ListToolbar
           search={
             <ListSearch
-              placeholder="Search PO#, vendor, job, site…"
+              placeholder={`Search PO#, vendor, ${getName('work_order').toLowerCase()}, site…`}
               value={searchQuery}
               onChange={(value) => {
                 setSearchQuery(value);
@@ -218,6 +238,12 @@ export default function PurchasingPage() {
               onToggle={() => setParam('type', type === 'FIELD' ? null : 'FIELD')}
             />
             <FilterChip
+              label="Past ETA"
+              count={overdueCount}
+              active={overdue}
+              onToggle={() => setParam('overdue', overdue ? null : 'true')}
+            />
+            <FilterChip
               label="To bill"
               count={toBillCount}
               active={toBillActive}
@@ -258,12 +284,12 @@ export default function PurchasingPage() {
                   <DenseTable className="dense-stack">
                     <DenseTHead>
                       <tr>
-                        <th>Purchase order</th>
-                        <th>Vendor</th>
+                        <SortHeader sortKey="poNumber" label="Purchase order" current={currentSort} onSort={onSort} />
+                        <SortHeader sortKey="vendorName" label="Vendor" current={currentSort} onSort={onSort} />
                         <th>For</th>
                         <th className="whitespace-nowrap">Status</th>
-                        <th className="whitespace-nowrap">Date</th>
-                        <th className="right whitespace-nowrap">Cost</th>
+                        <SortHeader sortKey="createdAt" label="Date" current={currentSort} onSort={onSort} />
+                        <SortHeader sortKey="totalCost" label="Cost" align="right" current={currentSort} onSort={onSort} />
                       </tr>
                     </DenseTHead>
                     <tbody>

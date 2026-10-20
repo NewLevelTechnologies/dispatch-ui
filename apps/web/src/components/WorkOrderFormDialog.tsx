@@ -21,7 +21,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
-import { Field, FieldGroup, Fieldset, Label, Legend } from './catalyst/fieldset';
+import { Description, Field, FieldGroup, Fieldset, Label, Legend } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Select } from './catalyst/select';
@@ -30,6 +30,7 @@ import { Subheading } from './catalyst/heading';
 import { Badge } from './catalyst/badge';
 import ServiceLocationPicker from './ServiceLocationPicker';
 import { US_STATES } from '../constants/states';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 interface AddressData {
   streetAddress: string;
@@ -47,6 +48,8 @@ interface WorkOrderFormState {
   priority: WorkOrderPriority;
   scheduledDate: string;
   customerOrderNumber: string;
+  // Edit-mode only. Blank = no limit.
+  notToExceed: string;
   // Create-mode only: the description for the first work item, sent inside the
   // atomic POST /work-orders payload as workItems: [{ description }]. Edit mode
   // ignores this field — work item edits happen inline on the detail page.
@@ -61,6 +64,7 @@ const EMPTY_FORM: WorkOrderFormState = {
   priority: 'NORMAL',
   scheduledDate: '',
   customerOrderNumber: '',
+  notToExceed: '',
   firstWorkItemDescription: '',
 };
 
@@ -102,6 +106,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
 
   const isEdit = !!workOrder?.id;
 
@@ -109,7 +114,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
   // The summary gives us instant render; the detail brings work items, cancellation
   // reason, internal notes, and other detail-only fields.
   const { data: detail } = useQuery({
-    queryKey: ['work-order', workOrder?.id],
+    queryKey: ['work-orders', workOrder?.id],
     queryFn: () => workOrderApi.getById(workOrder!.id),
     enabled: isOpen && !!workOrder?.id,
   });
@@ -218,6 +223,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
         priority: wo.priority ?? 'NORMAL',
         scheduledDate: wo.scheduledDate || '',
         customerOrderNumber: wo.customerOrderNumber || '',
+        notToExceed: wo.notToExceed != null ? String(wo.notToExceed) : '',
         firstWorkItemDescription: '', // not used in edit mode
       });
       setSelectedLocation(
@@ -296,9 +302,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
   const updateMutation = useMutation({
     mutationFn: (data: UpdateWorkOrderRequest) =>
       workOrderApi.update(effective!.id, data),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['work-order', effective?.id] });
       // Paginated list views (customer / service-location / equipment-
       // service-history tabs) keyed under work-orders-list. A WO that just
       // moved between locations / customers has to disappear from one
@@ -307,6 +312,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
       // Activity rail picks up the WORK_ORDER_UPDATED event the backend emits
       // for the change.
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', effective?.id] });
+      if (vars.notToExceed !== undefined) {
+        // Open invoices and quotes show the limit, and draft invoices warn when the job goes over it.
+        queryClient.invalidateQueries({ queryKey: ['invoice'] });
+        queryClient.invalidateQueries({ queryKey: ['quote'] });
+      }
       onClose();
     },
     onError: (error: unknown) => {
@@ -347,6 +357,12 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
     if (readOnly) return;
 
     if (isEdit) {
+      const nteRaw = formData.notToExceed.trim().replace(/[$,\s]/g, '');
+      const nte = nteRaw === '' ? null : Number(nteRaw);
+      if (nte !== null && !(Number.isFinite(nte) && nte > 0)) {
+        alert(t('workOrders.form.notToExceedInvalid'));
+        return;
+      }
       const updateRequest: UpdateWorkOrderRequest = {
         // Service location is editable in edit mode; cross-customer moves
         // are allowed. The picker is required, so this should always be
@@ -360,6 +376,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
         priority: formData.priority,
         scheduledDate: formData.scheduledDate || undefined,
         customerOrderNumber: formData.customerOrderNumber || undefined,
+        // Only sent when changed: null clears the limit, omitted leaves it alone.
+        ...(nte !== ((effective as WorkOrder).notToExceed ?? null) ? { notToExceed: nte } : {}),
       };
       updateMutation.mutate(updateRequest);
       return;
@@ -666,7 +684,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                   {/* CONDITIONAL: Billing Address (if different) */}
                   {!billingAddressSameAsService && (
                     <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                      <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient')}</Subheading>
+                      <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient', names)}</Subheading>
                       <div className="space-y-2">
                         {/* Billing Name */}
                         <Field>
@@ -760,7 +778,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                     <button
                       type="button"
                       onClick={() => setShowSiteContact(!showSiteContact)}
-                      className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                      className="flex w-full items-center gap-2 !text-sm !font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
                     >
                       <svg className={`h-4 w-4 transition-transform ${showSiteContact ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -806,7 +824,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                       <button
                         type="button"
                         onClick={() => setShowAccessInstructions(!showAccessInstructions)}
-                        className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                        className="flex w-full items-center gap-2 !text-sm !font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
                       >
                         <svg className={`h-4 w-4 transition-transform ${showAccessInstructions ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -830,7 +848,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                     <button
                       type="button"
                       onClick={() => setShowBusinessTerms(!showBusinessTerms)}
-                      className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                      className="flex w-full items-center gap-2 !text-sm !font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
                     >
                       <svg className={`h-4 w-4 transition-transform ${showBusinessTerms ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -994,7 +1012,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                 </Field>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={isEdit ? 'grid grid-cols-2 gap-3 sm:grid-cols-3' : 'grid grid-cols-2 gap-3'}>
                 <Field>
                   <Label className="text-xs">{t('workOrders.form.scheduledDate')}</Label>
                   <Input
@@ -1015,6 +1033,22 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                     maxLength={100}
                   />
                 </Field>
+
+                {isEdit && (
+                  <Field>
+                    <Label className="text-xs">{t('workOrders.form.notToExceed')}</Label>
+                    <Input
+                      name="notToExceed"
+                      inputMode="decimal"
+                      value={formData.notToExceed}
+                      onChange={(e) => handleChange('notToExceed', e.target.value)}
+                      placeholder={t('workOrders.form.notToExceedPlaceholder')}
+                    />
+                    <Description className="text-xs">
+                      {t('workOrders.form.notToExceedHint')}
+                    </Description>
+                  </Field>
+                )}
               </div>
 
               {/* First work item — required on create. The atomic POST sends
