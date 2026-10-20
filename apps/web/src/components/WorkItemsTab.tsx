@@ -150,10 +150,12 @@ export default function WorkItemsTab({
     queryKey: ['work-item-documents', workOrderId],
     queryFn: () => workItemDocumentsApi.getByWorkOrder(workOrderId),
   });
-  // The job's media — same query the Dispatches tab reads; filtered per item.
+  const selectedItemId = selected?.id;
+  // The selected item's own files (server-filtered by workItemId).
   const { data: filesPage } = useQuery({
-    queryKey: ['work-order-files', workOrderId, 'dispatch-media'],
-    queryFn: () => workOrderFilesApi.list(workOrderId, { limit: 100 }),
+    queryKey: ['work-order-files', workOrderId, { workItemId: selectedItemId }],
+    queryFn: () => workOrderFilesApi.list(workOrderId, { workItemId: selectedItemId, limit: 100 }),
+    enabled: !!selectedItemId,
   });
 
   const visits = useMemo(
@@ -211,9 +213,7 @@ export default function WorkItemsTab({
       purchaseOrders={purchaseOrders.filter((po) => po.workItemId === selected.id)}
       customerId={customerId}
       documents={itemDocuments.filter((d) => d.workItemId === selected.id)}
-      media={(filesPage?.content ?? []).filter(
-        (f) => f.workItemId === selected.id && f.kind !== 'DOCUMENT' && f.status !== 'FAILED',
-      )}
+      media={(filesPage?.content ?? []).filter((f) => f.kind !== 'DOCUMENT' && f.status !== 'FAILED')}
       dispatches={visits.filter((d) => dispatchCoversWorkItem(d, selected.id))}
       seqById={seqById}
       onSaveDescription={onSaveDescription}

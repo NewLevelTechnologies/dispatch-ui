@@ -1075,6 +1075,7 @@ export default function WorkOrderDetailPage() {
       <EquipmentQuickViewDrawer
         initialEquipment={drawerEquipment}
         onClose={() => setDrawerEquipment(null)}
+        workOrderId={workOrder.id}
       />
     </AppLayout>
   );

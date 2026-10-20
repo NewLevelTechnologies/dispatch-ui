@@ -4649,6 +4649,7 @@
       "loggedBy": "logged by {{name}}",
       "markComplete": "Mark complete",
       "markCompleteInstead": "Mark complete instead",
+      "nameplate": "Nameplate",
       "newItem": "New {{entity}}",
       "newQuote": "New {{quote}}",
       "noEquipmentAtLocation": "No {{entity, lowercase}} on file here yet.",

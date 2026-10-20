@@ -895,6 +895,10 @@ export const EQUIPMENT_NOTE_BODY_MAX_CHARS = 4000;
 export interface EquipmentNote {
   id: string;
   body: string;
+  /** The job the note was written on, and its number as it was. Null for
+   *  notes written elsewhere and for every note from before this was kept. */
+  workOrderId?: string | null;
+  workOrderNumber?: string | null;
   authorUserId: string | null;
   authorName: string | null;
   // Server-maintained; pinned notes sort first. Returns false until the
@@ -912,6 +916,8 @@ export interface SaveEquipmentNoteRequest {
   body: string;
   /** Optional — pin at creation. Defaults to false server-side. */
   pinned?: boolean;
+  /** Create only: the work order the note is written from (404 if unknown). */
+  workOrderId?: string;
 }
 
 // PATCH is partial: send `body` to edit text, `pinned` to toggle the pin, or
