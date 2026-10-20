@@ -226,9 +226,14 @@ function stepOf(evt: ActivityEvent, t: TFunc, getName: GetName): StepRow {
 }
 
 function auditRow(a: ServiceLocationAuditEntry, t: TFunc, getName: GetName): AuditRowModel {
+  return auditEntryRow(a, t, getName('work_order'));
+}
+
+/** One audit-service entry as an activity row, for any entity (`entity` is
+ *  its display name: the work order here, a work item in its History card). */
+export function auditEntryRow(a: ServiceLocationAuditEntry, t: TFunc, entity: string): AuditRowModel {
   const name = a.userName?.trim();
   const isPerson = !!name && name.toLowerCase() !== 'unknown';
-  const entity = getName('work_order');
   const single = a.changes.length === 1 ? a.changes[0] : null;
   const text =
     a.action === 'CREATE'

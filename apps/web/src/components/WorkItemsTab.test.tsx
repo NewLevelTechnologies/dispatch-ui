@@ -72,14 +72,17 @@ const baseProps = {
 };
 
 let pos: PurchaseOrderListItem[] = [];
+let audit: unknown[] = [];
 
 describe('WorkItemsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pos = [];
+    audit = [];
     window.history.replaceState(null, '', '/work-orders/wo-1?tab=items');
     vi.mocked(apiClient.get).mockImplementation(async (url: string) => {
       if (url === '/inventory/purchase-orders') return { data: { content: pos } };
+      if (url.startsWith('/audit/')) return { data: audit };
       if (url.endsWith('/notes')) return { data: [] };
       if (url.match(/^\/equipment\/[^/]+$/)) return { data: { id: 'eq-1', name: 'Upstairs Furnace' } };
       return { data: { content: [], totalElements: 0, counts: {} } };
@@ -236,6 +239,86 @@ describe('WorkItemsTab', () => {
     await waitFor(() =>
       expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/wo-1/work-items/wi-1', { laborHoursEstimate: null }),
     );
+  });
+
+  it('reopens a completed item through the server action', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: wi('wi-1', 1, 'No cooling') });
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        workItems={[wi('wi-1', 1, 'No cooling', { statusId: 's-done', statusCategory: 'COMPLETED' })]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /reopen/i }));
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/work-orders/wo-1/work-items/wi-1/reopen'));
+  });
+
+  it('offers no Reopen on a cancelled item', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        workItems={[wi('wi-1', 1, 'No cooling', { statusId: null, statusCategory: 'CANCELLED' })]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    await screen.findByRole('menuitem', { name: /edit description/i });
+    expect(screen.queryByRole('menuitem', { name: /reopen/i })).not.toBeInTheDocument();
+  });
+
+  it('lets delete through when a whole-job visit finished before the item was logged', async () => {
+    const user = userEvent.setup();
+    const h = handlers();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...h}
+        workItems={[wi('wi-1', 1, 'Found on site', { createdAt: '2026-05-14T18:00:00Z' })]}
+        dispatches={[dispatch('d-1', [], { status: 'COMPLETED', arrivedAt: '2026-05-14T14:00:00Z' })]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /delete work item/i }));
+    expect(h.onDelete).toHaveBeenCalled();
+  });
+
+  it('refuses delete when a whole-job visit arrived after the item was logged', async () => {
+    const user = userEvent.setup();
+    const h = handlers();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...h}
+        workItems={[wi('wi-1', 1, 'No cooling', { createdAt: '2026-05-14T10:00:00Z' })]}
+        dispatches={[dispatch('d-1', [], { status: 'COMPLETED', arrivedAt: '2026-05-14T14:00:00Z' })]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /delete work item/i }));
+    expect(await screen.findByText(/already worked this work item/i)).toBeInTheDocument();
+    expect(h.onDelete).not.toHaveBeenCalled();
+  });
+
+  it("shows the item's edit history from audit", async () => {
+    audit = [
+      {
+        id: 'a-1',
+        userName: 'Maria Cruz',
+        userEmail: 'maria@example.com',
+        userRole: 'CSR',
+        action: 'UPDATE',
+        timestamp: '2026-05-14T15:00:00Z',
+        changes: [{ field: 'description', label: 'Description', oldValue: 'No cool', newValue: 'No cooling', sensitive: false }],
+      },
+    ];
+    renderWithProviders(<WorkItemsTab {...baseProps} {...handlers()} workItems={[wi('wi-1', 1, 'No cooling')]} />);
+    expect(await screen.findByRole('region', { name: /history/i })).toBeInTheDocument();
+    expect(screen.getByText('Maria Cruz')).toBeInTheDocument();
+    expect(apiClient.get).toHaveBeenCalledWith('/audit/WorkItem/wi-1', expect.anything());
   });
 
   it('asks for findings on a scheduled item and saves them inline', async () => {
