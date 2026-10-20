@@ -14,7 +14,7 @@ import {
   workOrderApi,
   workOrderFilesApi,
   type DispatchBoardRow,
-  type PurchaseOrderResponse,
+  type PurchaseOrderListItem,
   type WorkflowTransition,
   type WorkItemResponse,
   type WorkItemStatus,
@@ -54,7 +54,7 @@ export interface WorkItemDetailProps {
   enforceWorkflow: boolean;
   readOnly: boolean;
   /** POs raised for this item (header-level workItemId link). */
-  purchaseOrders: PurchaseOrderResponse[];
+  purchaseOrders: PurchaseOrderListItem[];
   /** This item's photos/videos on this job. */
   media: WorkOrderFile[];
   /** Visits that cover this item (listed, or an unscoped visit), in visit order. */
@@ -574,7 +574,7 @@ function PartsSection({
   workOrderId: string;
   wi: WorkItemResponse;
   readOnly: boolean;
-  purchaseOrders: PurchaseOrderResponse[];
+  purchaseOrders: PurchaseOrderListItem[];
 }) {
   const { t } = useTranslation();
   const base = `/purchase-orders/new?workOrderId=${workOrderId}&workItemId=${wi.id}`;
@@ -603,7 +603,6 @@ function PartsSection({
         <div className="wit-parts">
           {purchaseOrders.map((po) => {
             const open = po.status === 'ORDERED' || po.status === 'PARTIALLY_RECEIVED';
-            const lines = po.lines.map((l) => l.name).filter(Boolean);
             return (
               <div key={po.id} className="wit-part">
                 <div className="min-w-0">
@@ -613,8 +612,10 @@ function PartsSection({
                     </Link>
                     <span className="truncate text-[12px] text-fg-muted">{po.vendorName}</span>
                   </div>
-                  {lines.length > 0 && (
-                    <div className="truncate text-[11.5px] text-fg">{lines.join(', ')}</div>
+                  {po.itemCount > 0 && (
+                    <div className="text-[11.5px] text-fg-muted">
+                      {t('workOrders.workItems.poLineCount', { count: po.itemCount })}
+                    </div>
                   )}
                 </div>
                 <Pill tone={PO_TONE[po.status] ?? 'neutral'} dot>

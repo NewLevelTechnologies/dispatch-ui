@@ -2492,6 +2492,8 @@ vi.mock('react-i18next', async () => {
     'workOrders.workItems.partsArrived': 'Parts arrived',
     'workOrders.workItems.pastJobs': 'Past {{workOrders, lowercase}}',
     'workOrders.workItems.photos': 'Photos',
+    'workOrders.workItems.poLineCount_one': '{{count}} line',
+    'workOrders.workItems.poLineCount_other': '{{count}} lines',
     'workOrders.workItems.poStatus.BILLED': 'Billed',
     'workOrders.workItems.poStatus.CANCELLED': 'Cancelled',
     'workOrders.workItems.poStatus.DRAFT': 'Draft',

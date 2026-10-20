@@ -4648,6 +4648,8 @@
       "pastJobs": "Past {{workOrders, lowercase}}",
       "photos": "Photos",
       "pickerEmpty": "No {{entities, lowercase}} on file at this {{location, lowercase}}.",
+      "poLineCount_one": "{{count}} line",
+      "poLineCount_other": "{{count}} lines",
       "poStatus": {
         "BILLED": "Billed",
         "CANCELLED": "Cancelled",
