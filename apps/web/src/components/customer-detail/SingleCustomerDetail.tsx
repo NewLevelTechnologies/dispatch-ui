@@ -138,6 +138,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
   const queryClient = useQueryClient();
 
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
+  const canCreateWorkOrder = useHasCapability('CREATE_WORK_ORDERS');
   const [activeTab, setActiveTab] = useUrlTab(SINGLE_TABS, 'overview');
   const goToBucket = useGoToInvoicesBucket();
 
@@ -334,17 +335,19 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
             </div>
 
             <div className="flex items-center gap-1.5 max-sm:w-full sm:flex-shrink-0">
-              <Button
-                outline
-                size="xs"
-                onClick={() => navigate(`/work-orders/new?locationId=${locId}`)}
-                aria-label={t('common.actions.new', { entity: getName('work_order') })}
-              >
-                <PlusIcon className="size-4" />
-                <span className="relative top-[0.5px] hidden sm:inline">
-                  {t('common.actions.new', { entity: getName('work_order') })}
-                </span>
-              </Button>
+              {canCreateWorkOrder && (
+                <Button
+                  outline
+                  size="xs"
+                  onClick={() => navigate(`/work-orders/new?locationId=${locId}`)}
+                  aria-label={t('common.actions.new', { entity: getName('work_order') })}
+                >
+                  <PlusIcon className="size-4" />
+                  <span className="relative top-[0.5px] hidden sm:inline">
+                    {t('common.actions.new', { entity: getName('work_order') })}
+                  </span>
+                </Button>
+              )}
               <Dropdown>
                 <DropdownButton as={IconButton} aria-label={t('common.moreOptions')} className="max-sm:p-2">
                   <EllipsisVerticalIcon className="size-4" />
@@ -404,7 +407,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
           )}
 
           {activeTab === 'jobs' && (
-            <CustomerWorkOrdersTab customerId={customer.id} canCreate onNewJob={() => navigate(`/work-orders/new?locationId=${locId}`)} />
+            <CustomerWorkOrdersTab customerId={customer.id} canCreate={canCreateWorkOrder} onNewJob={() => navigate(`/work-orders/new?locationId=${locId}`)} />
           )}
 
           {activeTab === 'agreements' && <CustomerAgreementsTab customerId={customer.id} />}

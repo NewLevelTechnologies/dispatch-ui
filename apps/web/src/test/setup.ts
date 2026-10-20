@@ -2950,8 +2950,10 @@ vi.mock('../hooks/useCurrentUser', async (importOriginal) => ({
         'VIEW_SETTINGS',
         'EDIT_SETTINGS',
         'VIEW_AUDIT_LOGS',
-      'VIEW_WORK_ORDERS',
-      'EDIT_WORK_ORDERS',
+      'VIEW_ALL_WORK_ORDERS',
+      'CREATE_WORK_ORDERS',
+      'EDIT_ALL_WORK_ORDERS',
+      'CANCEL_WORK_ORDERS',
       ],
       roles: [],
     },
@@ -2980,8 +2982,10 @@ vi.mock('../hooks/useCurrentUser', async (importOriginal) => ({
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
       'VIEW_AUDIT_LOGS',
-      'VIEW_WORK_ORDERS',
-      'EDIT_WORK_ORDERS',
+      'VIEW_ALL_WORK_ORDERS',
+      'CREATE_WORK_ORDERS',
+      'EDIT_ALL_WORK_ORDERS',
+      'CANCEL_WORK_ORDERS',
     ];
     return capabilities.includes(capability);
   }),
@@ -3007,8 +3011,10 @@ vi.mock('../hooks/useCurrentUser', async (importOriginal) => ({
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
       'VIEW_AUDIT_LOGS',
-      'VIEW_WORK_ORDERS',
-      'EDIT_WORK_ORDERS',
+      'VIEW_ALL_WORK_ORDERS',
+      'CREATE_WORK_ORDERS',
+      'EDIT_ALL_WORK_ORDERS',
+      'CANCEL_WORK_ORDERS',
     ];
     return capabilities.some(cap => mockCapabilities.includes(cap));
   }),
@@ -3034,8 +3040,10 @@ vi.mock('../hooks/useCurrentUser', async (importOriginal) => ({
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
       'VIEW_AUDIT_LOGS',
-      'VIEW_WORK_ORDERS',
-      'EDIT_WORK_ORDERS',
+      'VIEW_ALL_WORK_ORDERS',
+      'CREATE_WORK_ORDERS',
+      'EDIT_ALL_WORK_ORDERS',
+      'CANCEL_WORK_ORDERS',
     ];
     return capabilities.every(cap => mockCapabilities.includes(cap));
   }),

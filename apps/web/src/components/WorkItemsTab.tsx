@@ -13,7 +13,6 @@ import {
   type WorkItemStatus,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { useHasAnyCapability } from '../hooks/useCurrentUser';
 import { showError, extractApiError } from '../lib/toast';
 import { dispatchCoversWorkItem, workItemLabel } from '@dispatch/utils';
 import { isFinished } from '../lib/workItemSteps';
@@ -34,7 +33,7 @@ interface Props {
   statuses: WorkItemStatus[];
   transitions: WorkflowTransition[];
   enforceWorkflow: boolean;
-  /** Frozen WO (cancelled / archived). Users without EDIT_WORK_ORDERS are read-only too. */
+  /** Frozen WO (cancelled / archived) or no edit access to it (useWorkOrderAccess). */
   readOnly?: boolean;
   /** The job's customer — "Quote this work" bills the draft to them. */
   customerId?: string;
@@ -68,7 +67,7 @@ export default function WorkItemsTab({
   statuses,
   transitions,
   enforceWorkflow,
-  readOnly: frozen = false,
+  readOnly = false,
   dispatches = [],
   customerId,
   onDelete,
@@ -87,9 +86,6 @@ export default function WorkItemsTab({
 }: Props) {
   const { t } = useTranslation();
   const { getName, getAbbrev } = useGlossary();
-  const canEdit = useHasAnyCapability('EDIT_WORK_ORDERS');
-  // Read-only hides every edit affordance (not disabled): frozen WO or no edit right.
-  const readOnly = frozen || !canEdit;
   const [composing, setComposing] = useState(false);
 
   // Open first, then done; server order (sequence) within each group.

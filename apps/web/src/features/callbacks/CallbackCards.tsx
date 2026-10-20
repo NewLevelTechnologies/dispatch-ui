@@ -54,6 +54,7 @@ export function WorkOrderCallbackCard({
   typeName,
   isCallbackType,
   frozen,
+  canPick = true,
   editing,
   onEditingChange,
 }: {
@@ -61,6 +62,9 @@ export function WorkOrderCallbackCard({
   typeName: string | null;
   isCallbackType: boolean;
   frozen: boolean;
+  // The picker lists other people's jobs (VIEW_ALL_WORK_ORDERS). Without it
+  // the link can still be removed, just not set or changed.
+  canPick?: boolean;
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
 }) {
@@ -103,7 +107,8 @@ export function WorkOrderCallbackCard({
       title={<CardTitle icon={<LinkIcon className="size-3.5" />}>{tc('callbacks.label')}</CardTitle>}
       action={
         !editing &&
-        !frozen && (
+        !frozen &&
+        canPick && (
           <Button plain size="xxs" onClick={() => onEditingChange(true)}>
             {linked ? tc('callbacks.change') : tc('callbacks.link')}
           </Button>

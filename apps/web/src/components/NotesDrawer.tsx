@@ -39,6 +39,7 @@ export default function NotesDrawer({
   onClose,
   notes,
   canEdit,
+  canAdd = canEdit,
   onCreate,
   onEdit,
   onPin,
@@ -49,6 +50,8 @@ export default function NotesDrawer({
   onClose: () => void;
   notes: NoteDto[];
   canEdit: boolean;
+  // Composer visibility; defaults to canEdit (see NotesCard).
+  canAdd?: boolean;
   onCreate: (values: { body: string; pinned: boolean }) => Promise<unknown>;
   onEdit: (note: NoteDto) => void;
   onPin: (note: NoteDto) => void;
@@ -94,7 +97,7 @@ export default function NotesDrawer({
       </SlideOverHeader>
 
       {/* Inline composer — leads the drawer; composing is why you open it. */}
-      {canEdit && (
+      {canAdd && (
         <form onSubmit={submit} className="border-b border-border-soft px-6 py-3">
           <Textarea
             value={body}

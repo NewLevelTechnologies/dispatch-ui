@@ -120,11 +120,16 @@ export default function NotesCard({
   entityType,
   entityId,
   canEdit = true,
+  canAdd = canEdit,
   initialData,
 }: {
   entityType: NoteEntityType;
   entityId: string;
+  // Pin / edit / delete existing notes.
   canEdit?: boolean;
+  // Write a new note. Defaults to canEdit; work orders let anyone who can see
+  // the job add one, even when they can't change anything else.
+  canAdd?: boolean;
   // First-paint seed for entities whose detail payload embeds the full notes
   // array (service location). Must be the complete set, not a preview.
   initialData?: NoteDto[];
@@ -240,7 +245,7 @@ export default function NotesCard({
           </CardTitle>
         }
         action={
-          canEdit ? (
+          canAdd ? (
             <CardLink onClick={openAdd}>
               + {t('common.add')}
             </CardLink>
@@ -276,6 +281,7 @@ export default function NotesCard({
         onClose={() => setDrawerOpen(false)}
         notes={notes}
         canEdit={canEdit}
+        canAdd={canAdd}
         onCreate={(values) => createMutation.mutateAsync(values)}
         onEdit={openEdit}
         onPin={(n) => pinMutation.mutate(n)}

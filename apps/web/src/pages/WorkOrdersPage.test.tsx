@@ -715,6 +715,26 @@ describe('WorkOrdersPage', () => {
       expect(screen.queryByRole('button', { name: /assigned to me/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^unassigned/i })).not.toBeInTheDocument();
     });
+
+    it('offers no create, cancel, archive or delete to a technician', async () => {
+      vi.mocked(useCurrentUser).mockReturnValue({
+        data: { id: 'tech-1', capabilities: ['VIEW_ASSIGNED_WORK_ORDERS', 'EDIT_ASSIGNED_WORK_ORDERS'] },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof useCurrentUser>);
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
+      const user = userEvent.setup();
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?assigned=tech-1' });
+
+      await screen.findByText('WO-00001');
+      expect(screen.queryByRole('button', { name: /create work order/i })).not.toBeInTheDocument();
+
+      await user.click(screen.getAllByRole('button', { name: /more options/i })[0]);
+      expect(await screen.findByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /cancel/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /archive/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /delete/i })).not.toBeInTheDocument();
+    });
   });
 
   describe('Archive flow', () => {
