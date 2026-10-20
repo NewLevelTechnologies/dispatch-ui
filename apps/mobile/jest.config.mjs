@@ -23,6 +23,16 @@ import { COVERAGE_THRESHOLDS } from '../../coverage-thresholds.mjs';
 export default {
   preset: 'jest-expo',
 
+  // AsyncStorage's native module doesn't exist under Jest — the package ships
+  // its own mock rather than jest-expo auto-providing one (jest-expo mocks
+  // modules Expo itself depends on; this one is a plain RN community module).
+  // The mock file is a plain object, not a `jest.mock()` call, so it has to be
+  // wired in via moduleNameMapper rather than setupFiles.
+  moduleNameMapper: {
+    '^@react-native-async-storage/async-storage$':
+      '@react-native-async-storage/async-storage/jest/async-storage-mock',
+  },
+
   // Narrower than the other projects on purpose. Mobile's screens need render
   // tests that do not exist yet; including them would drag coverage below the
   // shared threshold and force either a red build or a weakened standard.

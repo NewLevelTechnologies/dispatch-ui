@@ -2929,5 +2929,12 @@
       "today": "Today row"
     },
     "title": "Style guide"
+  },
+  "nav": {
+    "lookup": "Lookup",
+    "placeholderBody": "This screen is coming in a later phase.",
+    "profile": "Profile",
+    "schedule": "Schedule",
+    "today": "Today"
   }
 }
