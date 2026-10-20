@@ -530,7 +530,10 @@ export default function WorkOrderDetailPage() {
   // Positional trip numbers per work item — shared with the overview peek so
   // the Work items tab header/footer never drift from it. (Hook stays above any
   // early return.)
-  const wiTrips = useMemo(() => tripsByWorkItem(dispatches), [dispatches]);
+  const wiTrips = useMemo(
+    () => tripsByWorkItem(dispatches, (workOrder?.workItems ?? []).map((wi) => wi.id)),
+    [dispatches, workOrder?.workItems],
+  );
 
   const handleCopy = async (kind: 'phone' | 'address', value: string) => {
     if (!value) return;

@@ -5,7 +5,7 @@ import { Pill } from '../ui/Pill';
 import { dispatchDate, onSiteDuration, timeLabel, windowLabel } from './format';
 
 interface Props {
-  /** Non-cancelled dispatches that address this item, in visit order. */
+  /** Visits that cover this item (`dispatchCoversWorkItem`), in visit order. */
   dispatches: DispatchBoardRow[];
   /** Positional visit number per dispatch id (1-based by arrival). */
   seqById: Map<string, number>;
@@ -37,8 +37,6 @@ export default function WorkItemDispatchesCard({ dispatches, seqById, partsBlock
         };
       case 'EN_ROUTE':
         return { text: t('workOrders.workItems.dispatchStatus.enRoute') };
-      case 'NO_SHOW':
-        return { text: t('workOrders.workItems.dispatchStatus.noShow'), warn: true };
       default:
         return partsBlocked
           ? { text: `⌛ ${t('workOrders.workItems.waitingOnParts')}`, warn: true }

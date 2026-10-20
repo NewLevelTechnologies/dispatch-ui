@@ -805,9 +805,13 @@ export default function WorkOrderOverview({
     });
     return m;
   }, [workOrder.workItems, getAbbrev]);
-  // For each work item, which positional trip numbers address it (shared util,
-  // also used by the Work items tab so the two surfaces never drift).
-  const wiTripsById = useMemo(() => tripsByWorkItem(dispatches), [dispatches]);
+  // For each work item, the positional numbers of the trips that cover it —
+  // unscoped trips cover every item (shared util, also used by the Work items
+  // tab so the two surfaces never drift).
+  const wiTripsById = useMemo(
+    () => tripsByWorkItem(dispatches, (workOrder.workItems ?? []).map((wi) => wi.id)),
+    [dispatches, workOrder.workItems],
+  );
   const attention = deriveAttention({
     workOrder,
     dispatches,

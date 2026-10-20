@@ -57,7 +57,7 @@ export interface WorkItemDetailProps {
   purchaseOrders: PurchaseOrderResponse[];
   /** This item's photos/videos on this job. */
   media: WorkOrderFile[];
-  /** Non-cancelled dispatches addressing this item, in visit order. */
+  /** Visits that cover this item (listed, or an unscoped visit), in visit order. */
   dispatches: DispatchBoardRow[];
   seqById: Map<string, number>;
   onSaveDescription: (wi: WorkItemResponse, next: string) => Promise<void>;
