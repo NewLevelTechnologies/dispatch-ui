@@ -36,7 +36,7 @@ import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchesTab from '../components/DispatchesTab';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import { equipmentCreateUrl, workItemAttachToken, parseWorkItemAttachToken } from '../lib/equipmentCreate';
-import { showError, extractApiError } from '../lib/toast';
+import { showError, extractApiError, errorCode } from '../lib/toast';
 import WorkOrderBillingTab from '../components/WorkOrderBillingTab';
 import WorkItemsTab from '../components/WorkItemsTab';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
@@ -226,7 +226,19 @@ export default function WorkOrderDetailPage() {
       setWorkItemToDelete(null);
     },
     onError: (err: unknown) => {
-      showError(t('common.form.errorDelete', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
+      // The server's refusals carry a code; say why in our words.
+      const code = errorCode(err);
+      const reason =
+        code === 'LAST_WORK_ITEM' ||
+        code === 'WORK_ITEM_HAS_COMPLETED_VISIT' ||
+        code === 'WORK_ORDER_CANCELLED'
+          ? t(`workOrders.workItems.deleteRefused.${code}`, {
+              entity: getName('work_item').toLowerCase(),
+              dispatch: getName('dispatch').toLowerCase(),
+              workOrder: getName('work_order').toLowerCase(),
+            })
+          : extractApiError(err);
+      showError(t('common.form.errorDelete', { entity: getName('work_item') }), reason ?? undefined);
     },
   });
 

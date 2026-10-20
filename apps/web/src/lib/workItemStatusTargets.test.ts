@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { WorkItemStatus, WorkflowTransition } from '../api/setup';
-import { allowedTargetStatuses, completeTarget, partsArrivedTarget, reopenTarget } from './workItemStatusTargets';
+import { allowedTargetStatuses, completeTarget, partsArrivedTarget } from './workItemStatusTargets';
 
 const status = (id: string, code: string, statusCategory: WorkItemStatus['statusCategory'], sortOrder: number) =>
   ({ id, code, name: code, statusCategory, sortOrder, isActive: true }) as WorkItemStatus;
@@ -35,15 +35,5 @@ describe('targets', () => {
     expect(completeTarget(ALL)?.id).toBe('s-done');
     expect(partsArrivedTarget(ALL)?.id).toBe('s-arrived');
     expect(partsArrivedTarget([NEW, WIP])).toBeNull();
-  });
-
-  it('reopens to the previous status when the workflow still allows it', () => {
-    expect(reopenTarget([NEW, WIP, PARTS], 's-parts')?.id).toBe('s-parts');
-  });
-
-  it('otherwise reopens to the first in-progress status', () => {
-    expect(reopenTarget([NEW, WIP], null)?.id).toBe('s-wip');
-    expect(reopenTarget([NEW, WIP], 's-gone')?.id).toBe('s-wip');
-    expect(reopenTarget([DONE], null)).toBeNull();
   });
 });

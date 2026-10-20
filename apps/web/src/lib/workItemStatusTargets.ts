@@ -41,24 +41,3 @@ export function completeTarget(allowed: WorkItemStatus[]): WorkItemStatus | null
 export function partsArrivedTarget(allowed: WorkItemStatus[]): WorkItemStatus | null {
   return allowed.find((s) => s.code === PARTS_ARRIVED_CODE) ?? null;
 }
-
-/**
- * The "Reopen" target: the status the item held before it was finished
- * (`previousStatusId`, read from the status-change activity), when the
- * workflow still allows moving back to it. Otherwise the first allowed
- * open status in the tenant's order — in-progress work first.
- */
-export function reopenTarget(
-  allowed: WorkItemStatus[],
-  previousStatusId: string | null,
-): WorkItemStatus | null {
-  const open = allowed.filter(
-    (s) => s.statusCategory !== 'COMPLETED' && s.statusCategory !== 'CANCELLED',
-  );
-  if (previousStatusId) {
-    const prev = open.find((s) => s.id === previousStatusId);
-    if (prev) return prev;
-  }
-  const bySort = [...open].sort((a, b) => a.sortOrder - b.sortOrder);
-  return bySort.find((s) => s.statusCategory === 'IN_PROGRESS') ?? bySort[0] ?? null;
-}

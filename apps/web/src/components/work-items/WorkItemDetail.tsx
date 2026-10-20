@@ -10,7 +10,6 @@ import {
   PlusIcon,
 } from '@heroicons/react/16/solid';
 import {
-  activityApi,
   workOrderApi,
   workOrderFilesApi,
   type DispatchBoardRow,
@@ -28,7 +27,6 @@ import {
   completeTarget,
   partsArrivedTarget,
   PENDING_PARTS_CODE,
-  reopenTarget,
 } from '../../lib/workItemStatusTargets';
 import { deriveWorkItemSteps, isFinished, openPurchaseOrders, primaryAction } from '../../lib/workItemSteps';
 import InlineComposer from '../InlineComposer';
@@ -42,6 +40,7 @@ import { Pill } from '../ui/Pill';
 import WorkItemSteps from './WorkItemSteps';
 import WorkItemEquipmentCard from './WorkItemEquipmentCard';
 import WorkItemEquipmentHistory from './WorkItemEquipmentHistory';
+import WorkItemHistory from './WorkItemHistory';
 import WorkItemDispatchesCard from './WorkItemDispatchesCard';
 import { formatHours, localDate, shortDate, timeLabel } from './format';
 
@@ -134,29 +133,27 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
   };
   const markComplete = () => toComplete && guardComplete(() => setStatus.mutate(toComplete.id));
 
-  // Reopen returns to the status held before Done — read from the item's
-  // status-change activity (the server keeps no "previous status" field).
-  const reopen = async () => {
-    let previous: string | null = null;
-    try {
-      const page = await activityApi.list(workOrderId, { categories: ['WORK_ITEM'], classification: 'ALL', limit: 200 });
-      const change = page.content.find(
-        (e) =>
-          e.kind === 'WORK_ITEM_STATUS_CHANGED' &&
-          (e.subject?.id === wi.id || e.data.workItemId === wi.id) &&
-          e.data.toStatusId === wi.statusId,
-      );
-      previous = typeof change?.data.fromStatusId === 'string' ? change.data.fromStatusId : null;
-    } catch {
-      // Fall back to the first open status below.
-    }
-    const target = reopenTarget(allowed, previous);
-    if (target) setStatus.mutate(target.id);
-    else showError(t('workOrders.workItems.reopenUnavailable'));
-  };
+  // Reopen is the server's rule: back to the status held before Done (from its
+  // status history), else In progress. Only Completed items reopen.
+  const reopen = useMutation({
+    mutationFn: () => workOrderApi.reopenWorkItem(workOrderId, wi.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
+    },
+    onError: (err) => showError(t('workOrders.workItems.reopenFailed'), extractApiError(err) ?? undefined),
+  });
 
-  // A visit that already did work on this item keeps it — finish it instead.
-  const completedVisit = dispatches.some((d) => d.status === 'COMPLETED');
+  // A completed visit that worked this item keeps it — finish it instead. Same
+  // rule as the server's 409: the visit listed the item, or it was a whole-job
+  // visit that arrived after the item was logged.
+  const completedVisit = dispatches.some(
+    (d) =>
+      d.status === 'COMPLETED' &&
+      ((d.addressedWorkItemIds?.length ?? 0) > 0 ||
+        (d.arrivedAt != null && new Date(d.arrivedAt).getTime() >= new Date(wi.createdAt).getTime())),
+  );
   const requestDelete = () => {
     if (completedVisit) setDeleteBlocked(true);
     else props.onDelete?.(wi);
@@ -218,16 +215,15 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
                       <DropdownItem onClick={() => setEditingTitle(true)}>
                         <DropdownLabel>{t('workOrders.workItems.editDescription')}</DropdownLabel>
                       </DropdownItem>
-                      {finished ? (
-                        <DropdownItem onClick={() => void reopen()}>
+                      {wi.statusCategory === 'COMPLETED' && (
+                        <DropdownItem onClick={() => reopen.mutate()} disabled={reopen.isPending}>
                           <DropdownLabel>{t('workOrders.workItems.reopen')}</DropdownLabel>
                         </DropdownItem>
-                      ) : (
-                        toComplete && (
-                          <DropdownItem onClick={markComplete}>
-                            <DropdownLabel>{t('workOrders.workItems.markComplete')}</DropdownLabel>
-                          </DropdownItem>
-                        )
+                      )}
+                      {!finished && toComplete && (
+                        <DropdownItem onClick={markComplete}>
+                          <DropdownLabel>{t('workOrders.workItems.markComplete')}</DropdownLabel>
+                        </DropdownItem>
                       )}
                       {props.onDuplicate && (
                         <DropdownItem onClick={() => props.onDuplicate?.(wi)}>
@@ -296,6 +292,7 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
             />
           </section>
           {wi.equipment && <WorkItemEquipmentHistory workOrderId={workOrderId} equipment={wi.equipment} />}
+          <WorkItemHistory wi={wi} />
         </div>
 
         <div className="flex min-w-0 flex-col gap-3.5">

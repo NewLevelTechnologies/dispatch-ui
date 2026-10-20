@@ -631,6 +631,18 @@ export const workOrderApi = {
     return response.data;
   },
 
+  /** Return a done item to the status it held before Done (server reads its
+   *  status history; falls back to In progress). 409 WORK_ITEM_NOT_DONE when
+   *  the item isn't in the Completed category. */
+  reopenWorkItem: async (workOrderId: string, workItemId: string): Promise<WorkItemResponse> => {
+    const response = await apiClient.post<WorkItemResponse>(
+      `/work-orders/${workOrderId}/work-items/${workItemId}/reopen`
+    );
+    return response.data;
+  },
+
+  // 409 { message, code } refusals: LAST_WORK_ITEM,
+  // WORK_ITEM_HAS_COMPLETED_VISIT, WORK_ORDER_CANCELLED.
   deleteWorkItem: async (workOrderId: string, workItemId: string): Promise<void> => {
     await apiClient.delete(`/work-orders/${workOrderId}/work-items/${workItemId}`);
   },
