@@ -61,7 +61,11 @@
       "Bash(sort -t' ' -k2 -n)",
       "Bash(awk '-F|' '{ *)",
       "Bash(awk -F'|' '{ print $1 \"|\" $4 }')",
-      "Bash(awk -F'|' '{ name=$1; gsub\\(/^[ ]+|[ ]+$/,\"\",name\\); fn=$4; gsub\\(/^[ ]+|[ ]+$/,\"\",fn\\); print fn \"% \" name }')"
+      "Bash(awk -F'|' '{ name=$1; gsub\\(/^[ ]+|[ ]+$/,\"\",name\\); fn=$4; gsub\\(/^[ ]+|[ ]+$/,\"\",fn\\); print fn \"% \" name }')",
+      "Read(//tmp/**)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm turbo *)",
+      "Bash(pnpm build *)"
     ]
   }
 }
