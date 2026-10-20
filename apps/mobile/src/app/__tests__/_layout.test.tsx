@@ -10,15 +10,39 @@ import RootLayout from '../_layout';
 const mockReplace = jest.fn();
 const mockSegments = jest.fn<string[], []>();
 const mockGetCurrentUser = jest.fn();
+const mockListMyTenants = jest.fn();
 
-jest.mock('expo-router', () => ({
-  Stack: () => null,
-  useRouter: () => ({ replace: mockReplace }),
-  useSegments: () => mockSegments(),
-}));
+jest.mock('expo-router', () => {
+  // A real <Stack> renders its <Stack.Screen> children as route config, not
+  // DOM — the mock only needs to not crash when one is passed, not do
+  // anything with it.
+  const MockStack = () => null;
+  MockStack.Screen = () => null;
+  return {
+    Stack: MockStack,
+    useRouter: () => ({ replace: mockReplace }),
+    useSegments: () => mockSegments(),
+  };
+});
+
+// Without `initialMetrics`, the real SafeAreaProvider waits on a native
+// onInsetsChange event that never fires under the test renderer — which
+// stalls the whole tree's effects, including AuthProvider's. This test is
+// about the auth redirect, not safe-area measurement, so stub it out the
+// same way the mocks above stub out expo-router/Amplify.
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = jest.requireActual('react-native');
+  return { SafeAreaProvider: View };
+});
 
 // Importing the real one configures Amplify as a side effect.
-jest.mock('../../api/setup', () => ({}));
+jest.mock('../../api/setup', () => ({
+  apiClient: { setTenantRevokedHandler: jest.fn() },
+  // Never resolves: this test is about the auth redirect, not the tenant
+  // gate, and the tabs group it would gate is behind a Stack mocked to
+  // render nothing anyway.
+  userApi: { listMyTenants: (...a: unknown[]) => mockListMyTenants(...a) },
+}));
 
 jest.mock('aws-amplify/auth', () => ({
   signIn: jest.fn(),
@@ -30,6 +54,10 @@ jest.mock('aws-amplify/auth', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockSegments.mockReturnValue([]);
+  // React Query v5 rejects a queryFn that resolves to `undefined` — give it a
+  // real (empty) answer so TenantProvider's bootstrap query settles instead
+  // of getting stuck retrying an invalid result.
+  mockListMyTenants.mockResolvedValue([]);
 });
 
 describe('RootLayout auth gate', () => {

@@ -4949,6 +4949,24 @@
       "yours": "Your workspaces"
     }
   },
+  "styleGuide": {
+    "sections": {
+      "avatars": "Avatars",
+      "buttons": "Buttons",
+      "cards": "Cards",
+      "lifecycle": "Lifecycle",
+      "status": "Status",
+      "today": "Today row"
+    },
+    "title": "Style guide"
+  },
+  "nav": {
+    "lookup": "Lookup",
+    "placeholderBody": "This screen is coming in a later phase.",
+    "profile": "Profile",
+    "schedule": "Schedule",
+    "today": "Today"
+  },
   "dispatchBoard": {
     "backTarget": "the board",
     "chips": {

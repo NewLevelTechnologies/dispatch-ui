@@ -23,6 +23,16 @@ import { COVERAGE_THRESHOLDS } from '../../coverage-thresholds.mjs';
 export default {
   preset: 'jest-expo',
 
+  // AsyncStorage's native module doesn't exist under Jest — the package ships
+  // its own mock rather than jest-expo auto-providing one (jest-expo mocks
+  // modules Expo itself depends on; this one is a plain RN community module).
+  // The mock file is a plain object, not a `jest.mock()` call, so it has to be
+  // wired in via moduleNameMapper rather than setupFiles.
+  moduleNameMapper: {
+    '^@react-native-async-storage/async-storage$':
+      '@react-native-async-storage/async-storage/jest/async-storage-mock',
+  },
+
   // Narrower than the other projects on purpose. Mobile's screens need render
   // tests that do not exist yet; including them would drag coverage below the
   // shared threshold and force either a red build or a weakened standard.
@@ -51,4 +61,14 @@ export default {
   // 15s matches web's testTimeout and still surfaces a genuinely hung test
   // quickly.
   testTimeout: 15_000,
+
+  // --forceExit lives on the `test`/`test:coverage` scripts in package.json,
+  // not here — it's a CLI-only flag, not a jest.config key. Needed once
+  // TenantProvider's `useQuery` entered the tree (src/tenant/TenantContext.tsx):
+  // @tanstack/query-core's notifyManager schedules a batched Timeout that
+  // outlives the test it fired for, so every run reports every assertion
+  // passing and then never exits on its own. Confirmed harmless (the
+  // suite's actual pass/fail is unaffected — only process exit is) via
+  // --detectOpenHandles; this is a documented react-query + RN combination,
+  // not a resource leak that grows across runs.
 };
