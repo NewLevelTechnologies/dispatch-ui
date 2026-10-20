@@ -93,8 +93,20 @@ that file in lockstep with web's if a token value changes there).
    tech/customer-notified timeline rows (audit-trail-derived, not needed when the
    technician already knows if they were texted) and visit notes (`dispatchNotesApi`
    is confirmed current, just outside this phase's stated scope).
-4. **Work order detail (tech subset)**: overview, work items + photos, files,
-   activity/notes — no Purchasing tab, no Estimate-tab editing, no billing.
+4. **Work order detail (tech subset)** (Part 1 done): overview (location/access
+   via `customerApi.getServiceLocationById` — richer than `WorkOrder`'s own slim
+   `serviceLocation`, call/directions), every work item (status pill via the
+   tenant's configurable `workItemStatusesApi` + the fixed `ProgressCategory` for
+   color, equipment name or the attach/no-equipment empty states, diagnosis or
+   "Not yet diagnosed", existing photos grouped onto their item), and notes
+   (view + add via `notesApi`, work-order-scoped — distinct from the singular
+   `noteApi.ts`). Reached from Dispatch detail's new "View Work Order" button.
+   Deliberately deferred to a Part 2: a full Files-tab browser (beyond the
+   photo thumbnails already shown), photo/video capture + upload (needs a
+   presigned-URL flow plus a camera/image-picker native dependency, neither of
+   which exist yet), and the Activity feed (`activityApi` — held back partly
+   because its `ActivityKind`/`ActivityCategory` enum values weren't confirmed
+   in this pass). No Purchasing tab, no Estimate-tab editing, no billing.
 5. **Completion**: signature + card-present payment (net-new, cross-repo).
 6. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self.
 7. **Reference lookup**: customers/service-locations/equipment, read-only, no billing.
