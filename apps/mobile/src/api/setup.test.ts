@@ -8,6 +8,7 @@
 const mockFetchAuthSession = jest.fn();
 const mockSetAuthProvider = jest.fn();
 const mockSetBaseURL = jest.fn();
+const mockSetTenantProvider = jest.fn();
 
 // Importing the real config would configure Amplify for real; it has its own
 // suite in src/config.
@@ -21,6 +22,7 @@ jest.mock('@dispatch/api', () => ({
   apiClient: {
     setAuthProvider: (...a: unknown[]) => mockSetAuthProvider(...a),
     setBaseURL: (...a: unknown[]) => mockSetBaseURL(...a),
+    setTenantProvider: (...a: unknown[]) => mockSetTenantProvider(...a),
   },
 }));
 
@@ -92,5 +94,13 @@ describe('mobile api setup', () => {
 
     // Overriding with undefined would be worse than not calling it at all.
     expect(mockSetBaseURL).not.toHaveBeenCalled();
+  });
+
+  it('wires a tenant provider backed by tenant.ts', () => {
+    loadSetup();
+
+    expect(mockSetTenantProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ getActiveTenantId: expect.any(Function) })
+    );
   });
 });

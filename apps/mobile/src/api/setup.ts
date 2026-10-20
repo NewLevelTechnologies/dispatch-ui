@@ -7,6 +7,7 @@ import './../config/amplify';
 
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { apiClient } from '@dispatch/api';
+import { getActiveTenantId } from '../tenant/tenant';
 
 // NOTE: the auth provider is defined here rather than imported from
 // @dispatch/api/src/amplifyAuthProvider, even though the two are nearly
@@ -41,6 +42,13 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 if (API_BASE_URL) {
   apiClient.setBaseURL(API_BASE_URL);
 }
+
+// The token says who; this says which workspace. Installed here rather than
+// in the package so `@dispatch/api` stays platform-agnostic — web supplies
+// its own holder over session/local storage (apps/web/src/api/setup.ts).
+// Reads the tenant that bootstrap validated against the membership list;
+// before that it returns null and no header is sent (see tenant/tenant.ts).
+apiClient.setTenantProvider({ getActiveTenantId });
 
 export { apiClient };
 export * from '@dispatch/api';

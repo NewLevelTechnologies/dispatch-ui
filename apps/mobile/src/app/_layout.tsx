@@ -11,6 +11,7 @@ import '@dispatch/i18n';
 import '../api/setup';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { ThemeProvider } from '../theme/ThemeProvider';
+import { TenantProvider } from '../tenant/TenantContext';
 
 const queryClient = new QueryClient();
 
@@ -42,7 +43,13 @@ function AuthGate() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: true, title: 'Dispatch' }} />;
+  return (
+    <Stack screenOptions={{ headerShown: true, title: 'Dispatch' }}>
+      {/* The tab shell draws its own chrome (AppHeader + tab bar) — a native
+          stack header on top of that would double up. */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    </Stack>
+  );
 }
 
 export default function RootLayout() {
@@ -51,8 +58,10 @@ export default function RootLayout() {
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <AuthGate />
-            <StatusBar style="auto" />
+            <TenantProvider>
+              <AuthGate />
+              <StatusBar style="auto" />
+            </TenantProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ThemeProvider>

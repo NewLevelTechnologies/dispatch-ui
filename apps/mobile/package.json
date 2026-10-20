@@ -10,8 +10,8 @@
     "ios": "expo run:ios",
     "lint": "eslint .",
     "submit:ios": "pnpm dlx eas-cli submit --platform ios --profile production",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
+    "test": "jest --forceExit",
+    "test:coverage": "jest --coverage --forceExit",
     "test:watch": "jest --watch"
   },
   "dependencies": {

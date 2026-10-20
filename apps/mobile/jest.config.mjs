@@ -61,4 +61,14 @@ export default {
   // 15s matches web's testTimeout and still surfaces a genuinely hung test
   // quickly.
   testTimeout: 15_000,
+
+  // --forceExit lives on the `test`/`test:coverage` scripts in package.json,
+  // not here — it's a CLI-only flag, not a jest.config key. Needed once
+  // TenantProvider's `useQuery` entered the tree (src/tenant/TenantContext.tsx):
+  // @tanstack/query-core's notifyManager schedules a batched Timeout that
+  // outlives the test it fired for, so every run reports every assertion
+  // passing and then never exits on its own. Confirmed harmless (the
+  // suite's actual pass/fail is unaffected — only process exit is) via
+  // --detectOpenHandles; this is a documented react-query + RN combination,
+  // not a resource leak that grows across runs.
 };
