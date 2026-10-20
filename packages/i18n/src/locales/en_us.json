@@ -5296,6 +5296,10 @@
     "errorBody": "Something went wrong reaching the server.",
     "errorTitle": "Couldn’t load this visit"
   },
+  "workOrderDetail": {
+    "errorBody": "Something went wrong reaching the server.",
+    "errorTitle": "Couldn’t load this work order"
+  },
   "myAvailability": {
     "emptyBody": "No upcoming time off recorded.",
     "emptyTitle": "Nothing on the books",

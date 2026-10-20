@@ -1,5 +1,5 @@
 import { ActivityIndicator, Linking, ScrollView, Text, View, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from '@dispatch/i18n';
 import { useTheme } from '../../theme/ThemeProvider';
 import { AppHeader, Button, Card, StatusPill, Stepper } from '../../components';
@@ -25,6 +25,7 @@ export default function DispatchDetailScreen() {
   const { id, workOrderId } = useLocalSearchParams<{ id: string; workOrderId: string }>();
   const { t } = useTranslation();
   const { colors, spacing } = useTheme();
+  const router = useRouter();
 
   const { dispatch, isLoading, error, refetch } = useDispatchDetail(id);
   const contact = useWorkOrderContact(workOrderId);
@@ -69,6 +70,12 @@ export default function DispatchDetailScreen() {
             {formatArrivalTime(dispatch.arrivalWindowStart)} – {formatArrivalTime(dispatch.arrivalWindowEnd)}
           </Text>
         </View>
+
+        <Button
+          label={t('workOrders.detail.overview.view', { entity: t('entities.workOrder') })}
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/work-order/[id]', params: { id: workOrderId } })}
+        />
 
         <Card title={t('workOrders.dispatches.drawer.timeline', { entity: 'Dispatch' })}>
           <Stepper steps={dispatchLifecycleSteps(dispatch.lifecycle, dispatch.status, t)} />

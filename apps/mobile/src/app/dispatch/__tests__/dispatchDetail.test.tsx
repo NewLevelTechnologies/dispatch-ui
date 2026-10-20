@@ -8,8 +8,10 @@ import { useWorkOrderContact } from '../../../dispatches/useWorkOrderContact';
 import { useUpdateDispatchStatus } from '../../../dispatches/useUpdateDispatchStatus';
 import type { Dispatch } from '@dispatch/api';
 
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'd1', workOrderId: 'wo1' }),
+  useRouter: () => ({ push: mockPush }),
 }));
 jest.mock('../../../dispatches/useDispatchDetail', () => ({ useDispatchDetail: jest.fn() }));
 jest.mock('../../../dispatches/useWorkOrderContact', () => ({ useWorkOrderContact: jest.fn() }));
@@ -113,6 +115,14 @@ describe('DispatchDetailScreen', () => {
     await renderDetail();
     expect(screen.getByText('On site')).toBeTruthy();
     expect(screen.queryByText('In Progress')).toBeNull();
+  });
+
+  it('navigates to the work order when "View Work Order" is pressed', async () => {
+    mockUseDispatchDetail.mockReturnValue({ dispatch: BASE_DISPATCH, isLoading: false, error: null, refetch: mockRefetch });
+    await renderDetail();
+
+    await fireEvent.press(screen.getByText('View Work Order'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/work-order/[id]', params: { id: 'wo1' } });
   });
 
   it('calls the site contact when Call is pressed', async () => {
