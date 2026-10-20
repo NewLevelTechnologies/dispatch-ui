@@ -33,22 +33,28 @@ export default function DispatchDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.bgSunken }]}>
-        <ActivityIndicator size="large" color={colors.accent500} />
+      <View style={{ flex: 1, backgroundColor: colors.bgSunken }}>
+        <AppHeader title={t('entities.workOrder')} onBack={() => router.back()} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.accent500} />
+        </View>
       </View>
     );
   }
 
   if (error || !dispatch) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.bgSunken, padding: spacing.xl, gap: spacing.md }]}>
-        <Text style={{ color: colors.fgStrong, fontSize: 15, fontWeight: '700' }}>
-          {t('dispatchDetail.errorTitle')}
-        </Text>
-        <Text style={{ color: colors.fgMuted, fontSize: 13, textAlign: 'center' }}>
-          {t('dispatchDetail.errorBody')}
-        </Text>
-        <Button label={t('common.actions.tryAgain')} variant="secondary" onPress={() => void refetch()} />
+      <View style={{ flex: 1, backgroundColor: colors.bgSunken }}>
+        <AppHeader title={t('entities.workOrder')} onBack={() => router.back()} />
+        <View style={[styles.center, { padding: spacing.xl, gap: spacing.md }]}>
+          <Text style={{ color: colors.fgStrong, fontSize: 15, fontWeight: '700' }}>
+            {t('dispatchDetail.errorTitle')}
+          </Text>
+          <Text style={{ color: colors.fgMuted, fontSize: 13, textAlign: 'center' }}>
+            {t('dispatchDetail.errorBody')}
+          </Text>
+          <Button label={t('common.actions.tryAgain')} variant="secondary" onPress={() => void refetch()} />
+        </View>
       </View>
     );
   }
@@ -62,6 +68,7 @@ export default function DispatchDetailScreen() {
       <AppHeader
         title={contact.summary || contact.workOrderNumber || t('entities.workOrder')}
         subtitle={contact.workOrderNumber ?? undefined}
+        onBack={() => router.back()}
       />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>

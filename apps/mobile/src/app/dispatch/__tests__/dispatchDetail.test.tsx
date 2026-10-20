@@ -9,9 +9,10 @@ import { useUpdateDispatchStatus } from '../../../dispatches/useUpdateDispatchSt
 import type { Dispatch } from '@dispatch/api';
 
 const mockPush = jest.fn();
+const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'd1', workOrderId: 'wo1' }),
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, back: mockBack }),
 }));
 jest.mock('../../../dispatches/useDispatchDetail', () => ({ useDispatchDetail: jest.fn() }));
 jest.mock('../../../dispatches/useWorkOrderContact', () => ({ useWorkOrderContact: jest.fn() }));
@@ -73,6 +74,27 @@ describe('DispatchDetailScreen', () => {
     mockUseDispatchDetail.mockReturnValue({ dispatch: undefined, isLoading: true, error: null, refetch: mockRefetch });
     await renderDetail();
     expect(screen.queryByText('No hot water, pilot will not stay lit')).toBeNull();
+  });
+
+  it('can navigate back while loading', async () => {
+    mockUseDispatchDetail.mockReturnValue({ dispatch: undefined, isLoading: true, error: null, refetch: mockRefetch });
+    await renderDetail();
+    await fireEvent.press(screen.getByLabelText('Back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('can navigate back on error', async () => {
+    mockUseDispatchDetail.mockReturnValue({ dispatch: undefined, isLoading: false, error: new Error('x'), refetch: mockRefetch });
+    await renderDetail();
+    await fireEvent.press(screen.getByLabelText('Back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('can navigate back once loaded', async () => {
+    mockUseDispatchDetail.mockReturnValue({ dispatch: BASE_DISPATCH, isLoading: false, error: null, refetch: mockRefetch });
+    await renderDetail();
+    await fireEvent.press(screen.getByLabelText('Back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it('shows the error state with a working retry', async () => {

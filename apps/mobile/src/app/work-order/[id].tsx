@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Image, Linking, ScrollView, Text, TextInput, View, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from '@dispatch/i18n';
 import type { WorkItemResponse, WorkOrderFile } from '@dispatch/api';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -27,6 +27,7 @@ export default function WorkOrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
   const { colors, spacing } = useTheme();
+  const router = useRouter();
 
   const { workOrder, isLoading, error, refetch } = useWorkOrderDetail(id);
   const { serviceLocation } = useServiceLocationDetail(workOrder?.serviceLocation?.id);
@@ -39,22 +40,28 @@ export default function WorkOrderDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.bgSunken }]}>
-        <ActivityIndicator size="large" color={colors.accent500} />
+      <View style={{ flex: 1, backgroundColor: colors.bgSunken }}>
+        <AppHeader title={t('entities.workOrder')} onBack={() => router.back()} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.accent500} />
+        </View>
       </View>
     );
   }
 
   if (error || !workOrder) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.bgSunken, padding: spacing.xl, gap: spacing.md }]}>
-        <Text style={{ color: colors.fgStrong, fontSize: 15, fontWeight: '700' }}>
-          {t('workOrderDetail.errorTitle')}
-        </Text>
-        <Text style={{ color: colors.fgMuted, fontSize: 13, textAlign: 'center' }}>
-          {t('workOrderDetail.errorBody')}
-        </Text>
-        <Button label={t('common.actions.tryAgain')} variant="secondary" onPress={() => void refetch()} />
+      <View style={{ flex: 1, backgroundColor: colors.bgSunken }}>
+        <AppHeader title={t('entities.workOrder')} onBack={() => router.back()} />
+        <View style={[styles.center, { padding: spacing.xl, gap: spacing.md }]}>
+          <Text style={{ color: colors.fgStrong, fontSize: 15, fontWeight: '700' }}>
+            {t('workOrderDetail.errorTitle')}
+          </Text>
+          <Text style={{ color: colors.fgMuted, fontSize: 13, textAlign: 'center' }}>
+            {t('workOrderDetail.errorBody')}
+          </Text>
+          <Button label={t('common.actions.tryAgain')} variant="secondary" onPress={() => void refetch()} />
+        </View>
       </View>
     );
   }
@@ -68,6 +75,7 @@ export default function WorkOrderDetailScreen() {
       <AppHeader
         title={workOrder.summary || workOrder.workOrderNumber || t('entities.workOrder')}
         subtitle={workOrder.workOrderNumber ?? undefined}
+        onBack={() => router.back()}
       />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Card title={t('workOrders.detail.siteContact')}>

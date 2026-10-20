@@ -10,8 +10,11 @@ import { useWorkOrderPhotos } from '../../../work-orders/useWorkOrderFiles';
 import { useWorkOrderNotes } from '../../../work-orders/useWorkOrderNotes';
 import type { WorkOrder, WorkOrderNote, WorkItemResponse } from '@dispatch/api';
 
+const mockPush = jest.fn();
+const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'wo1' }),
+  useRouter: () => ({ push: mockPush, back: mockBack }),
 }));
 jest.mock('../../../work-orders/useWorkOrderDetail', () => ({ useWorkOrderDetail: jest.fn() }));
 jest.mock('../../../work-orders/useServiceLocationDetail', () => ({ useServiceLocationDetail: jest.fn() }));
@@ -103,6 +106,27 @@ describe('WorkOrderDetailScreen', () => {
     mockUseWorkOrderDetail.mockReturnValue({ workOrder: undefined, isLoading: true, error: null, refetch: mockRefetch });
     await renderDetail();
     expect(screen.queryByText('WO-00138')).toBeNull();
+  });
+
+  it('can navigate back while loading', async () => {
+    mockUseWorkOrderDetail.mockReturnValue({ workOrder: undefined, isLoading: true, error: null, refetch: mockRefetch });
+    await renderDetail();
+    await fireEvent.press(screen.getByLabelText('Back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('can navigate back on error', async () => {
+    mockUseWorkOrderDetail.mockReturnValue({ workOrder: undefined, isLoading: false, error: new Error('x'), refetch: mockRefetch });
+    await renderDetail();
+    await fireEvent.press(screen.getByLabelText('Back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('can navigate back once loaded', async () => {
+    mockUseWorkOrderDetail.mockReturnValue({ workOrder: BASE_WORK_ORDER, isLoading: false, error: null, refetch: mockRefetch });
+    await renderDetail();
+    await fireEvent.press(screen.getByLabelText('Back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it('shows the error state with a working retry', async () => {
