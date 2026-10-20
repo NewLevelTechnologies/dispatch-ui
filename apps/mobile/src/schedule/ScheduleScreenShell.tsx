@@ -9,6 +9,9 @@ type ScheduleScreenShellProps = {
   eyebrow?: string;
   isLoading: boolean;
   error: unknown;
+  /** Defaults to the generic "couldn't load your schedule" copy Today/Schedule share. */
+  errorTitle?: string;
+  errorBody?: string;
   isEmpty: boolean;
   emptyTitle: string;
   emptyBody: string;
@@ -17,15 +20,17 @@ type ScheduleScreenShellProps = {
 };
 
 /**
- * Shared chrome for Today and Schedule: same header, same loading/error/empty
- * states, so the two screens differ only in what they fetch and how they lay
- * out the list once there's something to show.
+ * Shared chrome for Today, Schedule and Availability: same header, same
+ * loading/error/empty states, so each screen differs only in what it
+ * fetches and how it lays out the list once there's something to show.
  */
 export function ScheduleScreenShell({
   title,
   eyebrow,
   isLoading,
   error,
+  errorTitle,
+  errorBody,
   isEmpty,
   emptyTitle,
   emptyBody,
@@ -45,8 +50,12 @@ export function ScheduleScreenShell({
         </View>
       ) : error ? (
         <View style={[styles.center, { padding: spacing.xl, gap: spacing.md }]}>
-          <Text style={[styles.stateTitle, { color: colors.fgStrong }]}>{t('mobileSchedule.errorTitle')}</Text>
-          <Text style={[styles.stateBody, { color: colors.fgMuted }]}>{t('mobileSchedule.errorBody')}</Text>
+          <Text style={[styles.stateTitle, { color: colors.fgStrong }]}>
+            {errorTitle ?? t('mobileSchedule.errorTitle')}
+          </Text>
+          <Text style={[styles.stateBody, { color: colors.fgMuted }]}>
+            {errorBody ?? t('mobileSchedule.errorBody')}
+          </Text>
           <Button label={t('common.actions.tryAgain')} variant="secondary" onPress={onRetry} />
         </View>
       ) : isEmpty ? (

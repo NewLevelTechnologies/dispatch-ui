@@ -50,6 +50,18 @@ describe('ScheduleScreenShell', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it('uses a caller-supplied error title/body instead of the generic default', async () => {
+    await renderShell({
+      error: new Error('network'),
+      errorTitle: 'Couldn’t load your availability',
+      errorBody: 'Custom error body',
+    });
+
+    expect(screen.getByText('Couldn’t load your availability')).toBeTruthy();
+    expect(screen.getByText('Custom error body')).toBeTruthy();
+    expect(screen.queryByText('Couldn’t load your schedule')).toBeNull();
+  });
+
   it('shows the empty state when there is nothing to list', async () => {
     await renderShell({ isEmpty: true });
     expect(screen.getByText('No visits today')).toBeTruthy();
