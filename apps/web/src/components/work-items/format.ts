@@ -53,3 +53,8 @@ export function ageInYears(installDate: string): number | null {
 export function localDate(isoDate: string): string {
   return shortDate(`${isoDate.slice(0, 10)}T00:00:00`);
 }
+
+/** Labor hours: "1.5", "2", "0.25" — no trailing zeros. */
+export function formatHours(hours: number): string {
+  return String(Number(hours.toFixed(2)));
+}
