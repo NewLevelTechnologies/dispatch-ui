@@ -73,16 +73,25 @@ const baseProps = {
 
 let pos: PurchaseOrderListItem[] = [];
 let audit: unknown[] = [];
+let docs: unknown[] = [];
+let woQuotes: unknown[] = [];
 
 describe('WorkItemsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pos = [];
     audit = [];
+    docs = [];
+    woQuotes = [];
     window.history.replaceState(null, '', '/work-orders/wo-1?tab=items');
     vi.mocked(apiClient.get).mockImplementation(async (url: string) => {
       if (url === '/inventory/purchase-orders') return { data: { content: pos } };
       if (url.startsWith('/audit/')) return { data: audit };
+      if (url === '/financial/work-orders/wo-1/work-item-documents') return { data: docs };
+      if (url === '/financial/work-orders/wo-1/quotes') return { data: woQuotes };
+      if (url === '/financial/labor-rates')
+        return { data: [{ id: 'rate-reg', name: 'Regular', role: 'REGULAR', billRate: 120, active: true }] };
+      if (url === '/financial/quotes/q-draft') return { data: { id: 'q-draft', quoteNumber: 'Q-1900', version: 4 } };
       if (url.endsWith('/notes')) return { data: [] };
       if (url.match(/^\/equipment\/[^/]+$/)) return { data: { id: 'eq-1', name: 'Upstairs Furnace' } };
       return { data: { content: [], totalElements: 0, counts: {} } };
@@ -319,6 +328,88 @@ describe('WorkItemsTab', () => {
     expect(await screen.findByRole('region', { name: /history/i })).toBeInTheDocument();
     expect(screen.getByText('Maria Cruz')).toBeInTheDocument();
     expect(apiClient.get).toHaveBeenCalledWith('/audit/WorkItem/wi-1', expect.anything());
+  });
+
+  it('shows the item on its quote and invoice, with the Approved step', async () => {
+    docs = [
+      { workItemId: 'wi-1', documentType: 'QUOTE', documentId: 'q-1', number: 'Q-1903', status: 'ACCEPTED', amount: 420, declined: false },
+      { workItemId: 'wi-1', documentType: 'INVOICE', documentId: 'i-1', number: 'INV-3302', status: 'PAID', amount: 420, declined: false },
+      { workItemId: 'wi-2', documentType: 'QUOTE', documentId: 'q-2', number: 'Q-1999', status: 'SENT', amount: 99, declined: false },
+    ];
+    renderWithProviders(
+      <WorkItemsTab {...baseProps} {...handlers()} workItems={[wi('wi-1', 1, 'No cooling', { diagnosis: 'x' }), wi('wi-2', 2, 'Other')]} />,
+    );
+    expect(await screen.findByRole('link', { name: 'Q-1903' })).toHaveAttribute('href', '/quotes/q-1');
+    expect(screen.getByText('$420.00 for this item')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'INV-3302' })).toHaveAttribute('href', '/invoices/i-1');
+    expect(screen.getByText('Paid')).toBeInTheDocument();
+    expect(screen.getByText('Approved')).toBeInTheDocument();
+    expect(screen.queryByText('Q-1999')).not.toBeInTheDocument();
+  });
+
+  it('holds Quote this work until there is a labor estimate', async () => {
+    renderWithProviders(<WorkItemsTab {...baseProps} {...handlers()} customerId="c-1" workItems={[wi('wi-1', 1, 'No cooling')]} />);
+    expect(await screen.findByText(/not on a quote yet/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /quote this work/i })).toBeDisabled();
+    expect(screen.getByText(/add a labor estimate first/i)).toBeInTheDocument();
+  });
+
+  it('quotes the work: a new draft with the labor line tied to the item', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockImplementation(async (url: string) =>
+      url === '/financial/quotes' ? { data: { id: 'q-new', version: 0 } } : { data: { id: 'q-new', version: 1 } },
+    );
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        customerId="c-1"
+        workItems={[wi('wi-1', 1, 'No cooling', { laborHoursEstimate: 1.5 })]}
+      />,
+    );
+    const button = await screen.findByRole('button', { name: /quote this work/i });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    await waitFor(() =>
+      expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-new/lines', {
+        version: 0,
+        laborRateTypeId: 'rate-reg',
+        quantity: 1.5,
+        workItemId: 'wi-1',
+      }),
+    );
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes', {
+      customerId: 'c-1',
+      workOrderId: 'wo-1',
+      title: 'No cooling',
+    });
+  });
+
+  it('offers to add to the job\'s draft quote instead of starting another', async () => {
+    const user = userEvent.setup();
+    woQuotes = [{ id: 'q-draft', quoteNumber: 'Q-1900', status: 'DRAFT', createdAt: '2026-05-14T10:00:00Z' }];
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'q-draft', version: 5 } });
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        customerId="c-1"
+        workItems={[wi('wi-1', 1, 'No cooling', { laborHoursEstimate: 2 })]}
+      />,
+    );
+    const button = await screen.findByRole('button', { name: /quote this work/i });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    await user.click(await screen.findByRole('button', { name: 'Add to Q-1900' }));
+    await waitFor(() =>
+      expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-draft/lines', {
+        version: 4,
+        laborRateTypeId: 'rate-reg',
+        quantity: 2,
+        workItemId: 'wi-1',
+      }),
+    );
+    expect(apiClient.post).not.toHaveBeenCalledWith('/financial/quotes', expect.anything());
   });
 
   it('asks for findings on a scheduled item and saves them inline', async () => {

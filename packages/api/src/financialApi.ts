@@ -125,6 +125,9 @@ export interface DocumentLineItem {
   priceOverridden?: boolean;
   pricingRule?: PricingRule | null;
   pricingRuleValue?: number | null;
+  /** The work item this line is for (WO documents only). Billing a quote,
+   *  duplicating or reissuing carries it over. */
+  workItemId?: string | null;
 }
 
 /**
@@ -158,9 +161,12 @@ export interface AddLineRequest extends LineFieldsRequest {
   role?: 'REQUIRED' | 'ADD_ON';
   recommended?: boolean;
   recommendationNote?: string;
+  /** Tie the line to a work item (WO documents only; 400 otherwise). */
+  workItemId?: string;
 }
 
-export type UpdateLineRequest = LineFieldsRequest;
+/** A replace. `workItemId` is a link, not contents: omit to keep it, null to remove it. */
+export type UpdateLineRequest = LineFieldsRequest & { workItemId?: string | null };
 
 export interface ReorderLinesRequest {
   version: number;
@@ -380,6 +386,8 @@ export interface CreateInvoiceLineItemRequest {
   unit?: string;
   sourcePoLineId?: string;
   taxClass?: TaxClass;
+  /** Tie the line to a work item (WO documents only). */
+  workItemId?: string;
 }
 
 /** No tax rate — the server resolves tax from the location's jurisdiction. */
@@ -1301,6 +1309,31 @@ export interface QuoteInvoiceable {
 export interface UpdateQuoteStatusRequest {
   status: QuoteStatus;
 }
+
+/** One (work item, quote or invoice) pair with lines for the item. Quotes
+ *  first, newest first. */
+export interface WorkItemDocument {
+  workItemId: string;
+  documentType: 'QUOTE' | 'INVOICE';
+  documentId: string;
+  number: string;
+  /** The document's own status (QuoteStatus / InvoiceStatus). */
+  status: string;
+  /** The item's lines after discounts, before tax. Null on a not-yet-accepted
+   *  quote where the item sits on an option or add-on. */
+  amount: number | null;
+  /** Accepted quote on which every one of the item's lines went unsold. */
+  declined: boolean;
+}
+
+export const workItemDocumentsApi = {
+  getByWorkOrder: async (workOrderId: string): Promise<WorkItemDocument[]> => {
+    const response = await apiClient.get<WorkItemDocument[]>(
+      `/financial/work-orders/${workOrderId}/work-item-documents`,
+    );
+    return response.data;
+  },
+};
 
 export const quotesApi = {
   /** Light rows (no lines, adjustments or tax); open one with `getById`. */
