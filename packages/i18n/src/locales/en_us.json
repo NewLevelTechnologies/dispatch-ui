@@ -4573,7 +4573,6 @@
         "completed": "Completed",
         "enRoute": "En route",
         "inProgress": "On site",
-        "noShow": "No show",
         "scheduled": "Scheduled"
       },
       "doneGroup": "Done · {{count}}",

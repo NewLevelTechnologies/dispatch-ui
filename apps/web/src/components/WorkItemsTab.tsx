@@ -14,7 +14,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasAnyCapability } from '../hooks/useCurrentUser';
 import { showError, extractApiError } from '../lib/toast';
-import { workItemLabel } from '@dispatch/utils';
+import { dispatchCoversWorkItem, workItemLabel } from '@dispatch/utils';
 import { isFinished } from '../lib/workItemSteps';
 import { Button } from './catalyst/button';
 import { Input } from './catalyst/input';
@@ -210,7 +210,7 @@ export default function WorkItemsTab({
       media={(filesPage?.content ?? []).filter(
         (f) => f.workItemId === selected.id && f.kind !== 'DOCUMENT' && f.status !== 'FAILED',
       )}
-      dispatches={visits.filter((d) => d.addressedWorkItemIds?.includes(selected.id))}
+      dispatches={visits.filter((d) => dispatchCoversWorkItem(d, selected.id))}
       seqById={seqById}
       onSaveDescription={onSaveDescription}
       onSaveDiagnosis={onSaveDiagnosis}

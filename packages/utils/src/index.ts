@@ -45,4 +45,4 @@ export {
 } from './equipmentAttributes';
 
 // Scheduling helpers
-export { tripsByWorkItem } from './tripsByWorkItem';
+export { dispatchCoversWorkItem, tripsByWorkItem } from './tripsByWorkItem';

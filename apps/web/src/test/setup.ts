@@ -2450,7 +2450,6 @@ vi.mock('react-i18next', async () => {
     'workOrders.workItems.dispatchStatus.completed': 'Completed',
     'workOrders.workItems.dispatchStatus.enRoute': 'En route',
     'workOrders.workItems.dispatchStatus.inProgress': 'On site',
-    'workOrders.workItems.dispatchStatus.noShow': 'No show',
     'workOrders.workItems.dispatchStatus.scheduled': 'Scheduled',
     'workOrders.workItems.doneGroup': 'Done · {{count}}',
     'workOrders.workItems.emptyShort': 'No {{entities}} yet',

@@ -152,6 +152,24 @@ describe('WorkItemsTab', () => {
     expect(h.onScheduleDispatch).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-1' }));
   });
 
+  it('counts an unscoped visit as covering the item, and ignores a no-show', () => {
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        workItems={[wi('wi-1', 1, 'No cooling')]}
+        dispatches={[
+          dispatch('d-1', ['wi-1'], { status: 'NO_SHOW', assignedUserName: 'Ana Ruiz' }),
+          dispatch('d-2', [], { arrivalWindowStart: '2026-05-16T14:00:00Z', arrivalWindowEnd: '2026-05-16T16:00:00Z' }),
+        ]}
+      />,
+    );
+    expect(screen.getByText(/Daniel Park · Scheduled/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ana Ruiz/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not scheduled yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /schedule dispatch/i })).not.toBeInTheDocument();
+  });
+
   it('asks for findings on a scheduled item and saves them inline', async () => {
     const user = userEvent.setup();
     const h = handlers();
