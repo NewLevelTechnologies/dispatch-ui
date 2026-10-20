@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTranslation } from '@dispatch/i18n';
 import { useTheme } from '../../theme/ThemeProvider';
 import { DispatchRow } from '../../components';
@@ -18,6 +19,7 @@ import { formatFullDate } from '../../schedule/formatFullDate';
 export default function TodayScreen() {
   const { t } = useTranslation();
   const { spacing } = useTheme();
+  const router = useRouter();
   const date = dayKey(new Date());
   const { dispatches, isLoading, error, refetch } = useMyBoardDispatches(date);
 
@@ -43,6 +45,9 @@ export default function TodayScreen() {
               subtitle={data.subtitle}
               statusLabel={t(`workOrders.dispatches.status.${data.status}`)}
               statusTone={statusTone(data.status)}
+              onPress={() =>
+                router.push({ pathname: '/dispatch/[id]', params: { id: row.id, workOrderId: row.workOrderId } })
+              }
             />
           );
         })}

@@ -7,6 +7,9 @@ import type { BoardDispatch } from '@dispatch/api';
 
 jest.mock('../../../schedule/useMyBoardDispatches', () => ({ useMyBoardDispatches: jest.fn() }));
 
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+
 const mockUseMyBoardDispatches = useMyBoardDispatches as jest.Mock;
 const mockRefetch = jest.fn();
 
@@ -89,6 +92,23 @@ describe('TodayScreen', () => {
     expect(screen.getByText('No cool — compressor noise')).toBeTruthy();
     expect(screen.getByText('Johnson Residence · Phoenix, AZ')).toBeTruthy();
     expect(screen.getByText('Scheduled')).toBeTruthy();
+  });
+
+  it('navigates to the dispatch detail screen on tap', async () => {
+    mockUseMyBoardDispatches.mockReturnValue({
+      dispatches: [ROW],
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    await renderToday();
+
+    await fireEvent.press(screen.getByText('No cool — compressor noise'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/dispatch/[id]',
+      params: { id: 'd1', workOrderId: 'wo1' },
+    });
   });
 
   it('retries through the shell on error', async () => {

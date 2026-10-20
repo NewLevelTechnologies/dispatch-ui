@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTranslation } from '@dispatch/i18n';
 import { useTheme } from '../../theme/ThemeProvider';
 import { DispatchRow } from '../../components';
@@ -15,6 +16,7 @@ const UPCOMING_DAYS = 7;
 export default function ScheduleScreen() {
   const { t } = useTranslation();
   const { colors, spacing } = useTheme();
+  const router = useRouter();
   const dates = upcomingDateKeys(UPCOMING_DAYS);
   const { dispatches, isLoading, error, refetch } = useMyUpcomingBoardDispatches(dates);
 
@@ -46,6 +48,9 @@ export default function ScheduleScreen() {
                   subtitle={data.subtitle}
                   statusLabel={t(`workOrders.dispatches.status.${data.status}`)}
                   statusTone={statusTone(data.status)}
+                  onPress={() =>
+                    router.push({ pathname: '/dispatch/[id]', params: { id: row.id, workOrderId: row.workOrderId } })
+                  }
                 />
               );
             })}

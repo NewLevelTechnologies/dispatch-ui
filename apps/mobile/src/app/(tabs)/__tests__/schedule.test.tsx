@@ -9,6 +9,9 @@ jest.mock('../../../schedule/useMyUpcomingBoardDispatches', () => ({
   useMyUpcomingBoardDispatches: jest.fn(),
 }));
 
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+
 const mockUseMyUpcomingBoardDispatches = useMyUpcomingBoardDispatches as jest.Mock;
 const mockRefetch = jest.fn();
 
@@ -108,6 +111,23 @@ describe('ScheduleScreen', () => {
     expect(screen.getByText('Today job')).toBeTruthy();
     expect(screen.getByText('Tue, Oct 27')).toBeTruthy();
     expect(screen.getByText('Later job')).toBeTruthy();
+  });
+
+  it('navigates to the dispatch detail screen on tap', async () => {
+    mockUseMyUpcomingBoardDispatches.mockReturnValue({
+      dispatches: [TODAY_ROW],
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    await renderSchedule();
+
+    await fireEvent.press(screen.getByText('Today job'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/dispatch/[id]',
+      params: { id: 'today', workOrderId: 'wo1' },
+    });
   });
 
   it('retries through the shell on error', async () => {
