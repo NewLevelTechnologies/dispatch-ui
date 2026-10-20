@@ -8,7 +8,6 @@ import { useMyBoardDispatches } from '../../schedule/useMyBoardDispatches';
 import { boardDispatchToRowData } from '../../schedule/boardDispatchToRowData';
 import { statusTone } from '../../schedule/statusTone';
 import { dayKey } from '../../schedule/dayGroups';
-import { formatFullDate } from '../../schedule/formatFullDate';
 
 /**
  * The technician's jobs for today, soonest first. Calls `dayKey()` fresh on
@@ -26,7 +25,6 @@ export default function TodayScreen() {
   return (
     <ScheduleScreenShell
       title={t('nav.today')}
-      eyebrow={formatFullDate()}
       isLoading={isLoading}
       error={error}
       isEmpty={dispatches.length === 0}
