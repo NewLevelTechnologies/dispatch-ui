@@ -5291,5 +5291,15 @@
       "releaseDayTitle_one": "Release {{day}} · {{count}} not sent",
       "releaseDayTitle_other": "Release {{day}} · {{count}} not sent"
     }
+  },
+  "mobileSchedule": {
+    "emptyBodyToday": "Nothing assigned to you for today.",
+    "emptyBodyWeek": "No visits assigned to you in the next 7 days.",
+    "emptyTitleToday": "No visits today",
+    "emptyTitleWeek": "Nothing coming up",
+    "errorBody": "Something went wrong reaching the server.",
+    "errorTitle": "Couldn’t load your schedule",
+    "today": "Today",
+    "tomorrow": "Tomorrow"
   }
 }
