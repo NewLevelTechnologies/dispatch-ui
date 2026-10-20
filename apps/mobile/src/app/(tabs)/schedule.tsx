@@ -3,11 +3,11 @@ import { useTranslation } from '@dispatch/i18n';
 import { useTheme } from '../../theme/ThemeProvider';
 import { DispatchRow } from '../../components';
 import { ScheduleScreenShell } from '../../schedule/ScheduleScreenShell';
-import { useMyDispatches } from '../../schedule/useMyDispatches';
-import { dispatchToRowData } from '../../schedule/dispatchToRowData';
+import { useMyUpcomingBoardDispatches } from '../../schedule/useMyUpcomingBoardDispatches';
+import { boardDispatchToRowData } from '../../schedule/boardDispatchToRowData';
 import { statusTone } from '../../schedule/statusTone';
-import { upcomingRange } from '../../schedule/dateRanges';
 import { groupByDay } from '../../schedule/dayGroups';
+import { upcomingDateKeys } from '../../schedule/upcomingDateKeys';
 
 const UPCOMING_DAYS = 7;
 
@@ -15,8 +15,8 @@ const UPCOMING_DAYS = 7;
 export default function ScheduleScreen() {
   const { t } = useTranslation();
   const { colors, spacing } = useTheme();
-  const range = upcomingRange(UPCOMING_DAYS);
-  const { dispatches, isLoading, error, refetch } = useMyDispatches(range, `upcoming-${UPCOMING_DAYS}`);
+  const dates = upcomingDateKeys(UPCOMING_DAYS);
+  const { dispatches, isLoading, error, refetch } = useMyUpcomingBoardDispatches(dates);
 
   const days = groupByDay(dispatches, (row) => row.arrivalWindowStart, t);
 
@@ -37,7 +37,7 @@ export default function ScheduleScreen() {
               {day.heading}
             </Text>
             {day.items.map((row) => {
-              const data = dispatchToRowData(row);
+              const data = boardDispatchToRowData(row);
               return (
                 <DispatchRow
                   key={data.id}
