@@ -89,4 +89,10 @@ describe('ProfileScreen', () => {
     await fireEvent.press(screen.getByText('Style guide'));
     expect(mockPush).toHaveBeenCalledWith('/style-guide');
   });
+
+  it('navigates to My Availability', async () => {
+    await renderProfile();
+    await fireEvent.press(screen.getByText('My Availability'));
+    expect(mockPush).toHaveBeenCalledWith('/availability');
+  });
 });

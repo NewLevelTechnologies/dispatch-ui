@@ -44,10 +44,17 @@ function AuthGate() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: true, title: 'Dispatch' }}>
-      {/* The tab shell draws its own chrome (AppHeader + tab bar) — a native
-          stack header on top of that would double up. */}
+    <Stack screenOptions={{ headerShown: true, title: 'Dispatch', gestureEnabled: true }}>
+      {/* The tab shell and every detail screen draw their own chrome
+          (AppHeader) — a native stack header on top of that would double up.
+          `gestureEnabled` is on by default for native-stack, but it's spelled
+          out here since AppHeader's onBack is these screens' only other way
+          back and swipe is easy to assume works without checking. */}
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="dispatch/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="work-order/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="availability" options={{ headerShown: false }} />
+      <Stack.Screen name="style-guide" options={{ headerShown: false }} />
     </Stack>
   );
 }

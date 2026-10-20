@@ -36,6 +36,12 @@ export default function ProfileScreen() {
           </Card>
         )}
 
+        <Button
+          label={t('myAvailability.title')}
+          variant="secondary"
+          onPress={() => router.push('/availability')}
+        />
+
         {/* Dev convenience: Phase 0's component library has no permanent home
             of its own yet. Remove once there's a real settings surface to
             move it to. */}

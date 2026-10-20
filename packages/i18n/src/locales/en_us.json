@@ -5292,5 +5292,30 @@
       "releaseDayTitle_one": "Release {{day}} · {{count}} not sent",
       "releaseDayTitle_other": "Release {{day}} · {{count}} not sent"
     }
+  },
+  "dispatchDetail": {
+    "errorBody": "Something went wrong reaching the server.",
+    "errorTitle": "Couldn’t load this visit"
+  },
+  "workOrderDetail": {
+    "errorBody": "Something went wrong reaching the server.",
+    "errorTitle": "Couldn’t load this work order"
+  },
+  "myAvailability": {
+    "emptyBody": "No upcoming time off recorded.",
+    "emptyTitle": "Nothing on the books",
+    "errorBody": "Something went wrong reaching the server.",
+    "errorTitle": "Couldn’t load your availability",
+    "title": "My Availability"
+  },
+  "mobileSchedule": {
+    "emptyBodyToday": "Nothing assigned to you for today.",
+    "emptyBodyWeek": "No visits assigned to you in the next 7 days.",
+    "emptyTitleToday": "No visits today",
+    "emptyTitleWeek": "Nothing coming up",
+    "errorBody": "Something went wrong reaching the server.",
+    "errorTitle": "Couldn’t load your schedule",
+    "today": "Today",
+    "tomorrow": "Tomorrow"
   }
 }

@@ -33,4 +33,14 @@ describe('AppHeader', () => {
     await renderHeader();
     expect(screen.queryByText('Tuesday, Oct 20')).toBeNull();
   });
+
+  it('renders a subtitle line below the title when given one', async () => {
+    await renderHeader({ subtitle: 'WO-00138' });
+    expect(screen.getByText('WO-00138')).toBeTruthy();
+  });
+
+  it('omits the subtitle line when none is given', async () => {
+    await renderHeader();
+    expect(screen.queryByText('WO-00138')).toBeNull();
+  });
 });
