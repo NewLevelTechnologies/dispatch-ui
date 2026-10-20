@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { tenantSettingsApi } from '../api/setup';
 import { formatPhone } from '@dispatch/utils';
@@ -8,6 +9,7 @@ import { useAuth } from '../auth/AuthContext';
 export default function HomeScreen() {
   const { t } = useTranslation();
   const { username, leave } = useAuth();
+  const router = useRouter();
 
   // /tenant-settings requires a bearer token. Reaching it at all is the proof
   // that the Cognito session is being attached to outbound requests — the
@@ -53,6 +55,12 @@ export default function HomeScreen() {
         <Text style={styles.signOutText}>{t('auth.signOut')}</Text>
       </Pressable>
 
+      {/* Temporary: Phase 0's component library has no permanent home until the
+          Phase 1 tab shell exists, so it's reachable from here in the meantime. */}
+      <Pressable style={styles.styleGuideLink} onPress={() => router.push('/style-guide')}>
+        <Text style={styles.styleGuideLinkText}>{t('styleGuide.title')}</Text>
+      </Pressable>
+
       <Text style={styles.hint}>{t('app.pocHint')}</Text>
     </ScrollView>
   );
@@ -83,6 +91,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
+  styleGuideLink: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  styleGuideLinkText: { fontSize: 14, fontWeight: '600', color: '#ee6d00' },
   signOutText: { fontSize: 16, fontWeight: '600', color: '#374151' },
   hint: { fontSize: 13, color: '#9ca3af', textAlign: 'center', marginTop: 24 },
 });

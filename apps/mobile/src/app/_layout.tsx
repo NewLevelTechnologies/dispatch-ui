@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Initialize i18next from the shared package (same locales as web).
@@ -9,6 +10,7 @@ import '@dispatch/i18n';
 // Initialize the shared API client (Amplify config, base URL, auth provider).
 import '../api/setup';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
+import { ThemeProvider } from '../theme/ThemeProvider';
 
 const queryClient = new QueryClient();
 
@@ -45,11 +47,15 @@ function AuthGate() {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AuthGate />
-        <StatusBar style="auto" />
-      </AuthProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <AuthGate />
+            <StatusBar style="auto" />
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

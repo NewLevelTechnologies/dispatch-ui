@@ -17,6 +17,16 @@ jest.mock('expo-router', () => ({
   useSegments: () => mockSegments(),
 }));
 
+// Without `initialMetrics`, the real SafeAreaProvider waits on a native
+// onInsetsChange event that never fires under the test renderer — which
+// stalls the whole tree's effects, including AuthProvider's. This test is
+// about the auth redirect, not safe-area measurement, so stub it out the
+// same way the mocks above stub out expo-router/Amplify.
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = jest.requireActual('react-native');
+  return { SafeAreaProvider: View };
+});
+
 // Importing the real one configures Amplify as a side effect.
 jest.mock('../../api/setup', () => ({}));
 

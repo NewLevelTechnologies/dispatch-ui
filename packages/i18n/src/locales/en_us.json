@@ -2918,5 +2918,16 @@
       "title": "You\u2019re not a member of this workspace",
       "yours": "Your workspaces"
     }
+  },
+  "styleGuide": {
+    "sections": {
+      "avatars": "Avatars",
+      "buttons": "Buttons",
+      "cards": "Cards",
+      "lifecycle": "Lifecycle",
+      "status": "Status",
+      "today": "Today row"
+    },
+    "title": "Style guide"
   }
 }

@@ -11,11 +11,19 @@ import HomeScreen from '../index';
 const mockGetSettings = jest.fn();
 const mockGetCurrentUser = jest.fn();
 const mockSignOut = jest.fn();
+const mockPush = jest.fn();
 
 // Mocked wholesale: importing the real module configures Amplify as a side
 // effect, which a screen test has no business triggering.
 jest.mock('../../api/setup', () => ({
   tenantSettingsApi: { getSettings: (...args: unknown[]) => mockGetSettings(...args) },
+}));
+
+// The real expo-router Link/useRouter need a mounted navigator (see
+// _layout.test.tsx) — this screen test only cares that the right path is
+// requested, not that expo-router resolves it.
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
 }));
 
 jest.mock('aws-amplify/auth', () => ({
@@ -96,5 +104,15 @@ describe('HomeScreen', () => {
     await fireEvent.press(screen.getByText('Sign out'));
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
+  });
+
+  it('navigates to the style guide', async () => {
+    mockGetSettings.mockResolvedValue(SETTINGS);
+    await renderHome();
+    await waitFor(() => expect(screen.getByText('Style guide')).toBeTruthy());
+
+    await fireEvent.press(screen.getByText('Style guide'));
+
+    expect(mockPush).toHaveBeenCalledWith('/style-guide');
   });
 });
