@@ -41,9 +41,12 @@ export function AppHeader({ eyebrow, title, subtitle, onBack }: AppHeaderProps) 
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={t('common.actions.back')}
-          style={styles.back}
+          style={[styles.back, { flexDirection: 'row', alignItems: 'center' }]}
         >
           <Text style={{ color: colors.barFg, fontSize: 22, fontWeight: '600' }}>‹</Text>
+          <Text style={{ color: colors.barFg, fontSize: 15, fontWeight: '600', marginLeft: 2 }}>
+            {t('common.actions.back')}
+          </Text>
         </Pressable>
       )}
       {eyebrow && <Text style={{ color: colors.barFgDim, fontSize: 11 }}>{eyebrow}</Text>}
