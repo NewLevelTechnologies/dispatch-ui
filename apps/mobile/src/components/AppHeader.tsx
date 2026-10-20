@@ -3,9 +3,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 
 type AppHeaderProps = {
-  /** Small line above the title — e.g. a date, or a breadcrumb. */
+  /** Small line above the title — e.g. a date, or the signed-in user. */
   eyebrow?: string;
   title: string;
+  /** Small line below the title — e.g. a record number backing it up. */
+  subtitle?: string;
 };
 
 /**
@@ -14,7 +16,7 @@ type AppHeaderProps = {
  * Linear, Vercel, ServiceTitan". This is the one glance that says "same
  * product as the dashboard" the moment the app opens.
  */
-export function AppHeader({ eyebrow, title }: AppHeaderProps) {
+export function AppHeader({ eyebrow, title, subtitle }: AppHeaderProps) {
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -27,6 +29,7 @@ export function AppHeader({ eyebrow, title }: AppHeaderProps) {
     >
       {eyebrow && <Text style={{ color: colors.barFgDim, fontSize: 11 }}>{eyebrow}</Text>}
       <Text style={[styles.title, { color: colors.barFg }]}>{title}</Text>
+      {subtitle && <Text style={{ color: colors.barFgDim, fontSize: 11, marginTop: 2 }}>{subtitle}</Text>}
     </View>
   );
 }

@@ -67,7 +67,7 @@ export default function WorkOrderDetailScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bgSunken }}>
       <AppHeader
         title={workOrder.summary || workOrder.workOrderNumber || t('entities.workOrder')}
-        eyebrow={workOrder.workOrderNumber ?? undefined}
+        subtitle={workOrder.workOrderNumber ?? undefined}
       />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Card title={t('workOrders.detail.siteContact')}>

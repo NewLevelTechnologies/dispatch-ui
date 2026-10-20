@@ -61,7 +61,7 @@ export default function DispatchDetailScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bgSunken }}>
       <AppHeader
         title={contact.summary || contact.workOrderNumber || t('entities.workOrder')}
-        eyebrow={contact.workOrderNumber ?? undefined}
+        subtitle={contact.workOrderNumber ?? undefined}
       />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
