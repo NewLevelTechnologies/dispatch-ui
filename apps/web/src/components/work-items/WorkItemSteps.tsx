@@ -18,6 +18,14 @@ export default function WorkItemSteps({ steps }: { steps: WorkItemStep[] }) {
         const more = n.more > 0 ? ` +${n.more}` : '';
         return `${n.poNumber}${eta}${more}`;
       }
+      case 'quote':
+        return n.status === 'ACCEPTED'
+          ? n.number
+          : `${n.number} · ${t(`workOrders.workItems.docStatus.QUOTE.${n.status}`, { defaultValue: n.status })}`;
+      case 'declined':
+        return t('workOrders.workItems.steps.declinedOn', { number: n.number });
+      case 'expired':
+        return t('workOrders.workItems.steps.expiredOn', { number: n.number });
       default:
         return t(`workOrders.workItems.steps.${n.kind}`);
     }

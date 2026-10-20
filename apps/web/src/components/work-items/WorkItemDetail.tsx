@@ -14,6 +14,7 @@ import {
   workOrderFilesApi,
   type DispatchBoardRow,
   type PurchaseOrderListItem,
+  type WorkItemDocument,
   type WorkflowTransition,
   type WorkItemResponse,
   type WorkItemStatus,
@@ -41,6 +42,7 @@ import WorkItemSteps from './WorkItemSteps';
 import WorkItemEquipmentCard from './WorkItemEquipmentCard';
 import WorkItemEquipmentHistory from './WorkItemEquipmentHistory';
 import WorkItemHistory from './WorkItemHistory';
+import WorkItemDocumentsRow from './WorkItemDocumentsRow';
 import WorkItemDispatchesCard from './WorkItemDispatchesCard';
 import { formatHours, localDate, shortDate, timeLabel } from './format';
 
@@ -52,6 +54,10 @@ export interface WorkItemDetailProps {
   transitions: WorkflowTransition[];
   enforceWorkflow: boolean;
   readOnly: boolean;
+  /** The job's customer — "Quote this work" bills the draft to them. */
+  customerId?: string;
+  /** This item's quote/invoice rows. */
+  documents: WorkItemDocument[];
   /** POs raised for this item (header-level workItemId link). */
   purchaseOrders: PurchaseOrderListItem[];
   /** This item's photos/videos on this job. */
@@ -101,7 +107,7 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
   const finished = isFinished(wi);
   const findings = wi.diagnosis?.trim() ?? '';
   const openPOs = openPurchaseOrders(purchaseOrders);
-  const steps = deriveWorkItemSteps(wi, purchaseOrders);
+  const steps = deriveWorkItemSteps(wi, purchaseOrders, props.documents);
   const toComplete = completeTarget(allowed);
   const toPartsArrived = partsArrivedTarget(allowed);
   const awaitingParts = status?.code === PENDING_PARTS_CODE;
@@ -286,9 +292,11 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
             />
             <PartsSection
               workOrderId={workOrderId}
+              customerId={props.customerId}
               wi={wi}
               readOnly={readOnly || finished}
               purchaseOrders={purchaseOrders}
+              documents={props.documents}
             />
           </section>
           {wi.equipment && <WorkItemEquipmentHistory workOrderId={workOrderId} equipment={wi.equipment} />}
@@ -590,14 +598,18 @@ const PO_TONE: Record<string, 'warning' | 'success' | 'neutral'> = {
 
 function PartsSection({
   workOrderId,
+  customerId,
   wi,
   readOnly,
   purchaseOrders,
+  documents,
 }: {
   workOrderId: string;
+  customerId?: string;
   wi: WorkItemResponse;
   readOnly: boolean;
   purchaseOrders: PurchaseOrderListItem[];
+  documents: WorkItemDocument[];
 }) {
   const { t } = useTranslation();
   const base = `/purchase-orders/new?workOrderId=${workOrderId}&workItemId=${wi.id}`;
@@ -667,6 +679,13 @@ function PartsSection({
           )}
         </div>
       )}
+      <WorkItemDocumentsRow
+        workOrderId={workOrderId}
+        customerId={customerId}
+        wi={wi}
+        documents={documents}
+        readOnly={readOnly}
+      />
     </div>
   );
 }

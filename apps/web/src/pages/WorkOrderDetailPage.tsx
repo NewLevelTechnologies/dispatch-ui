@@ -926,6 +926,7 @@ export default function WorkOrderDetailPage() {
               enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
               readOnly={frozen}
               dispatches={dispatches}
+              customerId={workOrder.customer?.id}
               onDelete={handleDeleteWorkItem}
               onDuplicate={(wi) => duplicateWorkItemMutation.mutate(wi)}
               onSaveDescription={handleSaveWorkItemDescription}

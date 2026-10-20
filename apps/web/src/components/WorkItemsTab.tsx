@@ -4,6 +4,7 @@ import { useTranslation } from '@dispatch/i18n';
 import { PlusIcon } from '@heroicons/react/16/solid';
 import {
   purchaseOrderApi,
+  workItemDocumentsApi,
   workOrderApi,
   workOrderFilesApi,
   type DispatchBoardRow,
@@ -35,6 +36,8 @@ interface Props {
   enforceWorkflow: boolean;
   /** Frozen WO (cancelled / archived). Users without EDIT_WORK_ORDERS are read-only too. */
   readOnly?: boolean;
+  /** The job's customer — "Quote this work" bills the draft to them. */
+  customerId?: string;
   /** The WO's dispatches (non-cancelled ones address items). */
   dispatches?: DispatchBoardRow[];
   onDelete?: (wi: WorkItemResponse) => void;
@@ -67,6 +70,7 @@ export default function WorkItemsTab({
   enforceWorkflow,
   readOnly: frozen = false,
   dispatches = [],
+  customerId,
   onDelete,
   onDuplicate,
   onSaveDescription,
@@ -141,6 +145,11 @@ export default function WorkItemsTab({
     queryFn: () => purchaseOrderApi.list({ workOrderId, size: 100 }),
   });
   const purchaseOrders = poPage?.content ?? [];
+  // Per-item quote/invoice rows — one read for the whole job.
+  const { data: itemDocuments = [] } = useQuery({
+    queryKey: ['work-item-documents', workOrderId],
+    queryFn: () => workItemDocumentsApi.getByWorkOrder(workOrderId),
+  });
   // The job's media — same query the Dispatches tab reads; filtered per item.
   const { data: filesPage } = useQuery({
     queryKey: ['work-order-files', workOrderId, 'dispatch-media'],
@@ -200,6 +209,8 @@ export default function WorkItemsTab({
       enforceWorkflow={enforceWorkflow}
       readOnly={readOnly}
       purchaseOrders={purchaseOrders.filter((po) => po.workItemId === selected.id)}
+      customerId={customerId}
+      documents={itemDocuments.filter((d) => d.workItemId === selected.id)}
       media={(filesPage?.content ?? []).filter(
         (f) => f.workItemId === selected.id && f.kind !== 'DOCUMENT' && f.status !== 'FAILED',
       )}

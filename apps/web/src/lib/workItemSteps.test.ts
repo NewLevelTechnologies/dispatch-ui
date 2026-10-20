@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { PurchaseOrderResponse, WorkItemResponse } from '../api/setup';
+import type { PurchaseOrderResponse, WorkItemDocument, WorkItemResponse } from '../api/setup';
 import { deriveWorkItemSteps, primaryAction } from './workItemSteps';
 
 const wi = (overrides: Partial<WorkItemResponse> = {}): WorkItemResponse => ({
@@ -58,6 +58,48 @@ describe('deriveWorkItemSteps', () => {
 
   it('shows a cancelled item as a skipped Done', () => {
     expect(deriveWorkItemSteps(wi({ statusCategory: 'CANCELLED' }), []).at(-1)?.state).toBe('skip');
+  });
+});
+
+const quote = (status: string, overrides: Partial<WorkItemDocument> = {}): WorkItemDocument => ({
+  workItemId: 'wi-1',
+  documentType: 'QUOTE',
+  documentId: `q-${status}`,
+  number: 'Q-1903',
+  status,
+  amount: 420,
+  declined: false,
+  ...overrides,
+});
+
+describe('Approved step', () => {
+  const diagnosed = wi({ diagnosis: 'x', statusCategory: 'IN_PROGRESS' });
+
+  it('is absent when the item is on no quote', () => {
+    expect(deriveWorkItemSteps(diagnosed, [], []).map((s) => s.key)).not.toContain('approved');
+  });
+
+  it('is done once an accepted quote sold the item, and sits before Parts ready', () => {
+    const steps = deriveWorkItemSteps(diagnosed, [po('ORDERED')], [quote('ACCEPTED')]);
+    expect(states(steps)).toEqual(['reported:done', 'diagnosed:done', 'approved:done', 'partsReady:blocked', 'done:todo']);
+  });
+
+  it('is current while the quote is out, with its number and status', () => {
+    const steps = deriveWorkItemSteps(diagnosed, [], [quote('SENT')]);
+    expect(steps[2]).toMatchObject({ key: 'approved', state: 'current', note: { kind: 'quote', number: 'Q-1903', status: 'SENT' } });
+  });
+
+  it('is blocked when the accepted quote left the item unsold, or it was declined', () => {
+    expect(deriveWorkItemSteps(diagnosed, [], [quote('ACCEPTED', { declined: true })])[2]).toMatchObject({
+      state: 'blocked',
+      note: { kind: 'declined' },
+    });
+    expect(deriveWorkItemSteps(diagnosed, [], [quote('DECLINED')])[2].state).toBe('blocked');
+  });
+
+  it('ignores invoices', () => {
+    const steps = deriveWorkItemSteps(diagnosed, [], [quote('PAID', { documentType: 'INVOICE' })]);
+    expect(steps.map((s) => s.key)).not.toContain('approved');
   });
 });
 

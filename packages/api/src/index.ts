@@ -388,6 +388,7 @@ export {
 export {
   invoicesApi,
   quotesApi,
+  workItemDocumentsApi,
   documentsApi,
   paymentsApi,
   financialSummaryApi,
@@ -426,6 +427,7 @@ export {
   type InvoiceViews,
   type InvoiceViewsParams,
   type QuoteListItem,
+  type WorkItemDocument,
   type DocumentRow,
   type DocumentScope,
   type DocumentView,
