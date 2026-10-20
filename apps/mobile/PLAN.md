@@ -66,8 +66,15 @@ that file in lockstep with web's if a token value changes there).
    real (signed-in-as, active workspace, switcher when there's more than one
    membership, sign out); Today/Schedule/Lookup are placeholders for their own
    phases below.
-2. **Today / Schedule / My Availability**: net-new, reshapes dispatcher-facing data
-   into a single-tech view.
+2. **Today / Schedule / My Availability** (done): net-new, reshapes dispatcher-facing
+   data (`dispatchesApi.getAll`, filtered by `assignedUserId`) into a single-tech view.
+   Today is the flat list for the current local day; Schedule is the same data over
+   the next 7 days grouped under day headings. My Availability (reachable from
+   Profile, not its own tab) is a **view-only** list of upcoming time off via the real
+   `availabilityApi` — creating/removing time off was deliberately left out of this
+   pass (no existing UI to mirror, and the right approach — a date-range form vs.
+   mobile-friendly quick presets — needs its own design decision) and is this phase's
+   one open remainder.
 3. **Dispatch detail**: lifecycle timeline + tech-initiated status transitions,
    call/directions.
 4. **Work order detail (tech subset)**: overview, work items + photos, files,
@@ -76,7 +83,10 @@ that file in lockstep with web's if a token value changes there).
 6. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self.
 7. **Reference lookup**: customers/service-locations/equipment, read-only, no billing.
 8. **Push notifications** (needs new `dispatch-api` endpoints — device tokens, events).
-9. **Profile/account**: profile, sign out, workspace switcher.
+
+Profile/account (signed-in-as, sign out, workspace switcher) is **done** — folded into
+Phase 1 rather than staying its own numbered phase, since it was needed there to make
+the tenant gate testable end-to-end.
 
 ## Why
 
