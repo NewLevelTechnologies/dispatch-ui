@@ -14,6 +14,8 @@ interface EquipmentQuickViewDrawerProps {
    *  null to close the drawer (parent owns the open/closed state). */
   initialEquipment: { id: string; name: string } | null;
   onClose: () => void;
+  /** Opened from a work order: notes written here record it. */
+  workOrderId?: string;
 }
 
 /**
@@ -34,6 +36,7 @@ interface EquipmentQuickViewDrawerProps {
 export default function EquipmentQuickViewDrawer({
   initialEquipment,
   onClose,
+  workOrderId,
 }: EquipmentQuickViewDrawerProps) {
   const { t } = useTranslation();
 
@@ -114,6 +117,7 @@ export default function EquipmentQuickViewDrawer({
           <EquipmentQuickView
             equipmentId={top.id}
             onSelectSubUnit={handlePushSubUnit}
+            workOrderId={workOrderId}
           />
         )}
       </div>

@@ -46,6 +46,8 @@ interface EquipmentQuickViewProps {
   equipmentId: string;
   /** Click handler for sub-unit chips — pushes the sub-unit onto the drawer stack. */
   onSelectSubUnit: (subUnit: { id: string; name: string }) => void;
+  /** Opened from a work order: new notes record it ("· WO-3188" in history). */
+  workOrderId?: string;
 }
 
 /**
@@ -56,7 +58,7 @@ interface EquipmentQuickViewProps {
  * make/model/serial/asset tag/location); specs, warranty, dates and filters are
  * deferred to the full page. Editing the record edits it everywhere.
  */
-export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: EquipmentQuickViewProps) {
+export default function EquipmentQuickView({ equipmentId, onSelectSubUnit, workOrderId }: EquipmentQuickViewProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
@@ -449,6 +451,7 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
       {/* Notes — equipment-scoped, inline add. */}
       <NotesBlock
         equipmentId={equipmentId}
+        workOrderId={workOrderId}
         recentNotes={equipment.recentNotes ?? []}
         noteCount={equipment.noteCount ?? 0}
         onChanged={invalidateEquipmentRelatedCaches}
@@ -523,11 +526,13 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
 // existing note live on the full equipment page (drawer keeps the peek calm).
 function NotesBlock({
   equipmentId,
+  workOrderId,
   recentNotes,
   noteCount,
   onChanged,
 }: {
   equipmentId: string;
+  workOrderId?: string;
   recentNotes: EquipmentNote[];
   noteCount: number;
   onChanged: () => void;
@@ -538,7 +543,7 @@ function NotesBlock({
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
   const createMutation = useMutation({
-    mutationFn: (body: string) => equipmentNotesApi.create(equipmentId, { body }),
+    mutationFn: (body: string) => equipmentNotesApi.create(equipmentId, { body, ...(workOrderId ? { workOrderId } : {}) }),
     onSuccess: () => {
       onChanged();
       setDraft('');

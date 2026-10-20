@@ -32,22 +32,28 @@ export default function WorkItemEquipmentHistory({ workOrderId, equipment }: Pro
   const [allNotes, setAllNotes] = useState(false);
   const recordHref = `/equipment/${equipment.id}`;
 
-  // Earlier photos = the equipment's photos born on any other job (or on the
-  // record itself). No server-side exclude exists, so filter here.
+  // Earlier photos = the equipment's photos from any other job (or the record
+  // itself) — the server leaves this work order's out. Nameplate leads.
   const { data: photosPage, isSuccess: photosLoaded } = useQuery({
-    queryKey: ['equipment-files', equipment.id, 'PHOTO'],
-    queryFn: () => equipmentFilesApi.list(equipment.id, { kind: 'PHOTO', limit: 50 }),
+    queryKey: ['equipment-files', equipment.id, 'PHOTO', { excludeWorkOrderId: workOrderId }],
+    queryFn: () =>
+      equipmentFilesApi.list(equipment.id, { kind: 'PHOTO', limit: 50, excludeWorkOrderId: workOrderId }),
   });
   const photos = useMemo<WorkOrderFile[]>(
     () =>
-      (photosPage?.content ?? []).filter((f) => f.workOrderId !== workOrderId && f.status !== 'FAILED'),
-    [photosPage, workOrderId],
+      (photosPage?.content ?? [])
+        .filter((f) => f.status !== 'FAILED')
+        .sort((a, b) => Number(!!b.isNameplate) - Number(!!a.isNameplate)),
+    [photosPage],
   );
+  const photoTotal = Math.max(photosPage?.counts?.photos ?? 0, photos.length);
 
-  const { data: notes = [], isSuccess: notesLoaded } = useQuery({
+  const { data: allEquipmentNotes = [], isSuccess: notesLoaded } = useQuery({
     queryKey: ['equipment-notes', equipment.id],
     queryFn: () => equipmentNotesApi.list(equipment.id),
   });
+  // Earlier notes: the ones not written on this job.
+  const notes = allEquipmentNotes.filter((n) => n.workOrderId !== workOrderId);
 
   const { data: jobsPage, isSuccess: jobsLoaded } = useQuery({
     queryKey: ['work-orders-list', { equipmentId: equipment.id, recent: true }],
@@ -59,7 +65,7 @@ export default function WorkItemEquipmentHistory({ workOrderId, equipment }: Pro
   if (photos.length === 0 && notes.length === 0 && pastJobs.length === 0) return null;
 
   const shownNotes = allNotes ? notes : notes.slice(0, NOTES_SHOWN);
-  const morePhotos = photos.length - PHOTO_TILES;
+  const morePhotos = photoTotal - PHOTO_TILES;
 
   return (
     <section className="card" aria-label={t('workOrders.workItems.equipmentHistory')}>
@@ -76,7 +82,7 @@ export default function WorkItemEquipmentHistory({ workOrderId, equipment }: Pro
           <div className="wit-eqh">
             <span>{t('workOrders.workItems.photos')}</span>
             <span className="flex-1" />
-            {photos.length > 0 && <span className="tabular-nums">{photos.length}</span>}
+            {photos.length > 0 && <span className="tabular-nums">{photoTotal}</span>}
           </div>
           {photos.length === 0 ? (
             <div className="text-[11.5px] text-fg-muted">{t('workOrders.workItems.noneOnFile')}</div>
@@ -92,6 +98,7 @@ export default function WorkItemEquipmentHistory({ workOrderId, equipment }: Pro
                   onClick={() => setViewing(i)}
                 >
                   <img src={p.thumbnailUrl ?? p.url} alt="" loading="lazy" />
+                  {p.isNameplate && <span className="wit-phtag">{t('workOrders.workItems.nameplate')}</span>}
                 </button>
               ))}
               {morePhotos > 0 && (
@@ -115,6 +122,14 @@ export default function WorkItemEquipmentHistory({ workOrderId, equipment }: Pro
                 <div className="whitespace-pre-wrap text-[12px]/[1.5] text-fg">{n.body}</div>
                 <div className="mt-0.5 text-[10.5px] text-fg-muted">
                   {[n.authorName, shortDate(n.createdAt)].filter(Boolean).join(' · ')}
+                  {n.workOrderNumber && (
+                    <>
+                      {' · '}
+                      <Link to={`/work-orders/${n.workOrderId}`} className="font-mono hover:text-fg-accent">
+                        {n.workOrderNumber}
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

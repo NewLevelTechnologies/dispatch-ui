@@ -412,6 +412,54 @@ describe('WorkItemsTab', () => {
     expect(apiClient.post).not.toHaveBeenCalledWith('/financial/quotes', expect.anything());
   });
 
+  it('reads the item\'s own files and the equipment\'s history from other jobs', async () => {
+    const photo = (id: string, extra: object) => ({
+      id,
+      kind: 'PHOTO',
+      status: 'READY',
+      url: `https://x/${id}.jpg`,
+      thumbnailUrl: null,
+      fileName: `${id}.jpg`,
+      caption: null,
+      createdAt: '2025-03-14T10:00:00Z',
+      workOrderId: 'wo-0',
+      workOrderNumber: 'WO-3188',
+      isNameplate: false,
+      ...extra,
+    });
+    const base = vi.mocked(apiClient.get).getMockImplementation()!;
+    vi.mocked(apiClient.get).mockImplementation(async (url: string, config?: unknown) => {
+      if (url === '/equipment/eq-1/files')
+        return { data: { content: [photo('p1', {}), photo('p2', { isNameplate: true })], counts: { photos: 2 } } };
+      if (url === '/equipment/eq-1/notes')
+        return {
+          data: [
+            { id: 'n1', body: 'Disconnect is in the garage panel.', authorName: 'A. Reyes', createdAt: '2025-03-14T10:00:00Z', workOrderId: 'wo-0', workOrderNumber: 'WO-3188' },
+            { id: 'n2', body: 'Written on this job.', authorName: 'D. Park', createdAt: '2026-05-14T10:00:00Z', workOrderId: 'wo-1', workOrderNumber: 'WO-3892' },
+          ],
+        };
+      return base(url, config as never);
+    });
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        workItems={[wi('wi-1', 1, 'No cooling', { equipmentId: 'eq-1', equipment: { id: 'eq-1', name: 'Upstairs Furnace' } })]}
+      />,
+    );
+    expect(await screen.findByText('Disconnect is in the garage panel.')).toBeInTheDocument();
+    expect(screen.queryByText('Written on this job.')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'WO-3188' })).toHaveAttribute('href', '/work-orders/wo-0');
+    // Nameplate tile leads and is tagged.
+    const tiles = screen.getAllByRole('button', { name: /p\d\.jpg/ });
+    expect(tiles[0]).toHaveAccessibleName('p2.jpg');
+    expect(within(tiles[0]).getByText('Nameplate')).toBeInTheDocument();
+    expect(apiClient.get).toHaveBeenCalledWith('/equipment/eq-1/files', {
+      params: { kind: 'PHOTO', limit: 50, excludeWorkOrderId: 'wo-1' },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/wo-1/files', { params: { workItemId: 'wi-1', limit: 100 } });
+  });
+
   it('asks for findings on a scheduled item and saves them inline', async () => {
     const user = userEvent.setup();
     const h = handlers();

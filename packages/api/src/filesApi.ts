@@ -80,6 +80,10 @@ export interface ListFilesParams {
   page?: number;
   /** Default 50, max 100. */
   limit?: number;
+  /** Work order files only: one work item's files (counts follow it). */
+  workItemId?: string;
+  /** Equipment files only: leave out this work order's files (counts follow it). */
+  excludeWorkOrderId?: string;
 }
 
 /** Direct upload categories (location/customer files only; validated server-side). */
@@ -184,6 +188,8 @@ export interface WorkOrderFile {
   agreementId: string | null;
   // Equipment profile image flag (equipment-anchored images only).
   isProfile: boolean;
+  // The equipment's data-plate photo (at most one per equipment; the OCR source).
+  isNameplate?: boolean;
   uploadedBy: string | null;
   uploadedByName: string | null;
   createdAt: string;

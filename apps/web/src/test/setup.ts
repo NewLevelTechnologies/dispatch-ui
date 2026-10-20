@@ -2531,6 +2531,7 @@ vi.mock('react-i18next', async () => {
     'workOrders.workItems.steps.approved': "Approved",
     'workOrders.workItems.steps.declinedOn': "Declined · {{number}}",
     'workOrders.workItems.steps.expiredOn': "Expired · {{number}}",
+    'workOrders.workItems.nameplate': 'Nameplate',
     'workOrders.workItems.labor': 'Labor',
     'workOrders.workItems.laborHint': 'Estimate · actual comes from dispatch time',
     'workOrders.workItems.laborHours': 'Labor hours estimate',
