@@ -36,6 +36,7 @@ import {
 } from '../api/setup';
 import { workOrdersListQueryOptions } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import { useUrlTab } from '../hooks/useUrlTab';
 import { showSuccess, showError, extractApiError } from '../lib/toast';
 import { buildAttributes, formatFilterSize, formatSpecValue, formatTimestamp, parseAttributes, titleCaseAddress } from '@dispatch/utils';
@@ -186,6 +187,7 @@ export default function EquipmentDetailPage() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
+  const canCreateWorkOrder = useHasCapability('CREATE_WORK_ORDERS');
 
   const [activeTab, setActiveTab] = useUrlTab(EQUIPMENT_TABS, 'overview');
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
@@ -844,17 +846,19 @@ export default function EquipmentDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-1.5 max-sm:w-full sm:flex-shrink-0">
-                  <Button
-                    outline
-                    size="xs"
-                    onClick={() => navigate(`/work-orders/new?locationId=${equipment.serviceLocationId}`)}
-                    aria-label={t('common.actions.new', { entity: getName('work_order') })}
-                  >
-                    <PlusIcon className="size-4" />
-                    <span className="relative top-[0.5px] hidden sm:inline">
-                      {t('common.actions.new', { entity: getName('work_order') })}
-                    </span>
-                  </Button>
+                  {canCreateWorkOrder && (
+                    <Button
+                      outline
+                      size="xs"
+                      onClick={() => navigate(`/work-orders/new?locationId=${equipment.serviceLocationId}`)}
+                      aria-label={t('common.actions.new', { entity: getName('work_order') })}
+                    >
+                      <PlusIcon className="size-4" />
+                      <span className="relative top-[0.5px] hidden sm:inline">
+                        {t('common.actions.new', { entity: getName('work_order') })}
+                      </span>
+                    </Button>
+                  )}
                   <Button outline size="xs" onClick={beginIdentityEdit} aria-label={`Edit ${getName('equipment').toLowerCase()} details`}>
                     {t('common.edit')}
                   </Button>

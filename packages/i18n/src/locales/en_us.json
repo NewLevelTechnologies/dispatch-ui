@@ -4246,6 +4246,7 @@
       "duplicate": "Duplicate",
       "eta": "ETA {{date}}",
       "etaLabel": "ETA",
+      "notAvailable": "That {{entity, lowercase}} isn't available to you. It may have been reassigned.",
       "notScheduled": "Not scheduled",
       "nte": "NTE {{amount}}",
       "po": "PO",

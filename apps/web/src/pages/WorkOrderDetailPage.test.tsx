@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
 import { apiClient } from '../api/setup';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useLocation, type RouteObject } from 'react-router-dom';
 import type {
   ServiceLocationDetailDto,
@@ -311,6 +312,17 @@ describe('WorkOrderDetailPage', () => {
     });
   });
 
+  it('sends a 404 (not visible to this user) back to the list', async () => {
+    mockApiResponses();
+    const notFound = Object.assign(new Error('Not found'), { response: { status: 404 } });
+    const base = vi.mocked(apiClient.get).getMockImplementation()!;
+    vi.mocked(apiClient.get).mockImplementation((url, ...rest) =>
+      url === '/work-orders/wo-1' ? Promise.reject(notFound) : base(url, ...rest)
+    );
+    renderPage();
+    expect(await screen.findByText('Work Orders List')).toBeInTheDocument();
+  });
+
   it('auto-attaches new equipment on return from the full-page create (?newEquipmentId + ?attachTo=wi:)', async () => {
     mockApiResponses();
     vi.mocked(apiClient.patch).mockResolvedValue({ data: {} });
@@ -336,6 +348,38 @@ describe('WorkOrderDetailPage', () => {
     // Division + type render in the header AND the editable Details card.
     expect(screen.getAllByText('HVAC').length).toBeGreaterThan(0); // division
     expect(screen.getAllByText('HVAC Service').length).toBeGreaterThan(0); // type
+  });
+
+  describe('view-only access (Billing Clerk / Sales)', () => {
+    const defaultImpl = vi.mocked(useCurrentUser).getMockImplementation();
+    afterEach(() => {
+      if (defaultImpl) vi.mocked(useCurrentUser).mockImplementation(defaultImpl);
+    });
+
+    it('hides edit, add and delete controls but still lets them add a note', async () => {
+      vi.mocked(useCurrentUser).mockReturnValue({
+        data: { id: 'clerk-1', capabilities: ['VIEW_ALL_WORK_ORDERS'] },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof useCurrentUser>);
+      mockApiResponses();
+      const user = userEvent.setup();
+      renderPage();
+
+      await screen.findByRole('heading', { name: "Paul's House" });
+      expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /add work item/i })).not.toBeInTheDocument();
+      // Priority renders as a plain pill, not a change menu.
+      expect(screen.queryByRole('button', { name: /priority/i })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /more options/i }));
+      expect(screen.queryByRole('menuitem', { name: /delete/i })).not.toBeInTheDocument();
+      await user.keyboard('{Escape}');
+
+      // Adding a note needs only view access.
+      const notes = screen.getByText('Notes').closest('[class*="card"]') ?? document.body;
+      expect(within(notes as HTMLElement).getByText(/\+ add/i)).toBeInTheDocument();
+    });
   });
 
   it('renders the premise tag from the service-location record', async () => {

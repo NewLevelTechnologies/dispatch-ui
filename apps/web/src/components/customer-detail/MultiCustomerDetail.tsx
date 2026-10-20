@@ -81,6 +81,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
   const routerLocation = useLocation();
   const queryClient = useQueryClient();
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
+  const canCreateWorkOrder = useHasCapability('CREATE_WORK_ORDERS');
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
 
   const [activeTab, setActiveTab] = useUrlTab(VALID_TABS, 'overview');
@@ -258,17 +259,19 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
             </div>
 
             <div className="flex items-center gap-1.5 max-sm:w-full sm:flex-shrink-0">
-              <Button
-                outline
-                size="xs"
-                onClick={() => navigate(`/work-orders/new?customerId=${customer.id}`)}
-                aria-label={t('common.actions.new', { entity: getName('work_order') })}
-              >
-                <PlusIcon className="size-4" />
-                <span className="relative top-[0.5px] hidden sm:inline">
-                  {t('common.actions.new', { entity: getName('work_order') })}
-                </span>
-              </Button>
+              {canCreateWorkOrder && (
+                <Button
+                  outline
+                  size="xs"
+                  onClick={() => navigate(`/work-orders/new?customerId=${customer.id}`)}
+                  aria-label={t('common.actions.new', { entity: getName('work_order') })}
+                >
+                  <PlusIcon className="size-4" />
+                  <span className="relative top-[0.5px] hidden sm:inline">
+                    {t('common.actions.new', { entity: getName('work_order') })}
+                  </span>
+                </Button>
+              )}
               <Dropdown>
                 <DropdownButton as={IconButton} aria-label={t('common.moreOptions')} className="max-sm:p-2">
                   <EllipsisVerticalIcon className="size-4" />
@@ -330,7 +333,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
           {activeTab === 'jobs' && (
             <CustomerWorkOrdersTab
               customerId={customer.id}
-              canCreate
+              canCreate={canCreateWorkOrder}
               onNewJob={() => navigate(`/work-orders/new?customerId=${customer.id}`)}
             />
           )}

@@ -246,7 +246,8 @@ function WorkItemsPeek({
   workOrder: WorkOrder;
   statuses: WorkItemStatus[];
   tripsByWorkItem: Map<string, number[]>;
-  onAdd: () => void;
+  // Omitted when the user can't add work items (no edit access, or frozen).
+  onAdd?: () => void;
   onOpenItems: (workItemId: string) => void;
 }) {
   const { t } = useTranslation();
@@ -255,7 +256,7 @@ function WorkItemsPeek({
   return (
     <Card
       title={<CardTitle icon={<WrenchScrewdriverIcon className="size-3.5" />}>{getName('work_item', true)}</CardTitle>}
-      action={<CardLink onClick={onAdd}>{`+ ${getName('work_item')}`}</CardLink>}
+      action={onAdd ? <CardLink onClick={onAdd}>{`+ ${getName('work_item')}`}</CardLink> : undefined}
       padding="none"
     >
       {items.length === 0 ? (
@@ -770,7 +771,10 @@ export interface WorkOrderOverviewProps {
   financialSummary?: WorkOrderFinancialSummary;
   dispatches: DispatchBoardRow[];
   onOpenTab: (tab: string) => void;
-  onAddWorkItem: () => void;
+  // Omitted when the user can't add work items (no edit access, or frozen).
+  onAddWorkItem?: () => void;
+  // Pin / edit / delete on notes. Adding a note needs only view access.
+  canEditNotes?: boolean;
   /** Deep-link a specific work item: switch to the Items tab and focus it. */
   onOpenWorkItem: (workItemId: string) => void;
   onOpenFinancial: (tab: 'invoices' | 'quotes') => void;
@@ -788,6 +792,7 @@ export default function WorkOrderOverview({
   dispatches,
   onOpenTab,
   onAddWorkItem,
+  canEditNotes = true,
   onOpenWorkItem,
   onOpenFinancial,
   onSelectDispatch,
@@ -844,7 +849,7 @@ export default function WorkOrderOverview({
             onSchedule={onScheduleDispatch}
             onSelect={onSelectDispatch}
           />
-          <NotesCard entityType="work_order" entityId={workOrder.id} />
+          <NotesCard entityType="work_order" entityId={workOrder.id} canEdit={canEditNotes} canAdd />
           <ActivityTeaser workOrderId={workOrder.id} onViewAll={() => onOpenTab('activity')} />
         </div>
 
