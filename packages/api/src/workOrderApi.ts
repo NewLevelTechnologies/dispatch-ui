@@ -111,6 +111,22 @@ export interface WorkItemResponse {
   // of the attach prompt. Moot once `equipmentId` is set (equipment wins).
   // Optional on the FE type for the pre-deploy window; treat undefined as true.
   equipmentNeeded?: boolean;
+  // Who logged the item. Items created with the WO carry its creator; null
+  // name = the system user (agreement-generated WOs).
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+  // Findings provenance: first author + when. Findings written before this
+  // was recorded have `diagnosis` but no author — show them without a byline.
+  // Clearing the findings clears all of these.
+  diagnosedByUserId?: string | null;
+  diagnosedByName?: string | null;
+  diagnosedAt?: string | null;
+  // Set by each later change to the text; null = never edited ("· edited").
+  diagnosisEditedAt?: string | null;
+  // The visit the findings were written on; null when written from the office.
+  diagnosisDispatchId?: string | null;
+  // Hours, quarter-hour steps; null = no estimate. Estimate only, never billed.
+  laborHoursEstimate?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -328,6 +344,8 @@ export interface CreateWorkItemRequest {
   equipmentNeeded?: boolean;
   // Tech's on-site assessment (≤5000). Usually empty at create.
   diagnosis?: string;
+  // Visit the findings were written on (tech app). Must be a dispatch on this WO.
+  diagnosisDispatchId?: string;
 }
 
 // equipmentId + diagnosis use JsonNullable semantics: omit = no change,
@@ -342,6 +360,10 @@ export interface UpdateWorkItemRequest {
   // and mark not-needed in one PATCH).
   equipmentNeeded?: boolean;
   diagnosis?: string | null;
+  // Recorded only by the write that first sets the findings; the office omits it.
+  diagnosisDispatchId?: string;
+  // 0.25–999.75 in 0.25 steps; null clears, omit leaves unchanged.
+  laborHoursEstimate?: number | null;
 }
 
 export interface CreateWorkOrderRequest {

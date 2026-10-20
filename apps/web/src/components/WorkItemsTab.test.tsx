@@ -168,6 +168,76 @@ describe('WorkItemsTab', () => {
     expect(screen.queryByRole('button', { name: /schedule dispatch/i })).not.toBeInTheDocument();
   });
 
+  it('shows who logged the item and the labor estimate on the meta line', () => {
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        workItems={[wi('wi-1', 1, 'No cooling', { createdByName: 'Maria Cruz', laborHoursEstimate: 1.5 })]}
+      />,
+    );
+    expect(screen.getByText(/logged by Maria Cruz · est\. 1\.5 h/)).toBeInTheDocument();
+  });
+
+  it('bylines the findings with author, visit and edited', () => {
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        workItems={[
+          wi('wi-1', 1, 'No cooling', {
+            diagnosis: 'Run capacitor failed',
+            diagnosedByName: 'Daniel Park',
+            diagnosedAt: '2026-05-14T22:14:00Z',
+            diagnosisDispatchId: 'd-1',
+            diagnosisEditedAt: '2026-05-15T10:00:00Z',
+          }),
+        ]}
+        dispatches={[dispatch('d-1', ['wi-1'])]}
+      />,
+    );
+    expect(screen.getByText(/^Daniel Park · .+ · Dispatch 1 · edited$/)).toBeInTheDocument();
+  });
+
+  it('shows findings recorded before authorship without a byline', () => {
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        {...handlers()}
+        workItems={[wi('wi-1', 1, 'No cooling', { diagnosis: 'Run capacitor failed' })]}
+      />,
+    );
+    const heading = screen.getByText('Findings');
+    expect(screen.getByText('Run capacitor failed')).toBeInTheDocument();
+    expect(heading.nextElementSibling?.className).not.toContain('card-sub');
+  });
+
+  it('adds a labor estimate inline, snapped to the quarter hour', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: wi('wi-1', 1, 'No cooling') });
+    renderWithProviders(<WorkItemsTab {...baseProps} {...handlers()} workItems={[wi('wi-1', 1, 'No cooling')]} />);
+    await user.click(screen.getByRole('button', { name: /labor estimate/i }));
+    await user.type(screen.getByRole('spinbutton', { name: /labor hours/i }), '1.6{Enter}');
+    await waitFor(() =>
+      expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/wo-1/work-items/wi-1', { laborHoursEstimate: 1.5 }),
+    );
+    expect(apiClient.patch).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the labor estimate when the hours are emptied', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: wi('wi-1', 1, 'No cooling') });
+    renderWithProviders(
+      <WorkItemsTab {...baseProps} {...handlers()} workItems={[wi('wi-1', 1, 'No cooling', { laborHoursEstimate: 2 })]} />,
+    );
+    await user.click(screen.getByRole('button', { name: '2 h' }));
+    await user.clear(screen.getByRole('spinbutton', { name: /labor hours/i }));
+    await user.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/wo-1/work-items/wi-1', { laborHoursEstimate: null }),
+    );
+  });
+
   it('asks for findings on a scheduled item and saves them inline', async () => {
     const user = userEvent.setup();
     const h = handlers();

@@ -43,7 +43,7 @@ import WorkItemSteps from './WorkItemSteps';
 import WorkItemEquipmentCard from './WorkItemEquipmentCard';
 import WorkItemEquipmentHistory from './WorkItemEquipmentHistory';
 import WorkItemDispatchesCard from './WorkItemDispatchesCard';
-import { localDate, shortDate } from './format';
+import { formatHours, localDate, shortDate, timeLabel } from './format';
 
 export interface WorkItemDetailProps {
   workOrderId: string;
@@ -164,6 +164,21 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
 
   const wiId = wi.sequence != null ? workItemLabel(getAbbrev('work_item'), wi.sequence) : null;
 
+  // Findings byline: first author · when · the visit it was written on, plus
+  // "edited" after a later change. Findings from before authors were recorded
+  // have none of it — no byline.
+  const findingsVisit = wi.diagnosisDispatchId ? seqById.get(wi.diagnosisDispatchId) : undefined;
+  const findingsByline = findings
+    ? [
+        wi.diagnosedByName,
+        wi.diagnosedAt && `${shortDate(wi.diagnosedAt)} · ${timeLabel(wi.diagnosedAt)}`,
+        findingsVisit != null && `${getName('dispatch')} ${findingsVisit}`,
+        wi.diagnosisEditedAt && t('workOrders.workItems.edited'),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+
   return (
     <>
       {/* Header card heads the main column only, so the right column (equipment,
@@ -249,7 +264,14 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
                 </h2>
               )}
               <div className="text-[11.5px] text-fg-muted">
-                {t('workOrders.workItems.reportedOn', { date: shortDate(wi.createdAt) })}
+                {[
+                  t('workOrders.workItems.reportedOn', { date: shortDate(wi.createdAt) }),
+                  wi.createdByName && t('workOrders.workItems.loggedBy', { name: wi.createdByName }),
+                  wi.laborHoursEstimate != null &&
+                    t('workOrders.workItems.estHours', { hours: formatHours(wi.laborHoursEstimate) }),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
             </div>
             <WorkItemSteps steps={steps} />
@@ -260,6 +282,7 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
               wi={wi}
               readOnly={readOnly}
               findings={findings}
+              byline={findingsByline}
               editing={editingFindings}
               setEditing={setEditingFindings}
               media={media}
@@ -397,6 +420,7 @@ function FindingsSection({
   wi,
   readOnly,
   findings,
+  byline,
   editing,
   setEditing,
   media,
@@ -406,6 +430,7 @@ function FindingsSection({
   wi: WorkItemResponse;
   readOnly: boolean;
   findings: string;
+  byline: string;
   editing: boolean;
   setEditing: (v: boolean) => void;
   media: WorkOrderFile[];
@@ -454,6 +479,7 @@ function FindingsSection({
     <div className="wit-sec">
       <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
         <span className="text-[13px] font-semibold text-fg-strong">{t('workOrders.workItems.findings')}</span>
+        {byline && !editing && <span className="card-sub">{byline}</span>}
         <span className="flex-1" />
         {findings && !editing && !readOnly && (
           <button type="button" className="card-action" onClick={() => setEditing(true)}>
@@ -578,14 +604,22 @@ function PartsSection({
 }) {
   const { t } = useTranslation();
   const base = `/purchase-orders/new?workOrderId=${workOrderId}&workItemId=${wi.id}`;
+  const [addingLabor, setAddingLabor] = useState(false);
+  const hasLabor = wi.laborHoursEstimate != null;
+  const showLabor = hasLabor || addingLabor;
 
   return (
     <div className="wit-sec">
       <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
-        <span className="text-[13px] font-semibold text-fg-strong">{t('workOrders.workItems.parts')}</span>
+        <span className="text-[13px] font-semibold text-fg-strong">{t('workOrders.workItems.partsAndLabor')}</span>
         <span className="flex-1" />
         {!readOnly && (
           <>
+            {!showLabor && (
+              <button type="button" className="card-action" onClick={() => setAddingLabor(true)}>
+                {t('workOrders.workItems.addLaborEstimate')}
+              </button>
+            )}
             <Link to={`${base}&type=field`} className="card-action">
               {t('workOrders.workItems.recordFieldPurchase')}
             </Link>
@@ -595,7 +629,7 @@ function PartsSection({
           </>
         )}
       </div>
-      {purchaseOrders.length === 0 ? (
+      {purchaseOrders.length === 0 && !showLabor ? (
         <div className="wit-empty">
           <span>{t('workOrders.workItems.noPartsOnOrder')}</span>
         </div>
@@ -625,7 +659,121 @@ function PartsSection({
               </div>
             );
           })}
+          {showLabor && (
+            <LaborRow
+              workOrderId={workOrderId}
+              wi={wi}
+              readOnly={readOnly}
+              startEditing={addingLabor}
+              onDone={() => setAddingLabor(false)}
+            />
+          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Labor estimate row — hours edit inline in quarter-hour steps. An estimate
+// only (actual time comes from the visits); never billed. Clearing removes it.
+function LaborRow({
+  workOrderId,
+  wi,
+  readOnly,
+  startEditing,
+  onDone,
+}: {
+  workOrderId: string;
+  wi: WorkItemResponse;
+  readOnly: boolean;
+  startEditing: boolean;
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(startEditing);
+  const [draft, setDraft] = useState(wi.laborHoursEstimate != null ? String(wi.laborHoursEstimate) : '');
+
+  const save = useMutation({
+    mutationFn: (hours: number | null) =>
+      workOrderApi.updateWorkItem(workOrderId, wi.id, { laborHoursEstimate: hours }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
+    },
+    onError: (err) => showError(t('workOrders.workItems.laborSaveFailed'), extractApiError(err) ?? undefined),
+  });
+
+  // Enter commits, then the unmounting input may still blur — act once.
+  const settled = useRef(false);
+  const close = () => {
+    settled.current = true;
+    setEditing(false);
+    onDone();
+  };
+  const commit = () => {
+    if (settled.current) return;
+    const trimmed = draft.trim();
+    // Snap to the quarter hour the server accepts (0.25–999.75).
+    const hours = trimmed === '' ? null : Math.min(999.75, Math.max(0.25, Math.round(Number(trimmed) * 4) / 4));
+    if (hours !== null && Number.isNaN(hours)) return close();
+    if (hours !== (wi.laborHoursEstimate ?? null)) save.mutate(hours);
+    close();
+  };
+
+  return (
+    <div className="wit-part">
+      <div className="min-w-0">
+        <div className="text-[12.5px] font-medium text-fg-strong">{t('workOrders.workItems.labor')}</div>
+        <div className="text-[10.5px] text-fg-muted">{t('workOrders.workItems.laborHint')}</div>
+      </div>
+      {editing && !readOnly ? (
+        // Font on the wrapper: Preflight's `font: inherit` on the input/button
+        // beats a size utility on the control itself.
+        <span className="flex items-center gap-1.5 text-[12px]">
+          <input
+            autoFocus
+            type="number"
+            inputMode="decimal"
+            min={0.25}
+            max={999.75}
+            step={0.25}
+            value={draft}
+            aria-label={t('workOrders.workItems.laborHours')}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit();
+              if (e.key === 'Escape') {
+                setDraft(wi.laborHoursEstimate != null ? String(wi.laborHoursEstimate) : '');
+                close();
+              }
+            }}
+            className="h-7 w-20 rounded-[var(--r-sm)] border border-border bg-bg px-2 text-right tabular-nums text-fg-strong outline-none focus:border-border-strong"
+          />
+          <span className="text-fg-muted">{t('workOrders.workItems.hoursUnit')}</span>
+        </span>
+      ) : readOnly ? (
+        <span className="text-[12px] tabular-nums text-fg-muted">
+          {wi.laborHoursEstimate != null &&
+            t('workOrders.workItems.hours', { hours: formatHours(wi.laborHoursEstimate) })}
+        </span>
+      ) : (
+        <span className="text-[12px]">
+          <button
+            type="button"
+            className="tabular-nums text-fg-muted hover:text-fg-strong"
+            title={t('workOrders.workItems.editLabor')}
+            onClick={() => {
+              settled.current = false;
+              setEditing(true);
+            }}
+          >
+            {wi.laborHoursEstimate != null
+              ? t('workOrders.workItems.hours', { hours: formatHours(wi.laborHoursEstimate) })
+              : '—'}
+          </button>
+        </span>
       )}
     </div>
   );

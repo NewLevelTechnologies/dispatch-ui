@@ -233,13 +233,13 @@ export default function WorkOrderDetailPage() {
   // The card's ⋯ → Delete opens the ConfirmDialog; onConfirm fires the mutation.
   const handleDeleteWorkItem = (wi: WorkItemResponse) => setWorkItemToDelete(wi);
 
-  // Duplicate item (⋯ menu) — clone the complaint, diagnosis, and equipment
-  // link into a fresh item; status resets server-side (Triage).
+  // Duplicate item (⋯ menu) — clone the complaint and equipment link into a
+  // fresh item; status resets server-side. Findings stay with the original
+  // (copying them would credit whoever duplicated as their author).
   const duplicateWorkItemMutation = useMutation({
     mutationFn: (wi: WorkItemResponse) =>
       workOrderApi.createWorkItem(id!, {
         description: wi.description,
-        diagnosis: wi.diagnosis?.trim() || undefined,
         equipmentId: wi.equipment?.id ?? undefined,
         equipmentNeeded: wi.equipmentNeeded,
       }),
