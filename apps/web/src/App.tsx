@@ -77,6 +77,7 @@ import PublicInvoicePage from './pages/PublicInvoicePage';
 import PublicQuotePage from './pages/PublicQuotePage';
 import TenantGate from './components/workspace/TenantGate';
 import { useTenant } from './contexts/TenantContext';
+import { isAssignedOnly, useCurrentUser } from './hooks/useCurrentUser';
 
 // ProtectedRoute component - defined outside of App to avoid recreation on every render
 //
@@ -87,6 +88,24 @@ import { useTenant } from './contexts/TenantContext';
 // and /login are outside it by construction.
 const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElement; isAuthenticated: boolean }) => {
   return isAuthenticated ? <TenantGate>{element}</TenantGate> : <Navigate to="/login" replace />;
+};
+
+// Post-login landing. Field roles limited to their own work (the Technician
+// template) start on their assigned work orders; everyone else on the
+// dashboard. Rendered inside ProtectedRoute so the user is tenant-scoped.
+const HomeRedirect = () => {
+  const { data: user, isLoading } = useCurrentUser();
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+  if (user && isAssignedOnly(user)) {
+    return <Navigate to={`/work-orders?assigned=${user.id}`} replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 };
 
 // Preserves the :id param when redirecting from old /roles/:id route to the new location.
@@ -200,7 +219,7 @@ function App() {
         path="/login"
         element={
           authStatus === 'authenticated' ? (
-            <Navigate to="/dashboard" replace />
+            <Navigate to="/" replace />
           ) : (
             <LoginPage />
           )
@@ -309,13 +328,7 @@ function App() {
       <Route path="/account/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AccountSettingsPage />} />} />
       <Route
         path="/"
-        element={
-          authStatus === 'authenticated' ? (
-            <Navigate to="/dashboard" replace />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
+        element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<HomeRedirect />} />}
       />
       </Routes>
     </GlossaryProvider>
