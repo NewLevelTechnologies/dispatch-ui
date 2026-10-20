@@ -67,16 +67,32 @@ that file in lockstep with web's if a token value changes there).
    membership, sign out); Today/Schedule/Lookup are placeholders for their own
    phases below.
 2. **Today / Schedule / My Availability** (done): net-new, reshapes dispatcher-facing
-   data (`dispatchesApi.getAll`, filtered by `assignedUserId`) into a single-tech view.
-   Today is the flat list for the current local day; Schedule is the same data over
-   the next 7 days grouped under day headings. My Availability (reachable from
-   Profile, not its own tab) is a **view-only** list of upcoming time off via the real
-   `availabilityApi` — creating/removing time off was deliberately left out of this
-   pass (no existing UI to mirror, and the right approach — a date-range form vs.
-   mobile-friendly quick presets — needs its own design decision) and is this phase's
-   one open remainder.
-3. **Dispatch detail**: lifecycle timeline + tech-initiated status transitions,
-   call/directions.
+   data into a single-tech view. Today is the flat list for the current local day;
+   Schedule is the same data over the next 7 days grouped under day headings. My
+   Availability (reachable from Profile, not its own tab) is a **view-only** list of
+   upcoming time off via the real `availabilityApi` — creating/removing time off was
+   deliberately left out of this pass (no existing UI to mirror, and the right
+   approach — a date-range form vs. mobile-friendly quick presets — needs its own
+   design decision) and is this phase's one open remainder.
+   **Correction mid-phase**: Today/Schedule first shipped against
+   `dispatchesApi.getAll` (`/scheduling/dispatches`), then live testing found that
+   endpoint doesn't see dispatches managed through the dispatch board (a dispatch
+   confirmed "En route" on the web board came back empty under every filter tried,
+   including no filter at all). Switched both screens to `dispatchBoardApi.
+   getBoard({date})` — the board's current source of truth, which also fixed a
+   latent timezone bug for free (the board resolves `date` in the tenant's own
+   timezone server-side; the old approach required the client to get that right).
+3. **Dispatch detail** (done): lifecycle timeline (from `dispatchesApi.getById` —
+   confirmed, unlike the list endpoint, single-record reads ARE trusted for
+   board-managed dispatches, per web's own DispatchDetailDrawer using the same
+   call), tech-initiated status transitions (Mark en route / Mark arrived /
+   Complete — the exact status values lifted from web's drawer, not guessed), and
+   call/directions (site contact phone + full address come from `workOrderApi.
+   getById`, the one call that has them — neither the board row nor the plain
+   Dispatch carries a phone number). Deliberately dropped from web's version:
+   tech/customer-notified timeline rows (audit-trail-derived, not needed when the
+   technician already knows if they were texted) and visit notes (`dispatchNotesApi`
+   is confirmed current, just outside this phase's stated scope).
 4. **Work order detail (tech subset)**: overview, work items + photos, files,
    activity/notes — no Purchasing tab, no Estimate-tab editing, no billing.
 5. **Completion**: signature + card-present payment (net-new, cross-repo).
