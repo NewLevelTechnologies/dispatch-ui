@@ -35,6 +35,8 @@ export interface PurchaseOrderListItem {
   type: PurchaseOrderType;
   status: PurchaseOrderStatus;
   workOrderId: string | null;
+  // The work item the PO was raised for; null for a whole-job or stock PO.
+  workItemId?: string | null;
   workOrderNumber?: string | null;
   serviceLocationName?: string | null;
   createdByName?: string | null;

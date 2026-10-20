@@ -5,7 +5,7 @@ import WorkItemsTab from './WorkItemsTab';
 import { apiClient } from '../api/setup';
 import type {
   DispatchBoardRow,
-  PurchaseOrderResponse,
+  PurchaseOrderListItem,
   WorkItemResponse,
   WorkItemStatus,
 } from '../api/setup';
@@ -71,7 +71,7 @@ const baseProps = {
   enforceWorkflow: false,
 };
 
-let pos: PurchaseOrderResponse[] = [];
+let pos: PurchaseOrderListItem[] = [];
 
 describe('WorkItemsTab', () => {
   beforeEach(() => {
@@ -79,9 +79,7 @@ describe('WorkItemsTab', () => {
     pos = [];
     window.history.replaceState(null, '', '/work-orders/wo-1?tab=items');
     vi.mocked(apiClient.get).mockImplementation(async (url: string) => {
-      if (url === '/inventory/purchase-orders') return { data: { content: pos.map(({ id }) => ({ id })) } };
-      const poMatch = url.match(/^\/inventory\/purchase-orders\/(.+)$/);
-      if (poMatch) return { data: pos.find((p) => p.id === poMatch[1]) };
+      if (url === '/inventory/purchase-orders') return { data: { content: pos } };
       if (url.endsWith('/notes')) return { data: [] };
       if (url.match(/^\/equipment\/[^/]+$/)) return { data: { id: 'eq-1', name: 'Upstairs Furnace' } };
       return { data: { content: [], totalElements: 0, counts: {} } };
@@ -220,8 +218,10 @@ describe('WorkItemsTab', () => {
         status: 'ORDERED',
         eta: '2026-05-17',
         workItemId: 'wi-1',
-        lines: [{ id: 'l-1', name: 'Blower balance kit', quantityOrdered: 1, quantityReceived: 0, unitCost: 40 }],
-      } as PurchaseOrderResponse,
+        itemCount: 1,
+      } as PurchaseOrderListItem,
+      // A whole-job PO on the same WO isn't this item's.
+      { id: 'po-2', poNumber: 'PO-2105', vendorName: 'Ferguson', status: 'ORDERED', workItemId: null } as PurchaseOrderListItem,
     ];
     renderWithProviders(
       <WorkItemsTab
@@ -233,7 +233,7 @@ describe('WorkItemsTab', () => {
     );
     expect(await screen.findByText(/PO-2104 · ETA May 17/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'PO-2104' })).toHaveAttribute('href', '/purchase-orders/po-1');
-    expect(screen.getByText('Blower balance kit')).toBeInTheDocument();
+    expect(screen.queryByText('PO-2105')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /parts arrived/i })).toBeInTheDocument();
   });
 

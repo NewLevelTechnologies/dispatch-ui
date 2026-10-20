@@ -1,4 +1,7 @@
-import type { PurchaseOrderResponse, WorkItemResponse } from '../api/setup';
+import type { PurchaseOrderListItem, WorkItemResponse } from '../api/setup';
+
+/** The PO fields the strip reads — a list row is enough. */
+type ItemPurchaseOrder = Pick<PurchaseOrderListItem, 'poNumber' | 'status' | 'eta'>;
 
 // The Work Items tab step strip — DERIVED from data on every render, never
 // stored. Approved (quote state per item) joins once quote lines carry a
@@ -34,13 +37,13 @@ export const isFinished = (wi: Pick<WorkItemResponse, 'statusCategory'>) =>
   wi.statusCategory === 'COMPLETED' || wi.statusCategory === 'CANCELLED';
 
 /** POs still waiting on parts for this item (header-level workItemId link). */
-export function openPurchaseOrders(pos: PurchaseOrderResponse[]): PurchaseOrderResponse[] {
+export function openPurchaseOrders<T extends ItemPurchaseOrder>(pos: T[]): T[] {
   return pos.filter((po) => OPEN_PO.has(po.status));
 }
 
 export function deriveWorkItemSteps(
   wi: WorkItemResponse,
-  itemPurchaseOrders: PurchaseOrderResponse[],
+  itemPurchaseOrders: ItemPurchaseOrder[],
 ): WorkItemStep[] {
   const diagnosed = !!wi.diagnosis?.trim();
   const open = openPurchaseOrders(itemPurchaseOrders);

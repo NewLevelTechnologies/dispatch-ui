@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { PlusIcon } from '@heroicons/react/16/solid';
 import {
@@ -134,20 +134,13 @@ export default function WorkItemsTab({
     setComposing(true);
   }, [openComposerSignal]);
 
-  // Per-item POs (header-level workItemId). The WO's PO list is the Purchasing
-  // tab's query; list rows don't carry workItemId yet (BE ask), so read each
-  // PO in full — a job has a handful — under the PO detail page's key.
+  // Per-item POs: the WO's PO list (the Purchasing tab's query), grouped here
+  // by each row's workItemId.
   const { data: poPage } = useQuery({
     queryKey: ['purchase-orders', workOrderId],
     queryFn: () => purchaseOrderApi.list({ workOrderId, size: 100 }),
   });
-  const poDetails = useQueries({
-    queries: (poPage?.content ?? []).map((po) => ({
-      queryKey: ['purchase-order', po.id],
-      queryFn: () => purchaseOrderApi.getById(po.id),
-    })),
-  });
-  const purchaseOrders = poDetails.flatMap((q) => (q.data ? [q.data] : []));
+  const purchaseOrders = poPage?.content ?? [];
   // The job's media — same query the Dispatches tab reads; filtered per item.
   const { data: filesPage } = useQuery({
     queryKey: ['work-order-files', workOrderId, 'dispatch-media'],
