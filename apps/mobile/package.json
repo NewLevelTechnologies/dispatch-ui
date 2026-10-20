@@ -12,7 +12,8 @@
     "submit:ios": "pnpm dlx eas-cli submit --platform ios --profile production",
     "test": "jest --forceExit",
     "test:coverage": "jest --coverage --forceExit",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-amplify/react-native": "^1.3.3",

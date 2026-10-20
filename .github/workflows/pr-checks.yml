@@ -57,6 +57,17 @@ jobs:
       - name: Run linter
         run: pnpm turbo run lint
 
+      # apps/web gets type-checked for free — its build script is `tsc -b &&
+      # vite build`, run below. apps/mobile has no build script (it ships via
+      # EAS, not this pipeline), so without this step its types went
+      # completely unchecked: Babel strips types at transform time, so Jest
+      # passing says nothing about them, and ESLint's type-aware rules don't
+      # cover every type error tsc does. Runs for whichever packages declare a
+      # `typecheck` script — only apps/mobile today — same convention as the
+      # test:coverage step below.
+      - name: Run typecheck
+        run: pnpm turbo run typecheck
+
       # Runs every suite — apps/web plus the @dispatch/* packages — and
       # enforces the coverage thresholds in apps/web/vitest.config.ts. One pass
       # instead of two: adding a plain `test` step would re-run the same ~2000
@@ -98,6 +109,7 @@ jobs:
         run: |
           echo "✅ All checks passed!"
           echo "- Lint: Passed"
+          echo "- Typecheck: Passed"
           echo "- Dependency drift: Passed"
           echo "- Tests: Passed"
           echo "- Coverage: ≥80% lines/branches/statements, ≥75% functions"
