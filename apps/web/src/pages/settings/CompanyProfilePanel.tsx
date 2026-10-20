@@ -189,7 +189,7 @@ function WorkspaceNameCard({ canEdit }: { canEdit: boolean }) {
               setValue(current);
               setEditing(true);
             }
-          : () => {}
+          : undefined
       }
       onCancel={() => setEditing(false)}
       onSave={() => saveMutation.mutate()}
@@ -302,7 +302,7 @@ function IdentityCard({ settings, canEdit }: { settings: TenantSettings; canEdit
       title="Identity"
       subtitle="Name and contact info shown on invoices, quotes, and customer-facing emails."
       editing={editing}
-      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onEdit={canEdit ? () => setEditing(true) : undefined}
       onCancel={handleCancel}
       onSave={() => saveMutation.mutate()}
       saving={saveMutation.isPending}
@@ -496,7 +496,7 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
       title="Operating"
       subtitle="Defaults that drive your business day — reporting timezone (scheduling, invoice aging, end-of-day reports, 'today' rollups) and the premise type new service locations start as. Customer-facing job times follow each job's service location."
       editing={editing}
-      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onEdit={canEdit ? () => setEditing(true) : undefined}
       onCancel={handleCancel}
       onSave={() => saveMutation.mutate()}
       saving={saveMutation.isPending}
@@ -914,7 +914,7 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
       title="Branding"
       subtitle="Your logo. Appears in the app header and on customer-facing email + PDF templates."
       editing={editing}
-      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onEdit={canEdit ? () => setEditing(true) : undefined}
       onCancel={handleCancel}
       onSave={handleSave}
       saving={saving}

@@ -24,7 +24,8 @@ import {
   type DateRange,
 } from '../lib/dateRangePresets';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { useCurrentUser } from '../hooks/useCurrentUser';
+import { isAssignedOnly, useCurrentUser } from '../hooks/useCurrentUser';
+import { workOrderAccess } from '../hooks/useWorkOrderAccess';
 import AppLayout from '../components/AppLayout';
 import { titleCaseAddress } from '@dispatch/utils';
 import { withBackContext } from '../lib/backContext';
@@ -225,6 +226,12 @@ export default function WorkOrdersPage() {
   // (shares the `assigned` param with the filter). "My team" is not built.
   const myId = currentUser?.id ?? '';
   const scopeMine = !!myId && assignedId === myId;
+  // Field roles without VIEW_ALL_WORK_ORDERS are pinned to "Assigned to me".
+  // UI-only: the backend doesn't enforce assigned-only visibility yet.
+  const assignedOnly = isAssignedOnly(currentUser);
+  // Page-level rights (create); row actions re-derive per row since edit
+  // access can depend on who's assigned.
+  const access = workOrderAccess(currentUser);
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
   // Legacy bookmarked `?date=<preset>` (pre-DateRangeChip URL shape) — resolved
@@ -282,6 +289,16 @@ export default function WorkOrdersPage() {
     }
     setSearchParams(next, { replace: options.replace ?? false });
   }
+
+  // Re-pin the scope whenever something drops or changes `assigned` (clear
+  // filters, a shared link, back/forward). Replace so history stays clean.
+  useEffect(() => {
+    if (assignedOnly && myId && assignedId !== myId) {
+      const next = new URLSearchParams(searchParams);
+      next.set('assigned', myId);
+      setSearchParams(next, { replace: true });
+    }
+  }, [assignedOnly, myId, assignedId, searchParams, setSearchParams]);
 
   const handleSearchInputChange = (value: string) => {
     setSearchInput(value);
@@ -633,15 +650,17 @@ export default function WorkOrdersPage() {
           title={getName('work_order', true)}
           sub={subtitle}
           actions={
-            <Button color="accent" onClick={handleAdd}>
-              {t('common.actions.create', { entity: getName('work_order') })}
-            </Button>
+            access.canCreate ? (
+              <Button color="accent" onClick={handleAdd}>
+                {t('common.actions.create', { entity: getName('work_order') })}
+              </Button>
+            ) : undefined
           }
         />
 
         {/* Scope — "Assigned to me" is assignedUserId pinned to the current
             user; "All work" clears it. (My team is not built.) */}
-        {myId && (
+        {myId && !assignedOnly && (
           <div className="mb-3 flex items-center gap-2">
             <div className="inline-flex h-[30px] overflow-hidden rounded-md border border-border">
               <button
@@ -835,13 +854,15 @@ export default function WorkOrdersPage() {
                   active={onSiteOnly}
                   onToggle={() => updateParams({ onSite: onSiteOnly ? null : true, page: null })}
                 />
-                <FilterChip
-                  label={t('workOrders.filters.unassigned')}
-                  tone="warning"
-                  count={unassignedCount}
-                  active={unassignedOnly}
-                  onToggle={() => updateParams({ unassigned: unassignedOnly ? null : true, page: null })}
-                />
+                {!assignedOnly && (
+                  <FilterChip
+                    label={t('workOrders.filters.unassigned')}
+                    tone="warning"
+                    count={unassignedCount}
+                    active={unassignedOnly}
+                    onToggle={() => updateParams({ unassigned: unassignedOnly ? null : true, page: null })}
+                  />
+                )}
                 <FilterChip
                   label={t('workOrders.filters.urgentHigh')}
                   tone="danger"
@@ -926,9 +947,11 @@ export default function WorkOrdersPage() {
               <p className="text-[12.5px] text-fg-muted">
                 {t('common.actions.notFound', { entities: getName('work_order', true) })}
               </p>
-              <Button color="accent" className="mt-2" onClick={handleAdd}>
-                {t('common.actions.createFirst', { entity: getName('work_order') })}
-              </Button>
+              {access.canCreate && (
+                <Button color="accent" className="mt-2" onClick={handleAdd}>
+                  {t('common.actions.createFirst', { entity: getName('work_order') })}
+                </Button>
+              )}
             </CardBody>
           </Card>
         )}
@@ -978,6 +1001,9 @@ export default function WorkOrdersPage() {
                     const cancelled = isCancelled(workOrder);
                     const archived = !!workOrder.archivedAt;
                     const completed = workOrder.progressCategory === 'COMPLETED';
+                    const rowAccess = workOrderAccess(currentUser, workOrder);
+                    // Cancel needs view access too, which the row being listed proves.
+                    const canCancelRow = rowAccess.canCancel && !cancelled && !completed;
                     const dimmed = cancelled || archived;
                     const live = !dimmed && isLive(workOrder);
                     const typeName = activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId)?.name;
@@ -1087,30 +1113,39 @@ export default function WorkOrdersPage() {
                           {formatDate(workOrder.scheduledDate)}
                         </td>
                         <td>
-                          <Dropdown>
-                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
-                              <EllipsisVerticalIcon className="size-4" />
-                            </DropdownButton>
-                            <DropdownMenu anchor="bottom end">
-                              <DropdownItem onClick={() => handleEdit(workOrder)}>
-                                <DropdownLabel>{cancelled ? t('common.view') : t('common.edit')}</DropdownLabel>
-                              </DropdownItem>
-                              {!cancelled && !completed && (
-                                <DropdownItem onClick={() => handleCancel(workOrder)}>
-                                  <DropdownLabel>{t('workOrders.actions.cancel', { entity: getName('work_order') })}</DropdownLabel>
-                                </DropdownItem>
-                              )}
-                              <DropdownItem onClick={() => handleArchiveToggle(workOrder)}>
-                                <DropdownLabel>
-                                  {archived ? t('workOrders.actions.unarchive') : t('workOrders.actions.archive')}
-                                </DropdownLabel>
-                              </DropdownItem>
-                              <DropdownDivider />
-                              <DropdownItem onClick={() => handleDelete(workOrder)}>
-                                <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
+                          {(rowAccess.canEdit || cancelled || canCancelRow || rowAccess.canEditAll) && (
+                            <Dropdown>
+                              <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                <EllipsisVerticalIcon className="size-4" />
+                              </DropdownButton>
+                              <DropdownMenu anchor="bottom end">
+                                {/* Cancelled opens the dialog read-only — fine for anyone. */}
+                                {(rowAccess.canEdit || cancelled) && (
+                                  <DropdownItem onClick={() => handleEdit(workOrder)}>
+                                    <DropdownLabel>{cancelled ? t('common.view') : t('common.edit')}</DropdownLabel>
+                                  </DropdownItem>
+                                )}
+                                {canCancelRow && (
+                                  <DropdownItem onClick={() => handleCancel(workOrder)}>
+                                    <DropdownLabel>{t('workOrders.actions.cancel', { entity: getName('work_order') })}</DropdownLabel>
+                                  </DropdownItem>
+                                )}
+                                {rowAccess.canEditAll && (
+                                  <>
+                                    <DropdownItem onClick={() => handleArchiveToggle(workOrder)}>
+                                      <DropdownLabel>
+                                        {archived ? t('workOrders.actions.unarchive') : t('workOrders.actions.archive')}
+                                      </DropdownLabel>
+                                    </DropdownItem>
+                                    <DropdownDivider />
+                                    <DropdownItem onClick={() => handleDelete(workOrder)}>
+                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                    </DropdownItem>
+                                  </>
+                                )}
+                              </DropdownMenu>
+                            </Dropdown>
+                          )}
                         </td>
                       </DenseRow>
                     );

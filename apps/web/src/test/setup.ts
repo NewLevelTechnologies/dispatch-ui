@@ -2919,7 +2919,9 @@ vi.mock('../contexts/GlossaryContext', async () => {
 });
 
 // Mock useCurrentUser hook
-vi.mock('../hooks/useCurrentUser', () => ({
+// Partial mock — pure helpers (isAssignedOnly) stay real.
+vi.mock('../hooks/useCurrentUser', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../hooks/useCurrentUser')>()),
   useCurrentUser: vi.fn(() => ({
     data: {
       id: 'test-user-id',
@@ -2948,8 +2950,10 @@ vi.mock('../hooks/useCurrentUser', () => ({
         'VIEW_SETTINGS',
         'EDIT_SETTINGS',
         'VIEW_AUDIT_LOGS',
-      'VIEW_WORK_ORDERS',
-      'EDIT_WORK_ORDERS',
+      'VIEW_ALL_WORK_ORDERS',
+      'CREATE_WORK_ORDERS',
+      'EDIT_ALL_WORK_ORDERS',
+      'CANCEL_WORK_ORDERS',
       ],
       roles: [],
     },
@@ -2978,8 +2982,10 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
       'VIEW_AUDIT_LOGS',
-      'VIEW_WORK_ORDERS',
-      'EDIT_WORK_ORDERS',
+      'VIEW_ALL_WORK_ORDERS',
+      'CREATE_WORK_ORDERS',
+      'EDIT_ALL_WORK_ORDERS',
+      'CANCEL_WORK_ORDERS',
     ];
     return capabilities.includes(capability);
   }),
@@ -3005,8 +3011,10 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
       'VIEW_AUDIT_LOGS',
-      'VIEW_WORK_ORDERS',
-      'EDIT_WORK_ORDERS',
+      'VIEW_ALL_WORK_ORDERS',
+      'CREATE_WORK_ORDERS',
+      'EDIT_ALL_WORK_ORDERS',
+      'CANCEL_WORK_ORDERS',
     ];
     return capabilities.some(cap => mockCapabilities.includes(cap));
   }),
@@ -3032,8 +3040,10 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
       'VIEW_AUDIT_LOGS',
-      'VIEW_WORK_ORDERS',
-      'EDIT_WORK_ORDERS',
+      'VIEW_ALL_WORK_ORDERS',
+      'CREATE_WORK_ORDERS',
+      'EDIT_ALL_WORK_ORDERS',
+      'CANCEL_WORK_ORDERS',
     ];
     return capabilities.every(cap => mockCapabilities.includes(cap));
   }),

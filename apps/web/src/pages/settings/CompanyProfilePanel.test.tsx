@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import CompanyProfilePanel from './CompanyProfilePanel';
 import { apiClient } from '../../api/setup';
+import { useHasCapability } from '../../hooks/useCurrentUser';
 import { showError, showSuccess } from '../../lib/toast';
 
 vi.mock('@dispatch/api/src/client');
@@ -87,6 +88,20 @@ describe('CompanyProfilePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
+  });
+
+  describe('view-only (VIEW_SETTINGS without EDIT_SETTINGS)', () => {
+    const defaultImpl = vi.mocked(useHasCapability).getMockImplementation();
+    afterEach(() => {
+      if (defaultImpl) vi.mocked(useHasCapability).mockImplementation(defaultImpl);
+    });
+
+    it('renders the values but no edit controls', async () => {
+      vi.mocked(useHasCapability).mockImplementation((c: string) => c !== 'EDIT_SETTINGS');
+      renderWithProviders(<CompanyProfilePanel />);
+      await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: /^edit$|complete identity/i })).not.toBeInTheDocument();
+    });
   });
 
   it('renders heading and identity values in view mode', async () => {

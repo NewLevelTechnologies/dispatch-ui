@@ -191,6 +191,7 @@ export default function ServiceLocationDetailPage() {
   const [deletingEquipment, setDeletingEquipment] = useState<EquipmentSummary | null>(null);
 
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
+  const canCreateWorkOrder = useHasCapability('CREATE_WORK_ORDERS');
   const canCloseServiceLocations = useHasCapability('CLOSE_SERVICE_LOCATIONS');
 
   const { data: location, isLoading, error } = useQuery({
@@ -302,7 +303,7 @@ export default function ServiceLocationDetailPage() {
           <LocationHeader
             location={location}
             headline={headline}
-            onNewJob={() => navigate(`/work-orders/new?locationId=${location.id}`)}
+            onNewJob={canCreateWorkOrder ? () => navigate(`/work-orders/new?locationId=${location.id}`) : undefined}
             canEdit={canEditServiceLocations}
             onClose={
               canCloseServiceLocations && location.status !== 'CLOSED'
@@ -337,7 +338,10 @@ export default function ServiceLocationDetailPage() {
           )}
 
           {activeTab === 'jobs' && (
-            <JobsTab location={location} onNewJob={() => navigate(`/work-orders/new?locationId=${location.id}`)} />
+            <JobsTab
+              location={location}
+              onNewJob={canCreateWorkOrder ? () => navigate(`/work-orders/new?locationId=${location.id}`) : undefined}
+            />
           )}
 
           {activeTab === 'invoices' && <LocationDocumentsTab location={location} />}
@@ -414,7 +418,8 @@ function LocationHeader({
 }: {
   location: ServiceLocationDetailDto;
   headline: string;
-  onNewJob: () => void;
+  // Omitted without CREATE_WORK_ORDERS — the button isn't rendered.
+  onNewJob?: () => void;
   canEdit?: boolean;
   onClose?: () => void;
 }) {
@@ -486,18 +491,20 @@ function LocationHeader({
           TouchTarget already gives each Button a 44px hit area on coarse
           pointers; the kebab gets a wider mobile pad to match. */}
       <div className="flex items-center gap-1.5 max-sm:w-full sm:flex-shrink-0">
-        <Button
-          outline
-          size="xs"
-          onClick={onNewJob}
-          aria-label={t('common.actions.new', { entity: getName('work_order') })}
-          title={t('common.actions.new', { entity: getName('work_order') })}
-        >
-          <PlusIcon className="size-4" />
-          <span className="relative top-[0.5px] hidden sm:inline">
-            {t('common.actions.new', { entity: getName('work_order') })}
-          </span>
-        </Button>
+        {onNewJob && (
+          <Button
+            outline
+            size="xs"
+            onClick={onNewJob}
+            aria-label={t('common.actions.new', { entity: getName('work_order') })}
+            title={t('common.actions.new', { entity: getName('work_order') })}
+          >
+            <PlusIcon className="size-4" />
+            <span className="relative top-[0.5px] hidden sm:inline">
+              {t('common.actions.new', { entity: getName('work_order') })}
+            </span>
+          </Button>
+        )}
         <Button
           outline
           size="xs"
@@ -3650,7 +3657,7 @@ function JobDenseRow({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef 
   );
 }
 
-function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; onNewJob: () => void }) {
+function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; onNewJob?: () => void }) {
   const { getName, getAbbrev } = useGlossary();
   const { t } = useTranslation();
 
@@ -3799,10 +3806,12 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
         )}
 
         <span className="grow" />
-        <Button color="accent" size="xs" onClick={onNewJob}>
-          <PlusIcon className="size-4" />
-          {t('common.actions.new', { entity: getName('work_order') })}
-        </Button>
+        {onNewJob && (
+          <Button color="accent" size="xs" onClick={onNewJob}>
+            <PlusIcon className="size-4" />
+            {t('common.actions.new', { entity: getName('work_order') })}
+          </Button>
+        )}
       </div>
 
       <Card padding="none">

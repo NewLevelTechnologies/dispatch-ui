@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useCurrentUser, useHasCapability, useHasAnyCapability, useHasAllCapabilities } from './useCurrentUser';
+import { isAssignedOnly, useCurrentUser, useHasCapability, useHasAnyCapability, useHasAllCapabilities } from './useCurrentUser';
 import { userApi, type User } from '../api/setup';
 
 // Unmock the hook for this test file
@@ -197,5 +197,22 @@ describe('useHasAllCapabilities', () => {
     await waitFor(() => {
       expect(result.current).toBe(false);
     });
+  });
+});
+
+describe('isAssignedOnly', () => {
+  it('is true for assigned-only work order access (Technician)', () => {
+    expect(isAssignedOnly({ capabilities: ['VIEW_ASSIGNED_WORK_ORDERS'] })).toBe(true);
+  });
+
+  it('is false once the user can see all work orders', () => {
+    expect(
+      isAssignedOnly({ capabilities: ['VIEW_ASSIGNED_WORK_ORDERS', 'VIEW_ALL_WORK_ORDERS'] })
+    ).toBe(false);
+  });
+
+  it('is false without any work order capability or user', () => {
+    expect(isAssignedOnly({ capabilities: [] })).toBe(false);
+    expect(isAssignedOnly(undefined)).toBe(false);
   });
 });

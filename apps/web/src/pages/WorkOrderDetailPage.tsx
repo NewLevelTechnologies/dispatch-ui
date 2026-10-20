@@ -36,7 +36,8 @@ import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchesTab from '../components/DispatchesTab';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import { equipmentCreateUrl, workItemAttachToken, parseWorkItemAttachToken } from '../lib/equipmentCreate';
-import { showError, extractApiError, errorCode } from '../lib/toast';
+import { showError, showInfo, extractApiError, errorCode, errorStatus } from '../lib/toast';
+import { useWorkOrderAccess } from '../hooks/useWorkOrderAccess';
 import WorkOrderBillingTab from '../components/WorkOrderBillingTab';
 import WorkItemsTab from '../components/WorkItemsTab';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
@@ -406,9 +407,39 @@ export default function WorkOrderDetailPage() {
     }
   };
 
-  // W shortcut → open the inline work-item composer on the Items tab. Ignored
-  // when an input is focused or modifier keys are held.
+  const {
+    data: workOrder,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['work-orders', id],
+    queryFn: () => workOrderApi.getById(id!),
+    enabled: !!id,
+  });
+
+  const access = useWorkOrderAccess(workOrder);
+  const frozen = !!workOrder && (workOrder.lifecycleState === 'CANCELLED' || !!workOrder.archivedAt);
+  // Every work-order-service write on this page (header edits, work items,
+  // files, note edits) needs edit access; cancelled/archived freezes them all.
+  const editLocked = frozen || !access.canEdit;
+
+  // 404 = doesn't exist OR not visible to this user (the backend makes the two
+  // indistinguishable on purpose) — typically a tech following an old link to
+  // a reassigned job. Say so and fall back to the list. (A job assigned seconds
+  // ago can also 404 until the dispatch event lands; the app-wide retry covers
+  // that window.)
+  const notAvailable = errorStatus(error) === 404;
   useEffect(() => {
+    if (!notAvailable) return;
+    showInfo(t('workOrders.detail.notAvailable', { entity: getName('work_order') }));
+    navigate('/work-orders', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notAvailable]);
+
+  // W shortcut → open the inline work-item composer on the Items tab. Ignored
+  // when an input is focused, modifier keys are held, or the user can't edit.
+  useEffect(() => {
+    if (editLocked) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'w' && e.key !== 'W') return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -427,17 +458,7 @@ export default function WorkOrderDetailPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [setTab]);
-
-  const {
-    data: workOrder,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ['work-orders', id],
-    queryFn: () => workOrderApi.getById(id!),
-    enabled: !!id,
-  });
+  }, [setTab, editLocked]);
 
   // Full service-location record — premise, gate/arrival facts, access notes,
   // pinned site note for the Overview Location card. Same endpoint + cache key
@@ -565,7 +586,7 @@ export default function WorkOrderDetailPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || notAvailable) {
     return (
       <AppLayout>
         <LoadingState label={t('common.actions.loading', { entities: getName('work_order', true) })} />
@@ -597,7 +618,6 @@ export default function WorkOrderDetailPage() {
 
   const isCancelled = workOrder.lifecycleState === 'CANCELLED';
   const isArchived = !!workOrder.archivedAt;
-  const frozen = isCancelled || isArchived;
   const priority = workOrder.priority ?? 'NORMAL';
 
   const woDisplayNumber = workOrder.workOrderNumber || `#${workOrder.id.slice(0, 8)}`;
@@ -703,7 +723,7 @@ export default function WorkOrderDetailPage() {
                       {t(`workOrders.priority.${cfg.labelKey}`)}
                     </Pill>
                   );
-                  if (frozen) return pill;
+                  if (editLocked) return pill;
                   return (
                     <Dropdown>
                       <DropdownButton
@@ -817,26 +837,30 @@ export default function WorkOrderDetailPage() {
                   {t('workOrders.detail.directions')}
                 </Button>
               )}
-              <Button
-                outline
-                size="xs"
-                onClick={() => setEditWorkOrderDialogOpen(true)}
-                disabled={frozen}
-                title={frozen ? t('workOrders.detail.frozen') : undefined}
-              >
-                <PencilIcon data-slot="icon" />
-                {t('common.edit')}
-              </Button>
-              <Button color="accent" size="xs" onClick={handleAddWorkItem} disabled={frozen}>
-                <PlusIcon data-slot="icon" />
-                {`${t('common.add')} ${getName('work_item').toLowerCase()}`}
-              </Button>
+              {access.canEdit && (
+                <>
+                  <Button
+                    outline
+                    size="xs"
+                    onClick={() => setEditWorkOrderDialogOpen(true)}
+                    disabled={frozen}
+                    title={frozen ? t('workOrders.detail.frozen') : undefined}
+                  >
+                    <PencilIcon data-slot="icon" />
+                    {t('common.edit')}
+                  </Button>
+                  <Button color="accent" size="xs" onClick={handleAddWorkItem} disabled={frozen}>
+                    <PlusIcon data-slot="icon" />
+                    {`${t('common.add')} ${getName('work_item').toLowerCase()}`}
+                  </Button>
+                </>
+              )}
               <Dropdown>
                 <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
                   <EllipsisHorizontalIcon className="size-4" />
                 </DropdownButton>
                 <DropdownMenu anchor="bottom end">
-                  {!workOrder.callbackOf && !frozen && (
+                  {!workOrder.callbackOf && !editLocked && access.canViewAll && (
                     <DropdownItem
                       onClick={() => {
                         setTab('overview');
@@ -852,9 +876,11 @@ export default function WorkOrderDetailPage() {
                   <DropdownItem disabled>
                     <DropdownLabel>{t('workOrders.detail.duplicate')}</DropdownLabel>
                   </DropdownItem>
-                  <DropdownItem onClick={handleDeleteWorkOrder}>
-                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                  </DropdownItem>
+                  {access.canEditAll && (
+                    <DropdownItem onClick={handleDeleteWorkOrder}>
+                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                    </DropdownItem>
+                  )}
                 </DropdownMenu>
               </Dropdown>
             </div>
@@ -881,8 +907,9 @@ export default function WorkOrderDetailPage() {
               financialSummary={financialSummary}
               dispatches={dispatches}
               onOpenTab={(t2) => setTab(t2 as WorkOrderTab)}
-              onAddWorkItem={handleAddWorkItem}
+              onAddWorkItem={editLocked ? undefined : handleAddWorkItem}
               onOpenWorkItem={openWorkItem}
+              canEditNotes={access.canEdit}
               onOpenFinancial={openFinancialTab}
               onSelectDispatch={(d) => setSelectedDispatch(d)}
               onScheduleDispatch={() => {
@@ -896,7 +923,8 @@ export default function WorkOrderDetailPage() {
                       workOrder={workOrder}
                       typeName={woType?.name ?? null}
                       isCallbackType={isSeededCallbackType(woType)}
-                      frozen={frozen}
+                      frozen={editLocked}
+                      canPick={access.canViewAll}
                       editing={callbackEditing}
                       onEditingChange={setCallbackEditing}
                     />
@@ -924,7 +952,7 @@ export default function WorkOrderDetailPage() {
               statuses={workItemStatuses}
               transitions={workflowTransitions}
               enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
-              readOnly={frozen}
+              readOnly={editLocked}
               dispatches={dispatches}
               customerId={workOrder.customer?.id}
               onDelete={handleDeleteWorkItem}
@@ -979,7 +1007,7 @@ export default function WorkOrderDetailPage() {
           )}
 
           {tab === 'files' && (
-            <WorkOrderFilesTab workOrderId={workOrder.id} dispatches={dispatches} readOnly={frozen} />
+            <WorkOrderFilesTab workOrderId={workOrder.id} dispatches={dispatches} readOnly={editLocked} />
           )}
 
           {tab === 'activity' && <WorkOrderActivityTab workOrderId={workOrder.id} />}
