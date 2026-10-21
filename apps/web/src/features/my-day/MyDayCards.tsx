@@ -7,8 +7,10 @@ import {
   BriefcaseIcon,
   CalendarIcon,
   CheckIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   ExclamationTriangleIcon,
+  HomeIcon,
   MapIcon,
   MapPinIcon,
   PhoneIcon,
@@ -32,6 +34,7 @@ import { Pill, Tag } from '../../components/ui/Pill';
 import { WorkOrderTypePill } from '../../components/ui/WorkOrderTypePill';
 import { DISPATCH_PRESENTATION, statusClass } from '../../lib/dispatchStatus';
 import {
+  DAY_RANGE,
   clock,
   focusAction,
   formatDuration,
@@ -337,7 +340,7 @@ function StopRow({
         </div>
       </div>
       <span className="md-stop-right" aria-hidden="true">
-        {past ? <CheckIcon className="size-3.5" /> : <ChevronRightIcon className="size-3.5" />}
+        {stop.status === 'COMPLETED' ? <CheckIcon className="size-3.5" /> : <ChevronRightIcon className="size-3.5" />}
       </span>
     </Link>
   );
@@ -497,5 +500,114 @@ export function NoStops({ dispatchPhone }: { dispatchPhone: string | null | unde
         />
       </CardBody>
     </Card>
+  );
+}
+
+// ── Day stepper + other days ─────────────────────────────────────────
+// Today is the only day with a focus card and actions; every other day is
+// a route list, so nobody acts on the wrong day.
+
+export function DayStepper({
+  offset,
+  label,
+  onStep,
+}: {
+  offset: number;
+  label: string;
+  onStep: (offset: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="md-stepper" role="group" aria-label={t('myDay.stepper.aria')}>
+      <Button
+        plain
+        size="xs"
+        className="md-step"
+        aria-label={t('myDay.stepper.previous')}
+        disabled={offset <= -DAY_RANGE}
+        onClick={() => onStep(offset - 1)}
+      >
+        <ChevronLeftIcon data-slot="icon" />
+      </Button>
+      <Button
+        plain
+        size="xs"
+        className={clsx('md-step-label', offset === 0 && 'today')}
+        aria-label={offset === 0 ? undefined : t('myDay.stepper.backToToday')}
+        disabled={offset === 0}
+        onClick={() => onStep(0)}
+      >
+        {label}
+      </Button>
+      <Button
+        plain
+        size="xs"
+        className="md-step"
+        aria-label={t('myDay.stepper.next')}
+        disabled={offset >= DAY_RANGE}
+        onClick={() => onStep(offset + 1)}
+      >
+        <ChevronRightIcon data-slot="icon" />
+      </Button>
+    </div>
+  );
+}
+
+/** A day other than today: past days are history, future days are what's
+ *  been released so far. Read-only either way. */
+export function OtherDayRoute({
+  stops,
+  past,
+  timeZone,
+  types,
+}: {
+  stops: MyDayStop[];
+  past: boolean;
+  timeZone: string;
+  types: WorkOrderType[] | undefined;
+}) {
+  const { t } = useTranslation();
+  if (stops.length === 0) {
+    return (
+      <Card>
+        <CardBody flush>
+          <EmptyState
+            icon={<CalendarIcon className="size-10 text-fg-dim" />}
+            title={past ? t('myDay.other.noStopsPast') : t('myDay.other.nothingReleased')}
+            description={past ? undefined : t('myDay.other.nothingReleasedBody')}
+          />
+        </CardBody>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardHead>
+        <CardTitle icon={<TruckIcon className="size-3.5" />}>
+          {past ? t('myDay.other.route') : t('myDay.other.releasedRoute')}
+        </CardTitle>
+        <CardSub>{t('myDay.route.stops', { count: stops.length })}</CardSub>
+      </CardHead>
+      <CardBody flush className="md-route">
+        {stops.map((s) => (
+          <StopRow key={s.dispatchId} stop={s} past={past} timeZone={timeZone} types={types} />
+        ))}
+      </CardBody>
+      {!past && <div className="md-route-foot">{t('myDay.other.releasedFoot')}</div>}
+    </Card>
+  );
+}
+
+export function BackToToday({ href, date }: { href: string; date: string }) {
+  const { t } = useTranslation();
+  return (
+    <Link href={href} className="md-tomorrow">
+      <HomeIcon className="md-icon" aria-hidden="true" />
+      <div className="grow">
+        <div className="md-tomorrow-t">{t('myDay.stepper.backToToday')}</div>
+        <div className="md-tomorrow-s">{date}</div>
+      </div>
+      <ChevronRightIcon className="md-icon" aria-hidden="true" />
+    </Link>
   );
 }

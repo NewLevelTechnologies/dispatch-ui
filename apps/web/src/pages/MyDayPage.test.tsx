@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import type { MyDayStop } from '../api/setup';
@@ -99,11 +99,11 @@ const MIDDAY: MyDayStop[] = [
 
 const TECH_CAPS = ['VIEW_ASSIGNED_WORK_ORDERS', 'EDIT_ASSIGNED_WORK_ORDERS'];
 
-function serve(today: MyDayStop[], tomorrow: MyDayStop[] = []) {
+function serve(today: MyDayStop[], others: MyDayStop[] | Record<string, MyDayStop[]> = []) {
   mockGetDay.mockImplementation((date?: string) =>
     Promise.resolve(
       date
-        ? { date, timeZone: 'America/Phoenix', stops: tomorrow }
+        ? { date, timeZone: 'America/Phoenix', stops: Array.isArray(others) ? others : (others[date] ?? []) }
         : { date: '2026-10-21', timeZone: 'America/Phoenix', stops: today },
     ),
   );
@@ -240,5 +240,74 @@ describe('MyDayPage', () => {
     expect(screen.getAllByRole('link', { name: 'My day' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: /My work orders/i }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('link', { name: 'Customers' })).not.toBeInTheDocument();
+  });
+
+  describe('day stepper', () => {
+    const YESTERDAY = [
+      stop({
+        dispatchId: 'y1', workOrderId: 'wy1', workOrderSummary: 'Thermostat replacement',
+        status: 'COMPLETED', arrivedAt: '2026-10-20T15:05:00Z', departedAt: '2026-10-20T16:12:00Z',
+      }),
+      stop({ dispatchId: 'y2', workOrderId: 'wy2', workOrderSummary: 'Fall PM — split system', status: 'NO_SHOW' }),
+    ];
+    const TOMORROW = [
+      stop({ dispatchId: 't1', workOrderId: 'wt1', workOrderSummary: 'Fall PM — rooftop units (3)' }),
+    ];
+
+    beforeEach(() => serve(MIDDAY, { '2026-10-20': YESTERDAY, '2026-10-22': TOMORROW }));
+
+    it('opens tomorrow from the Tomorrow card as a read-only released route', async () => {
+      const { router } = renderWithProviders(<MyDayPage />, { initialPath: '/my-day' });
+      await userEvent.click(await screen.findByRole('link', { name: /Tomorrow/ }));
+      expect(router.state.location.search).toBe('?day=1');
+
+      expect(await screen.findByRole('heading', { level: 1, name: 'Tomorrow' })).toBeInTheDocument();
+      expect(screen.getByText('Released route')).toBeInTheDocument();
+      expect(screen.getByText('Fall PM — rooftop units (3)')).toBeInTheDocument();
+      expect(screen.getByText(/before the day is released in full/)).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Current stop' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Back to today/ })).toHaveAttribute('href', '/my-day');
+    });
+
+    it('shows yesterday as history with the carry-over still in view', async () => {
+      mockQuotes.mockResolvedValue({
+        content: [{ id: 'q1', quoteNumber: 'Q-1182', title: null, customerName: 'Iverson', totalAmount: 1, lastSentAt: null }],
+      });
+      renderWithProviders(<MyDayPage />, { initialPath: '/my-day?day=-1' });
+      expect(await screen.findByRole('heading', { level: 1, name: 'Yesterday' })).toBeInTheDocument();
+      expect(mockGetDay).toHaveBeenCalledWith('2026-10-20');
+      expect(screen.getByText('Route')).toBeInTheDocument();
+      const noShow = screen.getByText('Fall PM — split system').closest('a')!;
+      expect(within(noShow).getByText('No-show')).toBeInTheDocument();
+      expect(screen.getByText('8:05a–9:12a')).toBeInTheDocument();
+      expect(await screen.findByText('Q-1182')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Start driving|Complete visit/ })).not.toBeInTheDocument();
+    });
+
+    it('says nothing is released yet on an empty future day', async () => {
+      renderWithProviders(<MyDayPage />, { initialPath: '/my-day?day=2' });
+      expect(await screen.findByText('Nothing released yet')).toBeInTheDocument();
+      expect(mockGetDay).toHaveBeenCalledWith('2026-10-23');
+    });
+
+    it('stops at a week out, and the label returns to today', async () => {
+      const { router } = renderWithProviders(<MyDayPage />, { initialPath: '/my-day?day=7' });
+      expect(await screen.findByRole('button', { name: 'Next day' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Previous day' })).toBeEnabled();
+      await userEvent.click(screen.getByRole('button', { name: 'Back to today' }));
+      expect(router.state.location.search).toBe('');
+      expect(await screen.findByRole('region', { name: 'Current stop' })).toBeInTheDocument();
+    });
+
+    it('steps a day on a long horizontal swipe, not a short one', async () => {
+      const { router } = renderWithProviders(<MyDayPage />, { initialPath: '/my-day' });
+      const focus = await screen.findByRole('region', { name: 'Current stop' });
+      fireEvent.touchStart(focus, { touches: [{ clientX: 300 }] });
+      fireEvent.touchEnd(focus, { changedTouches: [{ clientX: 260 }] });
+      expect(router.state.location.search).toBe('');
+      fireEvent.touchStart(focus, { touches: [{ clientX: 300 }] });
+      fireEvent.touchEnd(focus, { changedTouches: [{ clientX: 150 }] });
+      expect(router.state.location.search).toBe('?day=1');
+    });
   });
 });

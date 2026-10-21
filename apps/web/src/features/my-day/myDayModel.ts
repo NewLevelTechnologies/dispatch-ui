@@ -90,3 +90,26 @@ export function showTomorrow(count: number, tomorrow: string): boolean {
   const day = new Date(`${tomorrow}T00:00:00Z`).getUTCDay();
   return day !== 0 && day !== 6;
 }
+
+/** Days reachable from the stepper either side of today. Further out is a
+ *  schedule's job, and this page is not a calendar. */
+export const DAY_RANGE = 7;
+
+/** `?day=` values the stepper can be on, as strings for useUrlTab. */
+export const DAY_KEYS: readonly string[] = Array.from({ length: DAY_RANGE * 2 + 1 }, (_, i) => String(i - DAY_RANGE));
+
+/** The step a horizontal swipe asks for: left = forward a day, right = back.
+ *  Short drags are scrolling or taps, not steps. */
+export function swipeStep(dx: number): -1 | 0 | 1 {
+  if (Math.abs(dx) <= 70) return 0;
+  return dx < 0 ? 1 : -1;
+}
+
+/** "Today" / "Yesterday" / "Tomorrow", else the weekday. */
+export function dayName(offset: number, date: string | undefined, t: (k: string) => string): string {
+  if (offset === 0) return t('myDay.stepper.today');
+  if (offset === -1) return t('myDay.stepper.yesterday');
+  if (offset === 1) return t('myDay.stepper.tomorrow');
+  if (!date) return '';
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+}
