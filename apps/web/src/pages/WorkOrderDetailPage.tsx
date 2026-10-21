@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
@@ -757,7 +757,20 @@ export default function WorkOrderDetailPage() {
             )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                <Heading level={1} size="page-sm" className="m-0">{headerTitle}</Heading>
+                <Heading level={1} size="page-sm" className="m-0">
+                  {/* The site name opens its Location page. */}
+                  {location?.locationName && serviceLocationId ? (
+                    <Link
+                      to={`/service-locations/${serviceLocationId}`}
+                      title={t('workOrders.detail.openLocationTitle', { entity: getName('service_location') })}
+                      className="text-inherit no-underline underline-offset-[3px] hover:text-fg-accent hover:underline"
+                    >
+                      {headerTitle}
+                    </Link>
+                  ) : (
+                    headerTitle
+                  )}
+                </Heading>
                 {premiseLabel && <Tag>{premiseLabel}</Tag>}
                 {/* Priority — click-to-change on active WOs, read-only when frozen. */}
                 {(() => {
@@ -811,6 +824,14 @@ export default function WorkOrderDetailPage() {
               {/* Meta line — render only populated items. */}
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
                 {displayAddress && <span className="font-medium text-fg-strong">{displayAddress}</span>}
+                {serviceLocationId && (
+                  <Link
+                    to={`/service-locations/${serviceLocationId}`}
+                    className="whitespace-nowrap font-semibold text-fg-accent no-underline hover:underline"
+                  >
+                    {t('workOrders.detail.viewLocation', { entity: getName('service_location') })}
+                  </Link>
+                )}
                 {displayAddress && <span className="text-fg-dim">·</span>}
                 <span className="font-mono">{woDisplayNumber}</span>
                 {workOrder.customerOrderNumber && (
