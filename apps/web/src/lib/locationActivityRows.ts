@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────
 import type {
   ActivityActor,
+  ActivityEvent,
   ActivityWorkOrderRef,
   FinancialActivityEvent,
   LocationActivityEvent,
@@ -320,6 +321,12 @@ export interface RecentActivityItem {
   kind: string;
   /** The event's instant, unformatted. */
   at: string;
+  /** The source event and its stream, for surfaces that phrase it their own way. */
+  event: ActivityEvent;
+  stream: 'work' | 'financial';
+  /** `obj` split for inline use: the identifier alone, and what follows it. */
+  objLabel: string | null;
+  objDetail: string | null;
   text: string;
   obj: string | null;
   objHref: string | null;
@@ -341,30 +348,45 @@ export function buildRecentActivity(
   getName: GetName,
   limit = 3
 ): RecentActivityItem[] {
-  const rows: { ts: string; row: BaseRow; kind: string; customer: boolean }[] = [
-    ...streams.events.map((e) => ({
-      ts: e.timestamp,
-      row: singleRowModel(e, t, getName),
-      kind: e.kind,
-      customer: e.actor?.type === 'CUSTOMER',
-    })),
-    ...streams.financial.map((f) => ({
-      ts: f.timestamp,
-      row: financialRowModel(f, t, getName),
-      kind: f.kind,
-      customer: f.actor?.type === 'CUSTOMER',
-    })),
+  type Source = {
+    ts: string;
+    row: BaseRow;
+    event: ActivityEvent;
+    stream: 'work' | 'financial';
+    objLabel: string | null;
+    objDetail: string | null;
+  };
+  const rows: Source[] = [
+    ...streams.events.map((e): Source => {
+      const row = singleRowModel(e, t, getName);
+      return {
+        ts: e.timestamp,
+        row,
+        event: e,
+        stream: 'work',
+        objLabel: e.workOrder?.workOrderNumber ?? row.obj,
+        objDetail: e.workOrder?.workOrderNumber ? (e.workOrder.summary ?? null) : null,
+      };
+    }),
+    ...streams.financial.map((f): Source => {
+      const row = financialRowModel(f, t, getName);
+      return { ts: f.timestamp, row, event: f, stream: 'financial', objLabel: row.obj, objDetail: null };
+    }),
   ];
   rows.sort((a, b) => b.ts.localeCompare(a.ts));
-  return rows.slice(0, limit).map(({ ts, row, kind, customer }) => ({
+  return rows.slice(0, limit).map(({ ts, row, event, stream, objLabel, objDetail }) => ({
     id: row.id,
     glyph: row.glyph,
     tone: row.tone,
     actor: row.actor,
     isPerson: row.isPerson,
-    actorType: customer ? 'customer' : row.isPerson ? 'staff' : 'system',
-    kind,
+    actorType: event.actor?.type === 'CUSTOMER' ? 'customer' : row.isPerson ? 'staff' : 'system',
+    kind: event.kind,
     at: ts,
+    event,
+    stream,
+    objLabel,
+    objDetail,
     text: row.text,
     obj: row.obj,
     objHref: row.objHref,
