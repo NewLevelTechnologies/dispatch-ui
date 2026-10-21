@@ -153,10 +153,6 @@ export interface DispatchBoardRow extends Dispatch {
   serviceLocationCity: string | null;
   serviceLocationState: string | null;
   assignedUserName: string | null;
-  // When the dispatcher handed it to the tech; null is the board's "on deck"
-  // state (assigned, not released). Always sent; optional only so fixtures
-  // written before it was typed still compile.
-  releasedAt?: string | null;
 }
 
 // PageResponse<T> as returned by the board endpoint. NOTE: the page index field

@@ -1235,6 +1235,8 @@ export interface ListQuotesParams {
   status?: QuoteStatus[];
   /** The user who first sent it (a sender group's drill-in). */
   sentByUserId?: string;
+  /** Who wrote it; a duplicate's writer is whoever duplicated it. */
+  createdByUserId?: string;
   /** Case-insensitive, anywhere in the quote number, title or customer name. */
   q?: string;
   /** Accepted quotes with a line not fully invoiced (the `invoiceable` rule). */

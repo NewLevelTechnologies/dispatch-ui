@@ -5,9 +5,9 @@
 // The unit of work is the DISPATCH (one trip to one site), not the work
 // order: a work order with two visits today is two stops, in arrival-window
 // order, both linking to the same work order. Everything here is derived
-// from the dispatch read — nothing is stored.
+// from GET /scheduling/my-day — what was released to the tech, as released.
 // ─────────────────────────────────────────────────────────────────────
-import type { DispatchBoardRow, DispatchStatus } from '../../api/setup';
+import type { DispatchStatus, MyDayStop } from '../../api/setup';
 import { formatHour, zonedHour } from '../../lib/boardTime';
 
 /** A stop that's behind the tech: it's done, or it isn't happening. */
@@ -21,21 +21,16 @@ export function isLive(status: DispatchStatus): boolean {
 }
 
 /**
- * The day's route, in arrival order.
- *
- * Unreleased dispatches are left out: that is the board's "on deck" state —
- * assigned, but not handed to the tech — and showing it would put a draft
- * schedule on the tech's phone. Cancelled visits are left out too, the same
- * as the board's default; they aren't work.
+ * The day's route. The server already returns only released work, in
+ * arrival order, as sent — so the only thing dropped here is a cancellation
+ * the tech has been told about: it isn't work, and the board hides it too.
  */
-export function routeStops(rows: readonly DispatchBoardRow[]): DispatchBoardRow[] {
-  return rows
-    .filter((r) => !!r.releasedAt && r.status !== 'CANCELLED')
-    .sort((a, b) => a.arrivalWindowStart.localeCompare(b.arrivalWindowStart));
+export function routeStops(stops: readonly MyDayStop[]): MyDayStop[] {
+  return stops.filter((s) => s.status !== 'CANCELLED');
 }
 
 /** The ONE stop to act on: whatever is live, else the first still scheduled. */
-export function pickFocus(stops: readonly DispatchBoardRow[]): DispatchBoardRow | null {
+export function pickFocus(stops: readonly MyDayStop[]): MyDayStop | null {
   return stops.find((s) => isLive(s.status)) ?? stops.find((s) => s.status === 'SCHEDULED') ?? null;
 }
 
@@ -73,7 +68,7 @@ export function formatDuration(minutes: number): string {
 }
 
 /** Σ (departed − arrived) over visits that have both. */
-export function onSiteMinutes(stops: readonly DispatchBoardRow[]): number {
+export function onSiteMinutes(stops: readonly MyDayStop[]): number {
   return stops.reduce((sum, s) => {
     if (!s.arrivedAt || !s.departedAt) return sum;
     const ms = new Date(s.departedAt).getTime() - new Date(s.arrivedAt).getTime();

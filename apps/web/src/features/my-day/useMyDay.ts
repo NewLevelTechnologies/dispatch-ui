@@ -5,19 +5,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import {
   dispatchesApi,
+  myDayApi,
   quotesApi,
   workItemStatusesApi,
   workOrderApi,
-  type DispatchBoardRow,
   type DispatchStatus,
+  type MyDayStop,
   type ProgressCategory,
 } from '../../api/setup';
-import { useTenantTimeZone } from '../../hooks/useTenantTimeZone';
-import { zonedDate } from '../../lib/boardTime';
 import { shiftDay } from '../../lib/boardMove';
-import { zonedIso } from '../../lib/zonedTime';
 import { PENDING_PARTS_CODE } from '../../lib/workItemStatusTargets';
-import { errorCode, extractApiError, isConflict, showError } from '../../lib/toast';
+import { errorCode, errorStatus, extractApiError, isConflict, showError } from '../../lib/toast';
 import { invalidateDispatchConsumers } from '../../utils/invalidateRoleConsumers';
 import { routeStops } from './myDayModel';
 
@@ -27,39 +25,31 @@ const POLL_MS = 60_000;
 const OPEN_CATEGORIES: ProgressCategory[] = ['NOT_STARTED', 'AWAITING_SCHEDULE', 'IN_PROGRESS', 'BLOCKED'];
 const CARRYOVER_LIMIT = 5;
 
-/** The tenant-local calendar day, so "today" is the truck's day, not the
- *  browser's. */
-export function useMyDayDates() {
-  const timeZone = useTenantTimeZone();
-  const today = zonedDate(new Date(), timeZone) ?? new Date().toISOString().slice(0, 10);
-  return { timeZone, today, tomorrow: shiftDay(today, 1) };
-}
-
-/** My released, non-cancelled dispatches on `date`, in arrival order. */
-export function useDayStops(userId: string | undefined, date: string, timeZone: string) {
+/** My day as released to me. `date` omitted = today in the tenant's zone,
+ *  which the server resolves — so the client never computes "today". */
+export function useMyDayStops(date?: string, { enabled = true }: { enabled?: boolean } = {}) {
   const query = useQuery({
     // Under ['dispatches'] so invalidateDispatchConsumers refreshes it after
     // any dispatch write — here, on the board, or on the work order.
-    queryKey: ['dispatches', 'my-day', userId, date, timeZone],
-    queryFn: () =>
-      dispatchesApi.getAll({
-        assignedUserId: userId,
-        from: zonedIso(date, 0, timeZone),
-        to: zonedIso(date, 24, timeZone),
-        sort: 'arrivalWindowStart,asc',
-        size: 200,
-      }),
-    enabled: !!userId,
+    queryKey: ['dispatches', 'my-day', date ?? 'today'],
+    queryFn: () => myDayApi.getDay(date),
+    enabled,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
-  const stops = useMemo(() => routeStops(query.data?.content ?? []), [query.data]);
+  const stops = useMemo(() => routeStops(query.data?.stops ?? []), [query.data]);
   return { ...query, stops };
 }
 
-/** The focus stop's work order — the address to navigate to, the person to
- *  call and the priority, none of which the dispatch row carries. */
+/** Tomorrow, once today's response has told us what "today" is. */
+export function useTomorrowStops(today: string | undefined) {
+  return useMyDayStops(today ? shiftDay(today, 1) : undefined, { enabled: !!today });
+}
+
+/** The focus stop's work order — only for who to call and what equipment,
+ *  which the stop doesn't carry. Never its schedule: the window is the
+ *  released one on the stop. */
 export function useFocusWorkOrder(workOrderId: string | undefined) {
   return useQuery({
     queryKey: ['work-orders', workOrderId],
@@ -68,7 +58,7 @@ export function useFocusWorkOrder(workOrderId: string | undefined) {
   });
 }
 
-/** Carry-over: open work orders of mine waiting on parts, and quotes I sent
+/** Carry-over: open work orders of mine waiting on parts, and quotes I wrote
  *  that the customer hasn't answered. Each is one selector over existing
  *  records. Work already on today's route is left to the route. */
 export function useCarryover(userId: string | undefined, onRouteWorkOrderIds: ReadonlySet<string>) {
@@ -94,7 +84,7 @@ export function useCarryover(userId: string | undefined, onRouteWorkOrderIds: Re
   const quotes = useQuery({
     queryKey: ['quotes', 'my-day', 'sent', userId],
     queryFn: () =>
-      quotesApi.getAll({ status: ['SENT'], sentByUserId: userId, size: CARRYOVER_LIMIT, sort: 'lastSentAt,desc' }),
+      quotesApi.getAll({ status: ['SENT'], createdByUserId: userId, size: CARRYOVER_LIMIT, sort: 'lastSentAt,desc' }),
     enabled: !!userId,
   });
 
@@ -113,11 +103,18 @@ export function useAdvanceDispatch() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ stop, to }: { stop: DispatchBoardRow; to: DispatchStatus }) =>
-      dispatchesApi.update(stop.id, { status: to, version: stop.version }),
+    mutationFn: ({ stop, to }: { stop: MyDayStop; to: DispatchStatus }) =>
+      dispatchesApi.update(stop.dispatchId, { status: to, ...(stop.version != null && { version: stop.version }) }),
     onSuccess: (_data, { stop }) => invalidateDispatchConsumers(queryClient, stop.workOrderId),
     onError: (err, { stop }) => {
       invalidateDispatchConsumers(queryClient, stop.workOrderId);
+      // Reassigned, unscheduled or cancelled since it was sent: the stop stays
+      // on the tech's day until the removal is released, but it's no longer
+      // theirs to act on.
+      if (errorStatus(err) === 404) {
+        showError(t('myDay.errors.changed'));
+        return;
+      }
       if (isConflict(err) && errorCode(err) === 'DISPATCH_VERSION_CONFLICT') {
         showError(t('myDay.errors.conflict'));
         return;

@@ -5417,7 +5417,10 @@
       "summary": "{{done}} of {{total}} stops completed",
       "title": "Day complete"
     },
+    "drive_one": "{{count}} min drive",
+    "drive_other": "{{count}} min drive",
     "errors": {
+      "changed": "Dispatch changed this job. Check with the office.",
       "conflict": "This visit just changed — refreshed with the latest.",
       "load": "Couldn’t load your day",
       "update": "Couldn’t update the visit"
@@ -5426,7 +5429,6 @@
       "aria": "Current stop",
       "enRoute": "En route",
       "estimate": "{{estimate}} on site",
-      "fromDispatch": "From dispatch",
       "next": "Next",
       "onSiteSince": "On site · since {{time}}",
       "upNext": "Up next"
@@ -5449,9 +5451,9 @@
       "onSiteAt": "on site at {{place}}"
     },
     "route": {
+      "agreement": "Agreement",
       "completed_one": "{{count}} completed stop · {{from}} – {{to}}",
       "completed_other": "{{count}} completed stops · {{from}} – {{to}}",
-      "note": "Note",
       "noShow": "no-show",
       "onSite": "On site",
       "stops_one": "{{count}} stop",

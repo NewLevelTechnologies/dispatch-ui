@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { DispatchBoardRow } from '../../api/setup';
+import type { MyDayStop } from '../../api/setup';
 import {
   focusAction,
   formatDuration,
@@ -10,9 +10,9 @@ import {
   showTomorrow,
 } from './myDayModel';
 
-const row = (over: Partial<DispatchBoardRow>): DispatchBoardRow =>
+const row = (over: Partial<MyDayStop>): MyDayStop =>
   ({
-    id: 'd',
+    dispatchId: 'd',
     workOrderId: 'wo',
     status: 'SCHEDULED',
     arrivalWindowStart: '2026-10-21T15:00:00Z',
@@ -21,28 +21,27 @@ const row = (over: Partial<DispatchBoardRow>): DispatchBoardRow =>
     arrivedAt: null,
     departedAt: null,
     ...over,
-  }) as DispatchBoardRow;
+  }) as MyDayStop;
 
 describe('routeStops', () => {
-  it('orders by arrival window and drops unreleased and cancelled visits', () => {
+  it('keeps the server’s order and drops cancelled visits', () => {
     const stops = routeStops([
-      row({ id: 'late', arrivalWindowStart: '2026-10-21T20:00:00Z' }),
-      row({ id: 'early', arrivalWindowStart: '2026-10-21T15:00:00Z' }),
-      row({ id: 'on-deck', releasedAt: null }),
-      row({ id: 'cancelled', status: 'CANCELLED' }),
+      row({ dispatchId: 'a' }),
+      row({ dispatchId: 'cancelled', status: 'CANCELLED' }),
+      row({ dispatchId: 'b' }),
     ]);
-    expect(stops.map((s) => s.id)).toEqual(['early', 'late']);
+    expect(stops.map((s) => s.dispatchId)).toEqual(['a', 'b']);
   });
 });
 
 describe('pickFocus', () => {
   it('prefers a live stop over an earlier scheduled one', () => {
-    const focus = pickFocus([row({ id: 'a' }), row({ id: 'b', status: 'IN_PROGRESS' })]);
-    expect(focus?.id).toBe('b');
+    const focus = pickFocus([row({ dispatchId: 'a' }), row({ dispatchId: 'b', status: 'IN_PROGRESS' })]);
+    expect(focus?.dispatchId).toBe('b');
   });
 
   it('falls back to the first scheduled stop, and to nothing when the day is done', () => {
-    expect(pickFocus([row({ id: 'a', status: 'COMPLETED' }), row({ id: 'b' })])?.id).toBe('b');
+    expect(pickFocus([row({ dispatchId: 'a', status: 'COMPLETED' }), row({ dispatchId: 'b' })])?.dispatchId).toBe('b');
     expect(pickFocus([row({ status: 'COMPLETED' }), row({ status: 'NO_SHOW' })])).toBeNull();
   });
 });

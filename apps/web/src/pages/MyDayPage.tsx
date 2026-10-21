@@ -19,6 +19,7 @@ import AppLayout from '../components/AppLayout';
 import { Callout } from '../components/ui/Callout';
 import { LoadingState } from '../components/ui/LoadingState';
 import { tenantSettingsApi, workOrderTypesApi } from '../api/setup';
+import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { extractApiError } from '../lib/toast';
 import { greetingPart } from '../features/home/opsSelectors';
@@ -35,19 +36,23 @@ import { clock, pickFocus, showTomorrow } from '../features/my-day/myDayModel';
 import {
   useAdvanceDispatch,
   useCarryover,
-  useDayStops,
   useFocusWorkOrder,
-  useMyDayDates,
+  useMyDayStops,
+  useTomorrowStops,
 } from '../features/my-day/useMyDay';
 
 export default function MyDayPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: user } = useCurrentUser();
-  const { timeZone, today, tomorrow } = useMyDayDates();
-
-  const day = useDayStops(user?.id, today, timeZone);
-  const next = useDayStops(user?.id, tomorrow, timeZone);
+  // The server resolves "today" in the tenant's zone and says which day and
+  // zone it used; until it answers, the tenant setting stands in.
+  const fallbackZone = useTenantTimeZone();
+  const day = useMyDayStops();
+  const today = day.data?.date;
+  const timeZone = day.data?.timeZone ?? fallbackZone;
+  const next = useTomorrowStops(today);
+  const tomorrow = next.data?.date;
   const stops = day.stops;
   const focus = pickFocus(stops);
   const { data: focusWorkOrder } = useFocusWorkOrder(focus?.workOrderId);
@@ -68,11 +73,11 @@ export default function MyDayPage() {
   // Time of day from the device clock — it's the tech's morning, wherever
   // the tenant's office is.
   const greeting = t(`dashboard.greeting.${greetingPart(new Date())}Named`, { name: user?.firstName ?? '' });
-  const dateLabel = new Date(`${today}T12:00:00Z`).toLocaleDateString('en-US', {
+  const dateLabel = (today ? new Date(`${today}T12:00:00Z`) : new Date()).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
-    timeZone: 'UTC',
+    timeZone: today ? 'UTC' : timeZone,
   });
   const first = stops[0];
   const last = stops[stops.length - 1];
@@ -89,7 +94,8 @@ export default function MyDayPage() {
   const allDone = stops.length > 0 && !focus;
   // My work orders, narrowed to tomorrow — there's no tech-facing schedule
   // page to send them to.
-  const tomorrowHref = user ? `/work-orders?assigned=${user.id}&from=${tomorrow}&to=${tomorrow}` : '/work-orders';
+  const tomorrowHref =
+    user && tomorrow ? `/work-orders?assigned=${user.id}&from=${tomorrow}&to=${tomorrow}` : '/work-orders';
 
   return (
     <AppLayout>
@@ -126,7 +132,7 @@ export default function MyDayPage() {
                 {allDone && <DayDone stops={stops} />}
                 {focus && (
                   <FocusCard
-                    key={focus.id}
+                    key={focus.dispatchId}
                     stop={focus}
                     workOrder={focusWorkOrder?.id === focus.workOrderId ? focusWorkOrder : undefined}
                     timeZone={timeZone}
@@ -138,7 +144,7 @@ export default function MyDayPage() {
                 {stops.length > 0 && (
                   <RouteCard
                     stops={stops}
-                    focusId={focus?.id ?? null}
+                    focusId={focus?.dispatchId ?? null}
                     timeZone={timeZone}
                     types={types}
                     expandPast={allDone}
@@ -147,7 +153,7 @@ export default function MyDayPage() {
               </div>
               <div className="md-col">
                 <UnfinishedCard awaitingParts={carryover.awaitingParts} quotes={carryover.quotes} />
-                {!next.isLoading && showTomorrow(next.stops.length, tomorrow) && (
+                {tomorrow && showTomorrow(next.stops.length, tomorrow) && (
                   <TomorrowLink stops={next.stops} href={tomorrowHref} timeZone={timeZone} />
                 )}
               </div>
