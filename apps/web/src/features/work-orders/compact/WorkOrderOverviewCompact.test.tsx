@@ -221,7 +221,7 @@ describe('WorkOrderOverviewCompact', () => {
   it('leads each row with its equipment, the findings with their author, and the open count', async () => {
     render();
     expect(screen.getAllByText('Upstairs condenser').length).toBeGreaterThan(0);
-    expect(screen.getByText(/Carrier 24ACC6 · system of 3/)).toBeInTheDocument();
+    expect(screen.getByText(/Carrier 24ACC6 · 2 units/)).toBeInTheDocument();
     expect(screen.getByText('Run capacitor failed')).toBeInTheDocument();
     expect(screen.getByText(/— Ray T\./)).toBeInTheDocument();
     expect(screen.getByText('2 open · 3 total')).toBeInTheDocument();
@@ -233,7 +233,7 @@ describe('WorkOrderOverviewCompact', () => {
     // History waits on the equipment's job list (1 earlier job).
     expect(await within(row).findByRole('button', { name: /history/i })).toBeInTheDocument();
     expect(within(row).getByRole('button', { name: /^equipment$/i })).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: /units\s*3/i })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: /units\s*2/i })).toBeInTheDocument();
     expect(within(row).getByRole('button', { name: /parts\s*1/i })).toBeInTheDocument();
     // No notes and no photos on file → no links.
     expect(within(row).queryByRole('button', { name: /notes/i })).not.toBeInTheDocument();
@@ -257,15 +257,31 @@ describe('WorkOrderOverviewCompact', () => {
     expect(within(row).getByText('System profile')).toBeInTheDocument();
   });
 
+  it('lists only sub-units under Units, and hides the link when there are none', () => {
+    const solo = {
+      ...workOrder,
+      workItems: [
+        { ...workOrder.workItems![0], equipment: { ...workOrder.workItems![0].equipment!, descendantCount: 0, descendants: [] } },
+      ],
+    } as unknown as WorkOrder;
+    render({ workOrder: solo });
+    const row = rowOf('Upstairs condenser');
+    expect(within(row).queryByRole('button', { name: /units/i })).not.toBeInTheDocument();
+    expect(within(row).queryByText(/· \d+ units?/)).not.toBeInTheDocument();
+  });
+
   it('expands a panel in place and collapses it from the same link', async () => {
     const user = userEvent.setup();
     render();
     const row = rowOf('Upstairs condenser');
-    const units = within(row).getByRole('button', { name: /units\s*3/i });
+    const units = within(row).getByRole('button', { name: /units\s*2/i });
     await user.click(units);
     expect(units).toHaveAttribute('aria-expanded', 'true');
     expect(within(row).getByText('Air handler')).toBeInTheDocument();
     expect(within(row).getByText('Evaporator coil')).toBeInTheDocument();
+    // The equipment itself isn't repeated as one of its units.
+    const panel = row.querySelector('.ovc-panel') as HTMLElement;
+    expect(within(panel).getAllByRole('button').map((b) => b.textContent)).not.toContain('Upstairs condenser');
     await user.click(units);
     expect(within(row).queryByText('Air handler')).not.toBeInTheDocument();
   });
