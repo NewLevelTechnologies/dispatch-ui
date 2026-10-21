@@ -997,6 +997,8 @@ export default function WorkOrderDetailPage() {
             <WorkOrderOverviewCompact
               workOrder={workOrder}
               statuses={workItemStatuses}
+              transitions={workflowTransitions}
+              enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
               location={locationDetail}
               financialSummary={financialSummary}
               dispatches={dispatches}
@@ -1013,6 +1015,12 @@ export default function WorkOrderDetailPage() {
               onAttachEquipment={handleAttachEquipmentToWorkItem}
               onSetEquipmentNeeded={handleSetWorkItemEquipmentNeeded}
               onAddEquipment={handleAddEquipmentToWorkItem}
+              onSaveDiagnosis={handleSaveWorkItemDiagnosis}
+              onScheduleDispatch={(wi) => {
+                setEditingDispatch(null);
+                setScheduleWorkItemIds(wi ? [wi.id] : null);
+                setAssignDispatchDialogOpen(true);
+              }}
               extraRail={overviewExtraRail}
             />
           )}

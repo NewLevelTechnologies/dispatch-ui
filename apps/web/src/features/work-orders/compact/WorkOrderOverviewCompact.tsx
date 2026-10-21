@@ -34,6 +34,7 @@ import {
   type WorkItemDocument,
   type WorkItemResponse,
   type WorkItemStatus,
+  type WorkflowTransition,
   type WorkOrder,
   type WorkOrderFile,
   type WorkOrderFinancialSummary,
@@ -50,19 +51,12 @@ import CompactItemRow, { type ItemTrip } from './CompactItemRow';
 import DispatchRailCard from './DispatchRailCard';
 import MoneyRailCard from './MoneyRailCard';
 
-// statusCategory → progress i18n key (fallback when an item has no tenant status).
-const PROGRESS_LABEL_KEYS: Record<WorkItemResponse['statusCategory'], string> = {
-  NOT_STARTED: 'notStarted',
-  AWAITING_SCHEDULE: 'awaitingSchedule',
-  IN_PROGRESS: 'inProgress',
-  BLOCKED: 'blocked',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-};
-
 export interface WorkOrderOverviewCompactProps {
   workOrder: WorkOrder;
   statuses: WorkItemStatus[];
+  /** The WO type's workflow — what the row status pickers may move to. */
+  transitions: WorkflowTransition[];
+  enforceWorkflow: boolean;
   location?: ServiceLocationDetailDto;
   financialSummary?: WorkOrderFinancialSummary;
   dispatches: DispatchBoardRow[];
@@ -82,6 +76,9 @@ export interface WorkOrderOverviewCompactProps {
   onAttachEquipment: (wi: WorkItemResponse, equipmentId: string | null) => Promise<void> | void;
   onSetEquipmentNeeded: (wi: WorkItemResponse, needed: boolean) => Promise<void> | void;
   onAddEquipment?: (wi: WorkItemResponse) => void;
+  onSaveDiagnosis: (wi: WorkItemResponse, next: string) => Promise<void>;
+  /** Open the dispatch form — with one item preselected, or (no item) blank. */
+  onScheduleDispatch?: (wi?: WorkItemResponse) => void;
   /** Page-owned rail cards (callback link / callbacks back) after Money. */
   extraRail?: ReactNode;
 }
@@ -160,7 +157,10 @@ export default function WorkOrderOverviewCompact(props: WorkOrderOverviewCompact
             visits={visits}
             partsBlocker={partsBlocker}
             onSelect={props.onSelectDispatch}
-            onViewAll={() => onOpenTab('trips')}
+            workItems={workOrder.workItems ?? []}
+            media={media}
+            onSchedule={props.readOnly || !props.onScheduleDispatch ? undefined : () => props.onScheduleDispatch?.()}
+            onOpenDispatchesTab={() => onOpenTab('trips')}
           />
           <MoneyRailCard
             workOrder={workOrder}
@@ -247,9 +247,6 @@ function WorkItemsBoard(
   const done = items.filter(isFinished);
 
   const row = (wi: WorkItemResponse) => {
-    const statusLabel =
-      statuses.find((s) => s.id === wi.statusId)?.name ||
-      t(`workOrders.progress.${PROGRESS_LABEL_KEYS[wi.statusCategory]}`);
     const trips: ItemTrip[] = visits
       .map((d, i) => ({ dispatch: d, seq: i + 1 }))
       .filter(({ dispatch }) => dispatchCoversWorkItem(dispatch, wi.id));
@@ -260,7 +257,9 @@ function WorkItemsBoard(
         serviceLocationId={workOrder.serviceLocationId || workOrder.serviceLocation?.id}
         customerId={workOrder.customer?.id}
         wi={wi}
-        statusLabel={statusLabel}
+        statuses={statuses}
+        transitions={props.transitions}
+        enforceWorkflow={props.enforceWorkflow}
         readOnly={props.readOnly}
         media={props.media.filter((m) => m.workItemId === wi.id)}
         purchaseOrders={props.purchaseOrders.filter((po) => po.workItemId === wi.id)}
@@ -272,6 +271,8 @@ function WorkItemsBoard(
         onAttachEquipment={props.onAttachEquipment}
         onSetEquipmentNeeded={props.onSetEquipmentNeeded}
         onAddEquipment={props.readOnly ? undefined : props.onAddEquipment}
+        onSaveDiagnosis={props.onSaveDiagnosis}
+        onScheduleDispatch={props.readOnly ? undefined : props.onScheduleDispatch}
       />
     );
   };

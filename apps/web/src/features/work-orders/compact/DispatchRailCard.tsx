@@ -3,16 +3,24 @@
 // recent), its lifecycle stamps, then the other visits one line each.
 // Deliberately no schedule button: scheduling lives on the dispatch board, and
 // the Work items tab keeps its state-driven "Schedule dispatch".
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { TruckIcon } from '@heroicons/react/16/solid';
-import { dispatchesApi, type DispatchBoardRow, type DispatchLifecycle } from '../../../api/setup';
+import {
+  dispatchesApi,
+  type DispatchBoardRow,
+  type DispatchLifecycle,
+  type WorkItemResponse,
+  type WorkOrderFile,
+} from '../../../api/setup';
 import { useGlossary } from '../../../contexts/GlossaryContext';
 import { Card, CardBody, CardHead, CardSub, CardTitle } from '../../../components/ui/Card';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Pill } from '../../../components/ui/Pill';
 import { dispatchDate, onSiteDuration, timeLabel, windowLabel } from '../../../components/work-items/format';
 import { DISPATCH_PRESENTATION, isLiveDispatch, pickHeroVisit } from '../overviewModel';
+import DispatchListDrawer from './DispatchListDrawer';
 
 interface Props {
   /** Non-cancelled visits in arrival order (positional numbers are index + 1). */
@@ -20,10 +28,24 @@ interface Props {
   /** Why the next visit can't happen yet: an open PO's ETA, or just "waiting". */
   partsBlocker: string | null;
   onSelect: (d: DispatchBoardRow) => void;
-  onViewAll: () => void;
+  /** For the "All →" drawer: what each visit covers, and its photo count. */
+  workItems: WorkItemResponse[];
+  media: WorkOrderFile[];
+  /** Omitted when the user can't schedule. */
+  onSchedule?: () => void;
+  onOpenDispatchesTab: () => void;
 }
 
-export default function DispatchRailCard({ visits, partsBlocker, onSelect, onViewAll }: Props) {
+export default function DispatchRailCard({
+  visits,
+  partsBlocker,
+  onSelect,
+  workItems,
+  media,
+  onSchedule,
+  onOpenDispatchesTab,
+}: Props) {
+  const [listOpen, setListOpen] = useState(false);
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const hero = pickHeroVisit(visits);
@@ -66,7 +88,7 @@ export default function DispatchRailCard({ visits, partsBlocker, onSelect, onVie
           {t('workOrders.detail.compact.onThisJob', { count: visits.length })}
         </CardSub>
         <span className="flex-1" />
-        <button type="button" className="card-action" onClick={onViewAll}>
+        <button type="button" className="card-action" onClick={() => setListOpen(true)}>
           {t('workOrders.detail.compact.all')}
         </button>
       </CardHead>
@@ -154,6 +176,17 @@ export default function DispatchRailCard({ visits, partsBlocker, onSelect, onVie
           })}
         </CardBody>
       )}
+      <DispatchListDrawer
+        open={listOpen}
+        onClose={() => setListOpen(false)}
+        visits={visits}
+        workItems={workItems}
+        media={media}
+        partsBlocker={partsBlocker}
+        onSelect={onSelect}
+        onSchedule={onSchedule}
+        onOpenDispatchesTab={onOpenDispatchesTab}
+      />
     </Card>
   );
 }
