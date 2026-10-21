@@ -28,6 +28,16 @@ admin screens to show them.
   bundles. `Role.performsFieldWork: boolean` is the one purpose-built signal (already
   consumed by dispatch-board/assignment pickers), but it is **not** used to gate
   sign-in — scope is limited by which screens exist, not by blocking login.
+- **The mobile app currently has zero permission checks** — every signed-in user can
+  do everything the built screens allow (status transitions, adding notes), regardless
+  of their tenant-assigned role. Web already has the full system to port: a tenant
+  admin assigns a flat `capabilities: string[]` to each `Role` (no enum — raw strings
+  like `CREATE_WORK_ORDERS`, `EDIT_ALL_WORK_ORDERS`, `EDIT_ASSIGNED_WORK_ORDERS`) via
+  `userApi.updateRoleCapabilities`; the signed-in user's own effective set comes back
+  denormalized on `User.capabilities` from `GET /users/me` (`userApi.getCurrentUser`,
+  no client-side merge-from-roles step). Mobile's own `useCurrentUser()`
+  (`src/hooks/useCurrentUser.ts`) already fetches that same `User` for `user.id` but
+  has never read `.capabilities`. See Phase 5.
 - Technicians **can belong to multiple tenants** — the mobile shell needs a
   lightweight port of web's `TenantGate`/workspace switcher, not a single-tenant
   assumption.
@@ -107,10 +117,34 @@ that file in lockstep with web's if a token value changes there).
    which exist yet), and the Activity feed (`activityApi` — held back partly
    because its `ActivityKind`/`ActivityCategory` enum values weren't confirmed
    in this pass). No Purchasing tab, no Estimate-tab editing, no billing.
-5. **Completion**: signature + card-present payment (net-new, cross-repo).
-6. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self.
-7. **Reference lookup**: customers/service-locations/equipment, read-only, no billing.
-8. **Push notifications** (needs new `dispatch-api` endpoints — device tokens, events).
+5. **Permission-aware actions** (next up): every signed-in user can currently do
+   everything the app allows — no capability checks exist anywhere in mobile. Reads
+   `user.capabilities` off the existing `useCurrentUser()` and ports web's access
+   logic rather than reinventing it:
+   - **Dispatch status actions retrofit** (Mark en route / Mark arrived / Complete,
+     shipped capability-free in Phase 3): web gates its equivalent buttons on
+     `useWorkOrderAccess(workOrder).canEdit` (`apps/web/src/hooks/
+     useWorkOrderAccess.ts`) — `EDIT_ALL_WORK_ORDERS`, or `EDIT_ASSIGNED_WORK_ORDERS`
+     plus the dispatch being assigned to the signed-in user — not a separate
+     dispatch-specific capability. Port the same `canEdit` logic as a pure function
+     (mirroring how `statusTone.ts`/`dispatchLifecycleSteps.ts` ported web logic
+     elsewhere) and gate those three buttons on it.
+   - **On-site work order creation** (Phase 7, below): gates on `CREATE_WORK_ORDERS`,
+     an existing, already-in-use capability string — no new backend work needed.
+   - **Add note stays ungated**: confirmed web deliberately lets "anyone who can see
+     [the work order] add one" (`apps/web/src/components/NotesCard.tsx` — only
+     editing/pinning/deleting an *existing* note needs edit access), so Phase 4's
+     notes feature needs no change.
+   - **Open question**: whether `dispatch-api` enforces any of this server-side (a
+     403 regardless of what the client checks) is unconfirmed from this repo alone —
+     nothing in `packages/api/src/*.ts`'s doc comments says either way. Treat
+     client-side gating here as a UX-correctness fix, not a verified security
+     boundary, until that's checked against the backend.
+6. **Completion**: signature + card-present payment (net-new, cross-repo).
+7. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self;
+   gated behind `CREATE_WORK_ORDERS` per Phase 5.
+8. **Reference lookup**: customers/service-locations/equipment, read-only, no billing.
+9. **Push notifications** (needs new `dispatch-api` endpoints — device tokens, events).
 
 Profile/account (signed-in-as, sign out, workspace switcher) is **done** — folded into
 Phase 1 rather than staying its own numbered phase, since it was needed there to make
