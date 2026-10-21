@@ -4322,6 +4322,7 @@
         "label": "Overview layout"
       },
       "onSiteContact": "On site",
+      "openLocationTitle": "Open {{entity, lowercase}}",
       "openedAt": "Opened {{time}}",
       "customerContact": "Customer Contact",
       "duplicate": "Duplicate",
@@ -4382,7 +4383,8 @@
         "files": "Files",
         "overview": "Overview",
         "purchasing": "Purchasing"
-      }
+      },
+      "viewLocation": "View {{entity, lowercase}} →"
     },
     "financialDrawer": {
       "voidDialog": {

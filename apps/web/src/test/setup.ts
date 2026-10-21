@@ -2349,6 +2349,8 @@ vi.mock('react-i18next', async () => {
     'workOrders.detail.layout.detailed': 'Detailed',
     'workOrders.detail.layout.label': 'Overview layout',
     'workOrders.detail.onSiteContact': 'On site',
+    'workOrders.detail.openLocationTitle': 'Open {{entity, lowercase}}',
+    'workOrders.detail.viewLocation': 'View {{entity, lowercase}} →',
     'workOrders.detail.customerContact': 'Customer Contact',
     'workOrders.detail.duplicate': 'Duplicate',
     'workOrders.detail.eta': 'ETA {{date}}',

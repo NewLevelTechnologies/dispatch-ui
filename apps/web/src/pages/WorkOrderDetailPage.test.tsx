@@ -397,6 +397,14 @@ describe('WorkOrderDetailPage', () => {
     });
   });
 
+  it('links the site name and a View location link to the location page', async () => {
+    mockApiResponses();
+    renderPage();
+    const title = await screen.findByRole('link', { name: "Paul's House" });
+    expect(title).toHaveAttribute('href', '/service-locations/loc-1');
+    expect(screen.getByRole('link', { name: 'View location →' })).toHaveAttribute('href', '/service-locations/loc-1');
+  });
+
   it('renders the premise tag from the service-location record', async () => {
     mockApiResponses();
     renderPage();
