@@ -123,7 +123,8 @@ export default function CompactItemRow(props: CompactItemRowProps) {
   const historyCount = jobsPage
     ? Math.max(0, jobsPage.totalElements - (jobs.some((w) => w.id === workOrderId) ? 1 : 0))
     : 0;
-  const unitCount = eq ? (eq.descendantCount ?? eq.descendants?.length ?? 0) + 1 : 0;
+  // Units are the equipment's sub-units only; most equipment has none.
+  const unitCount = eq ? (eq.descendantCount ?? eq.descendants?.length ?? 0) : 0;
   const noteCount = eq ? (eq.noteCount ?? eq.recentNotes?.length ?? 0) : 0;
   const photoCount = media.length + priorTotal;
 
@@ -141,7 +142,7 @@ export default function CompactItemRow(props: CompactItemRowProps) {
   const eqMeta = eq
     ? [
         makeModel,
-        unitCount > 1 && t('workOrders.detail.compact.systemOf', { count: unitCount }),
+        unitCount > 0 && t('workOrders.detail.compact.unitsMeta', { count: unitCount, units: getName('equipment_component', unitCount !== 1) }),
         warranty &&
           (warranty === 'covered'
             ? t('workOrders.detail.overview.warrantyCovered')
@@ -502,23 +503,14 @@ function UnitsPanel({
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const system = unitCount > 1;
   const children = eq.descendants ?? [];
-  const hidden = unitCount - 1 - children.length;
-  const model = [eq.make, eq.model].filter(Boolean).join(' ');
+  // The projection caps descendants; the rest live on the record.
+  const hidden = unitCount - children.length;
   return (
     <>
       <PanelHead
-        title={
-          system
-            ? t('workOrders.detail.compact.unitsTitle', { units: getName('equipment_component', true) })
-            : getName('equipment_component')
-        }
-        sub={
-          system
-            ? t('workOrders.detail.compact.unitsSub', { count: unitCount, name: eq.name })
-            : t('workOrders.detail.compact.standalone')
-        }
+        title={getName('equipment_component', true)}
+        sub={t('workOrders.detail.compact.unitsSub', { count: unitCount, name: eq.name })}
         action={
           <button type="button" className="card-action" onClick={() => onOpenEquipment({ id: eq.id, name: eq.name })}>
             {t('workOrders.detail.compact.fullRecord')}
@@ -526,26 +518,6 @@ function UnitsPanel({
         }
       />
       <div className="ovc-rows">
-        <button type="button" className="ovc-rowitem" onClick={() => onOpenEquipment({ id: eq.id, name: eq.name })}>
-          <EquipmentThumbnail
-            url={eq.profileImageUrl}
-            name={eq.name}
-            category={eq.equipmentCategoryName}
-            type={eq.equipmentTypeName}
-            monogram
-            sizeClass="size-9"
-            className="rounded-lg"
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[12.5px] font-semibold text-fg-strong">{eq.name}</span>
-            {model && <span className="block text-[11px] text-fg-muted">{model}</span>}
-          </span>
-          {eq.serialNumber && (
-            <span className="shrink-0 font-mono text-[11px] text-fg-muted">
-              {t('workOrders.detail.compact.serialShort', { serial: eq.serialNumber })}
-            </span>
-          )}
-        </button>
         {/* Sub-units carry name + photo only on this projection; their own
             record (the drawer) has the rest. Monogram seeds from the name. */}
         {children.map((u) => (
