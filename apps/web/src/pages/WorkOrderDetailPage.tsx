@@ -214,7 +214,8 @@ export default function WorkOrderDetailPage() {
   const handleAddEquipmentToWorkItem = (wi: WorkItemResponse) => {
     navigate(
       equipmentCreateUrl({
-        returnTo: `/work-orders/${id}?tab=items`,
+        // Back to the tab it was started from (Work items or the Overview row).
+        returnTo: tab === 'overview' ? `/work-orders/${id}` : `/work-orders/${id}?tab=items`,
         locationId: workOrder?.serviceLocationId || workOrder?.serviceLocation?.id,
         attachTo: workItemAttachToken(wi.id),
       })

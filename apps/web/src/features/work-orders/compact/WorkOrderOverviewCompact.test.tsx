@@ -227,7 +227,14 @@ describe('WorkOrderOverviewCompact', () => {
     expect(screen.getByText('2 open · 3 total')).toBeInTheDocument();
   });
 
-  it('shows only links with something behind them — Parts always', async () => {
+  it('opens an open item on its equipment profile', () => {
+    render();
+    const row = rowOf('Upstairs condenser');
+    expect(within(row).getByRole('button', { name: /^equipment$/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(within(row).getByText('System profile')).toBeInTheDocument();
+  });
+
+  it('shows each link with something behind it — Parts always; Notes, Photos and Units whenever equipment is attached', async () => {
     render();
     const row = rowOf('Upstairs condenser');
     // History waits on the equipment's job list (1 earlier job).
@@ -235,9 +242,9 @@ describe('WorkOrderOverviewCompact', () => {
     expect(within(row).getByRole('button', { name: /^equipment$/i })).toBeInTheDocument();
     expect(within(row).getByRole('button', { name: /units\s*2/i })).toBeInTheDocument();
     expect(within(row).getByRole('button', { name: /parts\s*1/i })).toBeInTheDocument();
-    // No notes and no photos on file → no links.
-    expect(within(row).queryByRole('button', { name: /notes/i })).not.toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: /photos/i })).not.toBeInTheDocument();
+    // At zero, but there so a note / photo can be added.
+    expect(within(row).getByRole('button', { name: /notes\s*0/i })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: /photos\s*0/i })).toBeInTheDocument();
 
     // No equipment needed: a quiet tile, and Parts is the only link.
     const drain = rowOf('Clear condensate drain');
@@ -250,14 +257,8 @@ describe('WorkOrderOverviewCompact', () => {
     ]);
   });
 
-  it('opens an open item on its equipment profile', () => {
-    render();
-    const row = rowOf('Upstairs condenser');
-    expect(within(row).getByRole('button', { name: /^equipment$/i })).toHaveAttribute('aria-expanded', 'true');
-    expect(within(row).getByText('System profile')).toBeInTheDocument();
-  });
-
-  it('lists only sub-units under Units, and hides the link when there are none', () => {
+  it('never lists the equipment as its own unit; with none, Units reads 0 and offers Add unit', async () => {
+    const user = userEvent.setup();
     const solo = {
       ...workOrder,
       workItems: [
@@ -266,8 +267,98 @@ describe('WorkOrderOverviewCompact', () => {
     } as unknown as WorkOrder;
     render({ workOrder: solo });
     const row = rowOf('Upstairs condenser');
-    expect(within(row).queryByRole('button', { name: /units/i })).not.toBeInTheDocument();
     expect(within(row).queryByText(/· \d+ units?/)).not.toBeInTheDocument();
+    await user.click(within(row).getByRole('button', { name: /units\s*0/i }));
+    expect(within(row).getByText('No units yet.')).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: '+ Add Unit' })).toBeInTheDocument();
+  });
+
+  it('hides Units on read-only equipment that has none', () => {
+    const solo = {
+      ...workOrder,
+      workItems: [
+        { ...workOrder.workItems![0], equipment: { ...workOrder.workItems![0].equipment!, descendantCount: 0, descendants: [] } },
+      ],
+    } as unknown as WorkOrder;
+    render({ workOrder: solo, readOnly: true });
+    expect(within(rowOf('Upstairs condenser')).queryByRole('button', { name: /units/i })).not.toBeInTheDocument();
+  });
+
+  it('adds a unit under the equipment: kind + serial required', async () => {
+    const user = userEvent.setup();
+    const base = vi.mocked(apiClient.get).getMockImplementation()!;
+    vi.mocked(apiClient.get).mockImplementation((url: string, ...rest) => {
+      if (url === '/equipment/eq-1') return Promise.resolve({ data: { id: 'eq-1', name: 'Upstairs condenser', equipmentTypeId: 'type-hvac' } });
+      if (url === '/equipment/config/categories') {
+        return Promise.resolve({ data: [{ id: 'cat-ah', equipmentTypeId: 'type-hvac', name: 'Air handler' }] });
+      }
+      return base(url, ...rest);
+    });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'u-new' } });
+    render({ workOrder: { ...workOrder, serviceLocationId: 'loc-1' } as WorkOrder });
+    const row = rowOf('Upstairs condenser');
+    await user.click(within(row).getByRole('button', { name: /units\s*2/i }));
+    await user.click(within(row).getByRole('button', { name: '+ Add Unit' }));
+
+    const add = within(row).getByRole('button', { name: 'Add Unit' });
+    expect(add).toBeDisabled();
+    await user.selectOptions(await within(row).findByRole('combobox', { name: 'Unit type' }), 'cat-ah');
+    expect(add).toBeDisabled(); // still needs a serial
+    await user.type(within(row).getByRole('textbox', { name: 'Serial' }), 'AH-778');
+    await user.click(add);
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/equipment',
+      expect.objectContaining({
+        name: 'Air handler',
+        parentId: 'eq-1',
+        equipmentCategoryId: 'cat-ah',
+        equipmentTypeId: 'type-hvac',
+        serialNumber: 'AH-778',
+        serviceLocationId: 'loc-1',
+      }),
+    );
+  });
+
+  it('adds an equipment note tagged with this job', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'n-1' } });
+    render();
+    const row = rowOf('Upstairs condenser');
+    await user.click(within(row).getByRole('button', { name: /notes\s*0/i }));
+    expect(await within(row).findByText(/no notes on this equipment yet/i)).toBeInTheDocument();
+    await user.click(within(row).getByRole('button', { name: 'Add Note' }));
+    await user.type(within(row).getByRole('textbox', { name: 'Note' }), 'Pad is sinking');
+    await user.click(within(row).getByRole('button', { name: 'Save' }));
+    expect(apiClient.post).toHaveBeenCalledWith('/equipment/eq-1/notes', { body: 'Pad is sinking', workOrderId: 'wo-1' });
+  });
+
+  it('keeps finished items in full under a Done label, with the attach tile when equipment is still needed', () => {
+    render();
+    expect(screen.getByText('Done · 1')).toBeInTheDocument();
+    expect(screen.getByText('Replace thermostat')).toBeInTheDocument();
+    expect(within(rowOf('Replace thermostat')).getByRole('button', { name: /attach equipment/i })).toBeInTheDocument();
+  });
+
+  it('offers no attach tile or Change link when read-only', () => {
+    render({ readOnly: true });
+    expect(within(rowOf('Replace thermostat')).queryByRole('button', { name: /attach/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
+  });
+
+  it('opens the equipment picker under the row header from the tile or Change', async () => {
+    const user = userEvent.setup();
+    render();
+    const done = rowOf('Replace thermostat');
+    await user.click(within(done).getByRole('button', { name: /attach equipment/i }));
+    expect(done.querySelector('.ovc-panel')).toBeNull();
+    expect(within(done).getByRole('button', { name: /attach equipment/i })).toHaveAttribute('aria-expanded', 'true');
+
+    const row = rowOf('Upstairs condenser');
+    const change = within(row).getByRole('button', { name: 'Change' });
+    await user.click(change);
+    expect(change).toHaveAttribute('aria-expanded', 'true');
+    // It already has findings, so swapping warns first.
+    expect(within(row).getByText(/findings move to this item only/i)).toBeInTheDocument();
   });
 
   it('expands a panel in place and collapses it from the same link', async () => {
@@ -291,22 +382,6 @@ describe('WorkOrderOverviewCompact', () => {
     render();
     await user.click(within(rowOf('Upstairs condenser')).getByRole('button', { name: 'Open →' }));
     expect(handlers.onOpenWorkItem).toHaveBeenCalledWith('wi-1');
-  });
-
-  it('keeps finished items behind the Done bar, with the attach tile when equipment is still needed', async () => {
-    const user = userEvent.setup();
-    render();
-    expect(screen.queryByText('Replace thermostat')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /done · 1/i }));
-    expect(screen.getByText('Replace thermostat')).toBeInTheDocument();
-    expect(within(rowOf('Replace thermostat')).getByRole('button', { name: /attach equipment/i })).toBeInTheDocument();
-  });
-
-  it('offers no attach tile when read-only', async () => {
-    const user = userEvent.setup();
-    render({ readOnly: true });
-    await user.click(screen.getByRole('button', { name: /done · 1/i }));
-    expect(within(rowOf('Replace thermostat')).queryByRole('button', { name: /attach/i })).not.toBeInTheDocument();
   });
 
   it('makes the next scheduled visit the Dispatch hero, with lifecycle stamps and the other visit below', async () => {
@@ -396,16 +471,6 @@ describe('WorkOrderOverviewCompact', () => {
     expect(within(row).getByText(/· edited/)).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: 'Edit' }));
     expect(within(row).getByRole('textbox', { name: 'Findings' })).toHaveValue('Run capacitor failed');
-  });
-
-  it('attaches equipment from a picker under the row header', async () => {
-    const user = userEvent.setup();
-    render();
-    await user.click(screen.getByRole('button', { name: /done · 1/i }));
-    const row = rowOf('Replace thermostat');
-    await user.click(within(row).getByRole('button', { name: /attach equipment/i }));
-    expect(row.querySelector('.ovc-panel')).toBeNull();
-    expect(within(row).getByRole('button', { name: /attach equipment/i })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('renders nothing writable when read-only', () => {
