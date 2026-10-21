@@ -5400,5 +5400,81 @@
     "errorTitle": "Couldn’t load your schedule",
     "today": "Today",
     "tomorrow": "Tomorrow"
+  },
+  "myDay": {
+    "actions": {
+      "arrived": "Arrived on site",
+      "call": "Call {{name}}",
+      "callDispatch": "Call dispatch",
+      "completeVisit": "Complete visit",
+      "navigate": "Navigate",
+      "open": "Open {{id}}",
+      "startDriving": "Start driving"
+    },
+    "dayDone": {
+      "noShows": "{{count}} no-show",
+      "onSite": "{{duration}} on site",
+      "summary": "{{done}} of {{total}} stops completed",
+      "title": "Day complete"
+    },
+    "errors": {
+      "conflict": "This visit just changed — refreshed with the latest.",
+      "load": "Couldn’t load your day",
+      "update": "Couldn’t update the visit"
+    },
+    "focus": {
+      "aria": "Current stop",
+      "enRoute": "En route",
+      "estimate": "{{estimate}} on site",
+      "fromDispatch": "From dispatch",
+      "next": "Next",
+      "onSiteSince": "On site · since {{time}}",
+      "upNext": "Up next"
+    },
+    "nav": {
+      "field": "Field",
+      "myWorkOrders": "My {{entities, lowercase}}"
+    },
+    "noStops": {
+      "description": "Nothing is on your route yet. Work shows up here as soon as it’s released to you.",
+      "title": "No stops today"
+    },
+    "progress": {
+      "aria": "Day progress",
+      "dayComplete": "day complete",
+      "done_one": "{{done}} of {{count}} stop done",
+      "done_other": "{{done}} of {{count}} stops done",
+      "enRouteTo": "en route to {{place}}",
+      "nextAt": "next at {{time}}",
+      "onSiteAt": "on site at {{place}}"
+    },
+    "route": {
+      "completed_one": "{{count}} completed stop · {{from}} – {{to}}",
+      "completed_other": "{{count}} completed stops · {{from}} – {{to}}",
+      "note": "Note",
+      "noShow": "no-show",
+      "onSite": "On site",
+      "stops_one": "{{count}} stop",
+      "stops_other": "{{count}} stops",
+      "title": "Today’s route"
+    },
+    "subtitle_one": "{{date}} · {{count}} stop · {{first}} – {{last}}",
+    "subtitle_other": "{{date}} · {{count}} stops · {{first}} – {{last}}",
+    "subtitleEmpty": "{{date}} · no stops scheduled",
+    "title": "My day",
+    "tomorrow": {
+      "first": "First at {{time}} — {{place}}",
+      "none": "Nothing scheduled yet",
+      "title_one": "Tomorrow · {{count}} stop",
+      "title_other": "Tomorrow · {{count}} stops",
+      "titleEmpty": "Tomorrow"
+    },
+    "unfinished": {
+      "awaitingParts": "Awaiting parts",
+      "quoteAwaiting": "{{quote}} awaiting customer",
+      "sent": "Sent {{date}}",
+      "title": "Unfinished",
+      "view": "View"
+    }
   }
 }

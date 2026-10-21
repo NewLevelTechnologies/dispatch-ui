@@ -1,0 +1,193 @@
+/* ───────────────────────────────────────────────────────────────────
+   My day — the technician landing. Surface-specific CSS.
+
+   Ported from claude_designs/Technician My Day.html (`.md-*`). Only layout
+   and the bespoke marks live here (progress strip, focus ring, route rail,
+   carry-over rows); cards, pills, tags and buttons are the shared
+   primitives. Phone-first: the base rules are the 375–430 px layout.
+   `--fg-dim` is chrome-only — no body copy here uses it.
+   ─────────────────────────────────────────────────────────────────── */
+
+.md-wrap { max-width: 1040px; }
+.md-head { margin-bottom: 12px; }
+.md-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--fg-muted); }
+
+.md-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.md-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+@media (min-width: 900px) {
+  .md-grid { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+}
+
+/* ── Progress strip ─────────────────────────────────────────────── */
+.md-progress { margin-bottom: 12px; }
+.md-progress-bar { display: flex; gap: 3px; height: 6px; }
+.md-seg { flex: 1; border-radius: 3px; background: var(--bg-active); }
+.md-seg.completed { background: var(--success-500); }
+.md-seg.noshow { background: var(--warning-500); }
+.md-seg.cancelled { background: var(--border-strong); }
+.md-seg.enroute, .md-seg.inprogress { background: var(--violet-500); }
+.md-progress-txt { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; font-size: 11.5px; color: var(--fg-muted); }
+
+/* ── Focus card ─────────────────────────────────────────────────── */
+.md-focus { padding: 14px; }
+@media (min-width: 900px) { .md-focus { padding: 16px; } }
+.md-focus.live {
+  border-color: color-mix(in oklch, var(--violet-500) 40%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--violet-500) 10%, transparent), var(--shadow-sm);
+}
+.md-focus-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.md-focus-tags { display: flex; align-items: center; gap: 6px; }
+.md-focus-when { display: flex; align-items: baseline; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.md-focus-time { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--fg-strong); }
+.md-focus-dash { color: var(--fg-muted); font-weight: 400; }
+.md-focus-est { font-size: 12px; color: var(--fg-muted); }
+.md-focus-title { margin: 10px 0 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; color: var(--fg-strong); text-wrap: pretty; }
+.md-focus-cust { margin-top: 3px; font-size: 13px; color: var(--fg); }
+.md-dot-sep { margin: 0 6px; color: var(--fg-muted); }
+.md-focus-addr, .md-focus-meta { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 12.5px; color: var(--fg); }
+.md-focus-meta { margin-top: 6px; font-size: 12px; color: var(--fg-muted); }
+
+.md-note { margin-top: 12px; padding: 10px 12px; border-radius: var(--r-md); background: var(--bg-elev-2); border: 1px solid var(--border-soft); }
+.md-note-k { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-muted); }
+.md-note-v { margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--fg); text-wrap: pretty; white-space: pre-line; }
+
+.md-actions { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.md-btn-lg { width: 100%; min-height: 44px; font-size: 14px; font-weight: 600; justify-content: center; }
+.md-btn-md { min-height: 40px; font-size: 12.5px; justify-content: center; padding-inline: 8px; overflow: hidden; white-space: nowrap; }
+.md-actions-row { display: flex; gap: 8px; }
+.md-actions-row > * { flex: 1 1 0; min-width: 0; }
+/* Under 400 px three labels don't fit side by side: 2-up, then the third
+   (Open WO) takes the full row. */
+@media (max-width: 399px) {
+  .md-actions-row { flex-wrap: wrap; }
+  .md-actions-row > * { flex-basis: calc(50% - 4px); }
+  .md-actions-row > :nth-child(3) { flex-basis: 100%; }
+}
+
+/* ── Today's route ──────────────────────────────────────────────── */
+.md-route { display: flex; flex-direction: column; }
+.md-collapse {
+  width: 100%;
+  min-height: 44px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-muted);
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+.md-collapse:hover { color: var(--fg-strong); }
+.md-collapse-chev { transition: transform 0.15s; }
+.md-collapse-chev.open { transform: rotate(90deg); }
+
+.md-stop {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px 20px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0 8px;
+  min-height: 56px;
+  padding: 12px 12px 12px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  color: inherit;
+  text-decoration: none;
+}
+@media (min-width: 400px) {
+  .md-stop { grid-template-columns: 58px 22px minmax(0, 1fr) auto; padding-left: 14px; }
+}
+.md-stop:last-child { border-bottom: none; }
+.md-stop:hover { background: var(--bg-hover); }
+.md-stop.current { background: color-mix(in oklch, var(--violet-500) 5%, var(--bg-elev)); }
+
+.md-stop-time { display: flex; flex-direction: column; gap: 2px; padding-top: 1px; font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+.md-stop-est { font-size: 10.5px; font-weight: 400; color: var(--fg-muted); white-space: nowrap; }
+.md-stop.past .md-stop-time,
+.md-stop.past .md-stop-title { color: var(--fg-muted); font-weight: 500; }
+
+.md-rail { position: relative; display: flex; justify-content: center; align-self: stretch; }
+.md-rail::before { content: ''; position: absolute; top: 18px; bottom: -14px; width: 2px; background: var(--border-soft); }
+.md-stop:last-child .md-rail::before { display: none; }
+.md-rail-dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  border: 2px solid var(--info-500);
+  color: #fff;
+}
+.md-rail-dot.completed { background: var(--success-500); border-color: var(--success-500); }
+.md-rail-dot.noshow { background: var(--warning-500); border-color: var(--warning-500); }
+.md-rail-dot.cancelled { background: var(--border-strong); border-color: var(--border-strong); }
+.md-rail-dot.enroute,
+.md-rail-dot.inprogress {
+  background: var(--violet-500);
+  border-color: var(--violet-500);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--violet-500) 22%, transparent);
+}
+
+.md-stop-body { min-width: 0; }
+.md-stop-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--fg-strong); }
+.md-now { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--violet-500); }
+.md-stop-sub { margin-top: 2px; font-size: 12px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-stop-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 6px; }
+.md-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; background: var(--bg-active); color: var(--fg); }
+.md-stop-right { align-self: center; display: grid; place-items: center; min-width: 24px; color: var(--fg-muted); }
+.md-stop.past .md-stop-right { color: var(--success-500); }
+
+/* ── Unfinished ─────────────────────────────────────────────────── */
+.md-carry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.md-carry:last-child { border-bottom: none; }
+.md-carry-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
+.md-carry-title { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--fg-strong); }
+.md-carry-meta { margin-top: 2px; font-size: 11.5px; color: var(--fg-muted); }
+
+/* ── Tomorrow ───────────────────────────────────────────────────── */
+.md-tomorrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-lg);
+  color: inherit;
+  text-decoration: none;
+}
+.md-tomorrow:hover { background: var(--bg-hover); }
+.md-tomorrow-t { font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+.md-tomorrow-s { margin-top: 1px; font-size: 11.5px; color: var(--fg-muted); }
+
+/* ── Day complete ───────────────────────────────────────────────── */
+.md-quiet {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in oklch, var(--success-500) 28%, var(--border));
+  background: color-mix(in oklch, var(--success-500) 7%, transparent);
+  border-radius: var(--r-lg);
+}
+.md-quiet-check { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; background: var(--success-500); color: #fff; }
+.md-quiet-t { font-size: 13.5px; font-weight: 600; color: var(--fg-strong); }
+.md-quiet-s { margin-top: 1px; font-size: 12px; color: var(--fg-muted); }
+
+/* Dark: the violet ring needs more presence against the darker surface. */
+.theme-dark .md-focus.live {
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--violet-500) 18%, transparent), var(--shadow-sm);
+}
