@@ -11,7 +11,7 @@
 // Location, notes card, activity teaser and the trip strip are intentionally
 // absent: gate / access / on-site contact ride in the page header, notes open
 // from the Work items head, activity has its own tab, scheduling is the board's.
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import {
@@ -228,7 +228,6 @@ function WorkItemsBoard(
   const { workOrder, location, statuses, visits } = props;
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const [showDone, setShowDone] = useState(false);
 
   const notes = useEntityNotes({
     entityType: 'work_order',
@@ -302,14 +301,11 @@ function WorkItemsBoard(
           </div>
         )}
         {open.map(row)}
+        {/* Done items stay in full (muted) under a label — nothing hides. */}
         {done.length > 0 && (
-          <button type="button" className="ovc-donebar" aria-expanded={showDone} onClick={() => setShowDone((v) => !v)}>
-            <span>{t('workOrders.detail.compact.doneCount', { count: done.length })}</span>
-            <span className="flex-1" />
-            <span>{showDone ? t('workOrders.detail.compact.hide') : t('workOrders.detail.compact.show')}</span>
-          </button>
+          <div className="ovc-donebar">{t('workOrders.detail.compact.doneCount', { count: done.length })}</div>
         )}
-        {showDone && done.map(row)}
+        {done.map(row)}
       </CardBody>
       {notes.overlays}
     </Card>

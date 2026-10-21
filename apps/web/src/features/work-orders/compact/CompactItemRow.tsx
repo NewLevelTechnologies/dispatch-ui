@@ -5,11 +5,12 @@
 // (the Work items tab) and the records a panel links to.
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { PlusIcon, TruckIcon, WrenchScrewdriverIcon } from '@heroicons/react/16/solid';
 import {
   equipmentApi,
+  equipmentCategoriesApi,
   equipmentFilesApi,
   equipmentNotesApi,
   workOrderApi,
@@ -35,6 +36,9 @@ import WorkItemPrimaryButton from '../../../components/work-items/WorkItemPrimar
 import { useWorkItemActions } from '../../../components/work-items/useWorkItemActions';
 import WorkItemStatusPill from '../../../components/WorkItemStatusPill';
 import InlineComposer from '../../../components/InlineComposer';
+import { Button } from '../../../components/catalyst/button';
+import { Input } from '../../../components/catalyst/input';
+import { Select } from '../../../components/catalyst/select';
 import WorkItemEquipmentPicker from '../../../components/work-items/WorkItemEquipmentPicker';
 import { ageInYears, localDate, shortDate } from '../../../components/work-items/format';
 import { warrantyState } from '../overviewModel';
@@ -131,10 +135,15 @@ export default function CompactItemRow(props: CompactItemRowProps) {
   // Parts always shows (it's where parts get added); the rest hide at zero.
   const links: [Panel, string, number | undefined][] = [];
   if (eq) links.push(['equipment', equipmentWord, undefined]);
-  if (eq && unitCount > 0) links.push(['units', getName('equipment_component', true), unitCount]);
+  // Units shows when there are some, or when one can be added here (a
+  // top-level unit, writable job) — adding the first unit starts there.
+  const canAddUnit = !!eq && !readOnly && !eq.parentName;
+  if (eq && (unitCount > 0 || canAddUnit)) links.push(['units', getName('equipment_component', true), unitCount]);
   links.push(['parts', t('workOrders.detail.compact.parts'), props.purchaseOrders.length]);
-  if (eq && noteCount > 0) links.push(['notes', t('workOrders.workItems.notes'), noteCount]);
-  if (photoCount > 0) links.push(['photos', t('workOrders.workItems.photos'), photoCount]);
+  // With equipment attached, Notes and Photos always show — even at 0 — so a
+  // note or a photo can be added from here.
+  if (eq) links.push(['notes', t('workOrders.workItems.notes'), noteCount]);
+  if (eq || photoCount > 0) links.push(['photos', t('workOrders.workItems.photos'), photoCount]);
   if (eq && historyCount > 0) links.push(['history', t('workOrders.detail.compact.history'), historyCount]);
 
   const makeModel = eq ? [eq.make, eq.model].filter(Boolean).join(' ') : '';
@@ -214,6 +223,18 @@ export default function CompactItemRow(props: CompactItemRowProps) {
                 </span>
               </span>
             )}
+            {/* Change the unit (or attach one to a no-equipment item) without
+                leaving: same picker as the Attach tile. Shown on row hover. */}
+            {!readOnly && !done && (eq || wi.equipmentNeeded === false) && (
+              <button
+                type="button"
+                className="card-action ovc-eqchange"
+                aria-expanded={attaching}
+                onClick={() => setAttaching((v) => !v)}
+              >
+                {eq ? t('workOrders.workItems.change') : t('workOrders.workItems.attach')}
+              </button>
+            )}
             <span className="flex-1" />
             <span className="flex shrink-0 items-center gap-2">
               <WorkItemStatusPill
@@ -237,9 +258,13 @@ export default function CompactItemRow(props: CompactItemRowProps) {
               )}
             </span>
           </div>
-          {attaching && !eq && !readOnly && (
+          {attaching && !readOnly && (
             <div className="mt-2 max-w-[420px]">
-              <AttachPicker {...props} onDone={() => setAttaching(false)} />
+              <AttachPicker
+                {...props}
+                hasRecords={!!findings || media.length > 0}
+                onDone={() => setAttaching(false)}
+              />
             </div>
           )}
           {eq && <div className="ovc-complaint">{wi.description}</div>}
@@ -343,7 +368,13 @@ export default function CompactItemRow(props: CompactItemRowProps) {
             />
           )}
           {panel === 'units' && eq && (
-            <UnitsPanel eq={eq} unitCount={unitCount} onOpenEquipment={props.onOpenEquipment} />
+            <UnitsPanel
+              eq={eq}
+              unitCount={unitCount}
+              serviceLocationId={props.serviceLocationId}
+              canAdd={canAddUnit}
+              onOpenEquipment={props.onOpenEquipment}
+            />
           )}
           {panel === 'parts' && (
             <PartsSection
@@ -356,7 +387,9 @@ export default function CompactItemRow(props: CompactItemRowProps) {
               className=""
             />
           )}
-          {panel === 'notes' && eq && <EquipmentNotesPanel equipmentId={eq.id} workOrderId={workOrderId} />}
+          {panel === 'notes' && eq && (
+            <EquipmentNotesPanel equipmentId={eq.id} workOrderId={workOrderId} canAdd={!readOnly} />
+          )}
           {panel === 'photos' && (
             <PhotosPanel
               workOrderId={workOrderId}
@@ -386,8 +419,10 @@ function PanelHead({ title, sub, action }: { title: string; sub?: string; action
   );
 }
 
-function AttachPicker(props: CompactItemRowProps & { onDone: () => void }) {
+function AttachPicker(props: CompactItemRowProps & { hasRecords: boolean; onDone: () => void }) {
+  const { t } = useTranslation();
   const { wi } = props;
+  const attached = wi.equipment;
   const [busy, setBusy] = useState(false);
   const run = async (fn: () => Promise<void> | void) => {
     setBusy(true);
@@ -401,10 +436,16 @@ function AttachPicker(props: CompactItemRowProps & { onDone: () => void }) {
   return (
     <WorkItemEquipmentPicker
       serviceLocationId={props.serviceLocationId}
-      value={null}
+      value={attached?.id ?? null}
       busy={busy}
-      warning={null}
-      onPick={(id) => void run(() => props.onAttachEquipment(wi, id))}
+      // Swapping the unit on an item that already has findings/photos re-files
+      // them against the new one — say so first (the Work items tab's rule).
+      warning={
+        attached && props.hasRecords
+          ? t('workOrders.workItems.changeEquipmentWarning', { name: attached.name })
+          : null
+      }
+      onPick={(id) => (id === attached?.id ? props.onDone() : void run(() => props.onAttachEquipment(wi, id)))}
       onCancel={props.onDone}
       onAddNew={props.onAddEquipment ? () => props.onAddEquipment?.(wi) : undefined}
       onNotNeeded={() => void run(() => props.onSetEquipmentNeeded(wi, false))}
@@ -495,49 +536,194 @@ function EquipmentPanel({
 function UnitsPanel({
   eq,
   unitCount,
+  serviceLocationId,
+  canAdd,
   onOpenEquipment,
 }: {
   eq: NonNullable<WorkItemResponse['equipment']>;
+  /** Sub-units only — the equipment itself is never one of its units. */
   unitCount: number;
+  serviceLocationId?: string;
+  /** Top-level unit on a writable job (units are one level deep). */
+  canAdd: boolean;
   onOpenEquipment: (equipment: { id: string; name: string }) => void;
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const [adding, setAdding] = useState(false);
   const children = eq.descendants ?? [];
   // The projection caps descendants; the rest live on the record.
-  const hidden = unitCount - children.length;
+  const hidden = Math.max(0, unitCount - children.length);
+  const unitWord = getName('equipment_component');
   return (
     <>
       <PanelHead
         title={getName('equipment_component', true)}
-        sub={t('workOrders.detail.compact.unitsSub', { count: unitCount, name: eq.name })}
+        sub={unitCount > 0 ? t('workOrders.detail.compact.unitsSub', { count: unitCount, name: eq.name }) : undefined}
         action={
-          <button type="button" className="card-action" onClick={() => onOpenEquipment({ id: eq.id, name: eq.name })}>
-            {t('workOrders.detail.compact.fullRecord')}
-          </button>
+          <>
+            {canAdd && !adding && serviceLocationId && (
+              <button type="button" className="card-action" onClick={() => setAdding(true)}>
+                {`+ ${t('common.actions.add', { entity: unitWord })}`}
+              </button>
+            )}
+            <button type="button" className="card-action" onClick={() => onOpenEquipment({ id: eq.id, name: eq.name })}>
+              {t('workOrders.detail.compact.fullRecord')}
+            </button>
+          </>
         }
       />
-      <div className="ovc-rows">
-        {/* Sub-units carry name + photo only on this projection; their own
-            record (the drawer) has the rest. Monogram seeds from the name. */}
-        {children.map((u) => (
-          <button key={u.id} type="button" className="ovc-rowitem" onClick={() => onOpenEquipment({ id: u.id, name: u.name })}>
-            <EquipmentThumbnail url={u.profileImageUrl} name={u.name} monogram sizeClass="size-9" className="rounded-lg" />
-            <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-fg-strong">{u.name}</span>
-          </button>
-        ))}
-        {hidden > 0 && (
-          <button type="button" className="ovc-rowitem" onClick={() => onOpenEquipment({ id: eq.id, name: eq.name })}>
-            <span className="text-[11.5px] text-fg-muted">{t('workOrders.detail.compact.moreUnits', { count: hidden })}</span>
-          </button>
-        )}
-      </div>
+      {adding && serviceLocationId && (
+        <AddUnitForm parent={eq} serviceLocationId={serviceLocationId} onDone={() => setAdding(false)} />
+      )}
+      {unitCount === 0 && !adding && (
+        <div className="text-[12px] text-fg-muted">
+          {t('workOrders.detail.compact.noUnits', { units: getName('equipment_component', true).toLowerCase() })}
+        </div>
+      )}
+      {unitCount > 0 && (
+        <div className="ovc-rows">
+          {/* Sub-units carry name + photo only on this projection; their own
+              record (the drawer) has the rest. Monogram seeds from the name. */}
+          {children.map((u) => (
+            <button key={u.id} type="button" className="ovc-rowitem" onClick={() => onOpenEquipment({ id: u.id, name: u.name })}>
+              <EquipmentThumbnail url={u.profileImageUrl} name={u.name} monogram sizeClass="size-9" className="rounded-lg" />
+              <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-fg-strong">{u.name}</span>
+            </button>
+          ))}
+          {hidden > 0 && (
+            <button type="button" className="ovc-rowitem" onClick={() => onOpenEquipment({ id: eq.id, name: eq.name })}>
+              <span className="text-[11.5px] text-fg-muted">{t('workOrders.detail.compact.moreUnits', { count: hidden })}</span>
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }
 
-function EquipmentNotesPanel({ equipmentId, workOrderId }: { equipmentId: string; workOrderId: string }) {
+/**
+ * Quick add of a sub-unit on site: its kind (a category under the parent's
+ * equipment type), make, model and serial. Kind + serial are required — the
+ * serial is what makes a unit findable later. The rest (photos, nameplate,
+ * warranty) is on the unit's own record once it exists.
+ */
+function AddUnitForm({
+  parent,
+  serviceLocationId,
+  onDone,
+}: {
+  parent: NonNullable<WorkItemResponse['equipment']>;
+  serviceLocationId: string;
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const queryClient = useQueryClient();
+  const [categoryId, setCategoryId] = useState('');
+  const [make, setMake] = useState('');
+  const [model, setModel] = useState('');
+  const [serial, setSerial] = useState('');
+
+  // The parent's type scopes the kinds offered (same keys as the equipment form).
+  const { data: parentDetail } = useQuery({
+    queryKey: ['equipment-detail', parent.id],
+    queryFn: () => equipmentApi.getById(parent.id),
+  });
+  const typeId = parentDetail?.equipmentTypeId ?? undefined;
+  const { data: categories = [] } = useQuery({
+    queryKey: ['equipment-categories', typeId ?? ''],
+    queryFn: () => equipmentCategoriesApi.getAll(typeId),
+    enabled: !!parentDetail,
+  });
+  const category = categories.find((c) => c.id === categoryId);
+
+  const save = useMutation({
+    mutationFn: () =>
+      equipmentApi.create({
+        name: category!.name,
+        serviceLocationId,
+        parentId: parent.id,
+        equipmentTypeId: category!.equipmentTypeId,
+        equipmentCategoryId: category!.id,
+        make: make.trim() || null,
+        model: model.trim() || null,
+        serialNumber: serial.trim(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-detail', parent.id] });
+      onDone();
+    },
+    onError: (err) =>
+      showError(
+        t('common.form.errorCreate', { entity: getName('equipment_component') }),
+        extractApiError(err) ?? undefined,
+      ),
+  });
+
+  const canSave = !!category && serial.trim().length > 0 && !save.isPending;
+
+  return (
+    <form
+      className="mb-2.5 rounded-[var(--r-sm)] border border-border-soft bg-bg-elev p-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (canSave) save.mutate();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          onDone();
+        }
+      }}
+    >
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-4">
+        <Select
+          size="xs"
+          autoFocus
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          aria-label={t('workOrders.detail.compact.unitKind', { unit: getName('equipment_component') })}
+        >
+          <option value="">{t('workOrders.detail.compact.unitKindPlaceholder', { unit: getName('equipment_component') })}</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+        <Input size="xs" value={make} onChange={(e) => setMake(e.target.value)} placeholder={t('workOrders.detail.compact.make')} aria-label={t('workOrders.detail.compact.make')} />
+        <Input size="xs" value={model} onChange={(e) => setModel(e.target.value)} placeholder={t('workOrders.workItems.facts.model')} aria-label={t('workOrders.workItems.facts.model')} />
+        <Input size="xs" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder={t('workOrders.workItems.facts.serial')} aria-label={t('workOrders.workItems.facts.serial')} />
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <span className="text-[11px] text-fg-muted">{t('workOrders.detail.compact.unitPhotoLater')}</span>
+        <span className="flex-1" />
+        <Button plain size="xs" onClick={onDone} disabled={save.isPending}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit" color="accent" size="xs" disabled={!canSave}>
+          {save.isPending ? t('common.saving') : t('common.actions.add', { entity: getName('equipment_component') })}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function EquipmentNotesPanel({
+  equipmentId,
+  workOrderId,
+  canAdd,
+}: {
+  equipmentId: string;
+  workOrderId: string;
+  canAdd: boolean;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [writing, setWriting] = useState(false);
   const { data: notes = [], isSuccess } = useQuery({
     queryKey: ['equipment-notes', equipmentId],
     queryFn: () => equipmentNotesApi.list(equipmentId),
@@ -552,8 +738,39 @@ function EquipmentNotesPanel({ equipmentId, workOrderId }: { equipmentId: string
       <PanelHead
         title={t('workOrders.detail.compact.notesTitle')}
         sub={t('workOrders.detail.compact.notesSub')}
+        action={
+          canAdd &&
+          !writing && (
+            <button type="button" className="card-action" onClick={() => setWriting(true)}>
+              {t('workOrders.detail.addNote')}
+            </button>
+          )
+        }
       />
-      {isSuccess && ordered.length === 0 && (
+      {writing && (
+        <div className="mb-2.5">
+          <InlineComposer
+            rows={2}
+            placeholder={t('notes.addPlaceholder')}
+            ariaLabel={t('notes.bodyLabel')}
+            onCancel={() => setWriting(false)}
+            onSave={async (body) => {
+              try {
+                // Tagged with this job, so it reads "· WO-…" in the thread later.
+                await equipmentNotesApi.create(equipmentId, { body, workOrderId });
+              } catch (err) {
+                showError(t('workOrders.detail.compact.noteSaveFailed'), extractApiError(err) ?? undefined);
+                throw err;
+              }
+              queryClient.invalidateQueries({ queryKey: ['equipment-notes', equipmentId] });
+              queryClient.invalidateQueries({ queryKey: ['equipment-detail', equipmentId] });
+              queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+              setWriting(false);
+            }}
+          />
+        </div>
+      )}
+      {isSuccess && ordered.length === 0 && !writing && (
         <div className="text-[12px] text-fg-muted">
           {t('workOrders.detail.compact.noNotes')}
         </div>

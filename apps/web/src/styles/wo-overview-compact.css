@@ -273,12 +273,6 @@ button.ovc-rowitem:hover { background: var(--bg-hover); }
 .ovc-panel .wit-parts { background: var(--bg-elev); }
 
 .ovc-donebar {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  display: flex;
-  gap: 8px;
-  width: 100%;
   padding: 8px 14px;
   font-size: 10.5px;
   font-weight: 600;
@@ -287,9 +281,8 @@ button.ovc-rowitem:hover { background: var(--bg-hover); }
   color: var(--fg-muted);
   background: var(--bg-elev-2);
   border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
 }
-.ovc-donebar:hover { color: var(--fg-strong); }
-.ovc-donebar:focus-visible { outline: 2px solid var(--accent-500); outline-offset: -2px; }
 
 /* Rail — Dispatch hero. */
 .ovc-hero {
@@ -400,3 +393,12 @@ button.ovc-rowitem:hover { background: var(--bg-hover); }
 }
 .ovc-dlrow:hover { background: var(--bg-hover); }
 .ovc-dlrow:focus-visible { outline: 2px solid var(--accent-500); outline-offset: -2px; }
+
+/* Change / Attach equipment beside the name: on row hover and keyboard focus. */
+.ovc-eqchange { opacity: 0; }
+.ovc-item:hover .ovc-eqchange,
+.ovc-eqchange:focus-visible,
+.ovc-eqchange[aria-expanded='true'] { opacity: 1; }
+@media (hover: none) {
+  .ovc-eqchange { opacity: 1; }
+}
