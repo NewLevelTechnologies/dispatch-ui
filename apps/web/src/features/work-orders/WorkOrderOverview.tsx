@@ -41,6 +41,7 @@ import {
   type ProgressCategory,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { withWorkOrderBack } from '../../lib/backContext';
 import { Card } from '../../components/catalyst/card';
 import { CardTitle, CardLink } from '../../components/customer-detail/shared';
 import { Pill, Tag } from '../../components/ui/Pill';
@@ -434,9 +435,14 @@ function TripCell({
 function LocationCard({
   location,
   fallbackContact,
+  workOrderId,
+  workOrderNumber,
 }: {
   location: ServiceLocationDetailDto;
   fallbackContact?: { name?: string; phone?: string; email?: string };
+  /** For the Location page's back-link to this job. */
+  workOrderId: string;
+  workOrderNumber?: string | null;
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -454,7 +460,7 @@ function LocationCard({
     <Card
       title={<CardTitle icon={<MapPinIcon className="size-3.5" />}>{getName('service_location')}</CardTitle>}
       action={
-        <CardLink to={`/service-locations/${location.id}`}>
+        <CardLink to={withWorkOrderBack(`/service-locations/${location.id}`, workOrderId, workOrderNumber)}>
           {t('workOrders.detail.overview.openLocation', { entity: getName('service_location') })}
         </CardLink>
       }
@@ -742,7 +748,14 @@ export default function WorkOrderOverview({
         </div>
 
         <div className="flex flex-col gap-3">
-          {location && <LocationCard location={location} fallbackContact={customerContact} />}
+          {location && (
+            <LocationCard
+              location={location}
+              fallbackContact={customerContact}
+              workOrderId={workOrder.id}
+              workOrderNumber={workOrder.workOrderNumber}
+            />
+          )}
           <MoneyCard
             workOrder={workOrder}
             summary={financialSummary}

@@ -401,8 +401,10 @@ describe('WorkOrderDetailPage', () => {
     mockApiResponses();
     renderPage();
     const title = await screen.findByRole('link', { name: "Paul's House" });
-    expect(title).toHaveAttribute('href', '/service-locations/loc-1');
-    expect(screen.getByRole('link', { name: 'View location →' })).toHaveAttribute('href', '/service-locations/loc-1');
+    // Carries the back-context so the Location page returns to this job.
+    const href = '/service-locations/loc-1?from=work-order&woId=wo-1&woNo=WO-00010';
+    expect(title).toHaveAttribute('href', href);
+    expect(screen.getByRole('link', { name: 'View location →' })).toHaveAttribute('href', href);
   });
 
   it('renders the premise tag from the service-location record', async () => {

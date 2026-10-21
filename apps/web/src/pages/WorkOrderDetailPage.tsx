@@ -27,7 +27,7 @@ import {
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import WorkOrderActivityTab from '../features/work-orders/WorkOrderActivityTab';
-import { resolveBack } from '../lib/backContext';
+import { resolveBack, withWorkOrderBack } from '../lib/backContext';
 import { useDocumentBack } from '../hooks/useDocumentBack';
 import AppLayout from '../components/AppLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -655,6 +655,10 @@ export default function WorkOrderDetailPage() {
   const essence = summary || (firstItem ? (moreItems > 0 ? `${firstItem} +${moreItems} more` : firstItem) : null);
 
   const sitePhone = location?.siteContactPhone || customer?.phone;
+  // The Location page's back-link returns here, labelled with this WO number.
+  const locationHref = serviceLocationId
+    ? withWorkOrderBack(`/service-locations/${serviceLocationId}`, workOrder.id, workOrder.workOrderNumber)
+    : null;
   // Header arrival line — from the full location record (the same gate match
   // the Detailed layout's Location card uses).
   const gateFact = (locationDetail?.arrivalFacts ?? []).find((f) => /gate|code|lockbox/i.test(f.label));
@@ -759,9 +763,9 @@ export default function WorkOrderDetailPage() {
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                 <Heading level={1} size="page-sm" className="m-0">
                   {/* The site name opens its Location page. */}
-                  {location?.locationName && serviceLocationId ? (
+                  {location?.locationName && locationHref ? (
                     <Link
-                      to={`/service-locations/${serviceLocationId}`}
+                      to={locationHref}
                       title={t('workOrders.detail.openLocationTitle', { entity: getName('service_location') })}
                       className="text-inherit no-underline underline-offset-[3px] hover:text-fg-accent hover:underline"
                     >
@@ -824,9 +828,9 @@ export default function WorkOrderDetailPage() {
               {/* Meta line — render only populated items. */}
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
                 {displayAddress && <span className="font-medium text-fg-strong">{displayAddress}</span>}
-                {serviceLocationId && (
+                {locationHref && (
                   <Link
-                    to={`/service-locations/${serviceLocationId}`}
+                    to={locationHref}
                     className="whitespace-nowrap font-semibold text-fg-accent no-underline hover:underline"
                   >
                     {t('workOrders.detail.viewLocation', { entity: getName('service_location') })}
