@@ -1,0 +1,367 @@
+/* ───────────────────────────────────────────────────────────────────
+   Work order Overview — Compact layout (WO detail ?tab=overview, the
+   per-user "Compact" switch). Job-first: work items lead, each row
+   expands its equipment / units / parts / notes / photos / history
+   in place; the rail is Dispatch + Money.
+
+   Only what Tailwind can't express cleanly lives here: the container
+   breakpoints, the item grid + tile states, the inline panel offset,
+   and the tinted bands. Unlayered like work-items.css so bare <button>
+   rows keep their sizing.
+   ─────────────────────────────────────────────────────────────────── */
+
+.ovc { container-type: inline-size; display: flex; flex-direction: column; gap: 12px; }
+.ovc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 12px;
+  align-items: start;
+}
+@container (max-width: 900px) {
+  .ovc-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Attention chips — one line each; the sub rides in the title tooltip. */
+.ovc-attn { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.ovc-chip {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 11px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ovc-chip);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-sm);
+}
+.ovc-chip:hover { background: var(--bg-hover); }
+.ovc-chip:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 1px; }
+.ovc-chipicon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklch, var(--ovc-chip) 14%, var(--bg-elev));
+}
+.ovc-chiptitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ovc-chipaction { font-size: 11.5px; font-weight: 600; color: var(--fg-accent); white-space: nowrap; flex-shrink: 0; }
+
+/* Count badge inside buttons/links/tabs. */
+.ovc-n {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pinned notes band under the Work items head. */
+.ovc-pins {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg);
+  background: color-mix(in oklch, var(--warning-500) 9%, var(--bg-elev));
+  border-bottom: 1px solid var(--border-soft);
+}
+.ovc-pins > svg { flex-shrink: 0; margin-top: 2px; color: var(--warning-fg); }
+.ovc-pins:hover { background: color-mix(in oklch, var(--warning-500) 14%, var(--bg-elev)); }
+.ovc-pins:focus-visible { outline: 2px solid var(--accent-500); outline-offset: -2px; }
+
+/* Item row: 112px tile | text, tone rail on the left. */
+.ovc-item { border-bottom: 1px solid var(--border-soft); border-left: 3px solid var(--ovc-rail); }
+.ovc-item:last-child { border-bottom: 0; }
+.ovc-itemgrid {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px 14px 10px 12px;
+  align-items: start;
+}
+.ovc-item.done .ovc-eqname,
+.ovc-item.done .ovc-complaint { color: var(--fg-muted); }
+
+.ovc-thumb {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: block;
+  width: 112px;
+  height: 112px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.ovc-thumb:hover { box-shadow: 0 0 0 2px var(--accent-500); }
+.ovc-thumb:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 2px; }
+.ovc-thumb.attach {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  padding: 10px;
+  border: 1px dashed var(--border-strong);
+  color: var(--fg-accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+}
+.ovc-thumb.attach:hover { background: var(--bg-hover); box-shadow: none; }
+.ovc-thumb.none,
+.ovc-thumb.locked {
+  cursor: default;
+  display: grid;
+  place-items: center;
+  background: var(--bg-elev-2);
+  color: var(--fg-muted);
+  border: 1px solid var(--border-soft);
+}
+.ovc-thumb.none:hover,
+.ovc-thumb.locked:hover { box-shadow: none; }
+
+.ovc-eqname { font-size: 13.5px; font-weight: 600; color: var(--fg-strong); min-width: 0; overflow-wrap: anywhere; }
+.ovc-eqmeta { font-weight: 400; color: var(--fg-muted); }
+.ovc-complaint {
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+}
+.ovc-finding {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ovc-findlbl {
+  margin-right: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--success-500);
+}
+.ovc-findwho { color: var(--fg-muted); }
+
+/* Link row = the inline panel's tabs. */
+.ovc-links { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 9px; }
+.ovc-link {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  border: 1px solid transparent;
+}
+.ovc-link:hover { background: var(--bg-hover); color: var(--fg-strong); }
+.ovc-link:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 1px; }
+.ovc-link.on {
+  background: color-mix(in oklch, var(--accent-500) 9%, var(--bg-elev));
+  border-color: color-mix(in oklch, var(--accent-500) 40%, var(--border));
+  color: var(--fg-accent);
+}
+.ovc-link.on .ovc-n { background: color-mix(in oklch, var(--accent-500) 16%, var(--bg-elev)); color: var(--fg-accent); }
+.ovc-triptag {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  margin-left: 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  white-space: nowrap;
+}
+.ovc-triptag:hover { background: var(--bg-hover); }
+.ovc-triptag:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 1px; }
+
+/* Inline panel — aligned with the text column (12 + 3 rail + 112 + 16 gap ≈ 140). */
+.ovc-panel {
+  margin: 0 14px 12px 140px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  background: var(--bg-elev-2);
+}
+@container (max-width: 640px) {
+  .ovc-panel { margin-left: 14px; }
+  .ovc-itemgrid { grid-template-columns: 72px minmax(0, 1fr); gap: 12px; }
+  .ovc-thumb { width: 72px; height: 72px; border-radius: 10px; }
+}
+.ovc-ph {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-strong);
+}
+.ovc-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 5px 14px;
+  margin: 0;
+  font-size: 12px;
+}
+.ovc-facts dt { color: var(--fg-muted); white-space: nowrap; }
+.ovc-facts dd { margin: 0; color: var(--fg-strong); overflow-wrap: anywhere; }
+.ovc-facts dd.mono { font-size: 11.5px; }
+@container (max-width: 760px) {
+  .ovc-facts { grid-template-columns: auto minmax(0, 1fr); }
+}
+.ovc-rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--bg-elev);
+}
+.ovc-rowitem {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+}
+.ovc-rowitem:last-child { border-bottom: 0; }
+a.ovc-rowitem:hover,
+button.ovc-rowitem:hover { background: var(--bg-hover); }
+.ovc-panel .wit-parts { background: var(--bg-elev); }
+
+.ovc-donebar {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  background: var(--bg-elev-2);
+  border-top: 1px solid var(--border-soft);
+}
+.ovc-donebar:hover { color: var(--fg-strong); }
+.ovc-donebar:focus-visible { outline: 2px solid var(--accent-500); outline-offset: -2px; }
+
+/* Rail — Dispatch hero. */
+.ovc-hero {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 2px;
+  border-radius: var(--r-sm);
+}
+.ovc-hero:hover { background: var(--bg-hover); }
+.ovc-hero:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 1px; }
+.ovc-stamps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 10px; }
+.ovc-stamp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-soft);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+}
+.ovc-stamp .tabular-nums { font-size: 12px; font-weight: 600; color: var(--fg-muted); white-space: nowrap; }
+.ovc-stamp.set .tabular-nums { color: var(--fg-strong); }
+
+/* Rail — Money. */
+.ovc-moneytabs.tab-row {
+  margin-bottom: 0;
+  padding: 0 10px;
+  border-top: 1px solid var(--border-soft);
+  border-bottom-color: var(--border-soft);
+  background: var(--bg-elev-2);
+}
+.ovc-moneytabs .tab { padding: 7px 8px 8px; }
+.ovc-doc {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  text-decoration: none;
+}
+.ovc-doc:last-child { border-bottom: 0; }
+.ovc-doc:hover { background: var(--bg-hover); }
+.ovc-docsub { grid-column: 1 / -1; font-size: 11px; color: var(--fg-muted); }
+.ovc-cost {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12.5px;
+}
+.ovc-cost:last-of-type { border-bottom: 0; }
+.ovc-margin {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklch, var(--success-500) 8%, var(--bg-elev));
+  border: 1px solid color-mix(in oklch, var(--success-500) 30%, var(--border));
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-strong);
+}

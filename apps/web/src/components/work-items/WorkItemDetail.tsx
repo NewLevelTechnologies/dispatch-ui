@@ -596,13 +596,17 @@ const PO_TONE: Record<string, 'warning' | 'success' | 'neutral'> = {
   CANCELLED: 'neutral',
 };
 
-function PartsSection({
+/** Parts & labor for one item: its POs, the labor estimate, and where it sits
+ *  on a quote/invoice. Also the Compact overview's inline Parts panel, which
+ *  supplies its own frame via `className`. */
+export function PartsSection({
   workOrderId,
   customerId,
   wi,
   readOnly,
   purchaseOrders,
   documents,
+  className = 'wit-sec',
 }: {
   workOrderId: string;
   customerId?: string;
@@ -610,6 +614,7 @@ function PartsSection({
   readOnly: boolean;
   purchaseOrders: PurchaseOrderListItem[];
   documents: WorkItemDocument[];
+  className?: string;
 }) {
   const { t } = useTranslation();
   const base = `/purchase-orders/new?workOrderId=${workOrderId}&workItemId=${wi.id}`;
@@ -618,7 +623,7 @@ function PartsSection({
   const showLabor = hasLabor || addingLabor;
 
   return (
-    <div className="wit-sec">
+    <div className={className}>
       <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
         <span className="text-[13px] font-semibold text-fg-strong">{t('workOrders.workItems.partsAndLabor')}</span>
         <span className="flex-1" />

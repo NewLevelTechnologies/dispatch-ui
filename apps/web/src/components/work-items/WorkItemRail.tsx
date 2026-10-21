@@ -52,15 +52,23 @@ export default function WorkItemRail({ items, statuses, selectedId, onSelect, tr
   return (
     <aside className="card wit-rail" aria-label={getName('work_item', true)}>
       <div className="card-head">
-        <div className="card-title">{getName('work_item', true)}</div>
-        <span className="card-sub">
+        <div className="card-title whitespace-nowrap">{getName('work_item', true)}</div>
+        <span className="card-sub min-w-0 truncate">
           {t('workOrders.workItems.openTotalCount', { open: open.length, total: items.length })}
         </span>
         <span className="flex-1" />
+        {/* The 280px rail can't fit "Add Work Item" beside the title and count;
+            the card title already names the entity, so the button just says Add. */}
         {onAdd && (
-          <Button outline size="xxs" onClick={onAdd}>
+          <Button
+            outline
+            size="xxs"
+            className="shrink-0"
+            onClick={onAdd}
+            aria-label={t('common.actions.add', { entity: getName('work_item') })}
+          >
             <PlusIcon data-slot="icon" />
-            {t('common.actions.add', { entity: getName('work_item') })}
+            {t('common.add')}
           </Button>
         )}
       </div>

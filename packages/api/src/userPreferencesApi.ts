@@ -2,6 +2,10 @@ import apiClient from './client';
 
 export type ThemePreference = 'LIGHT' | 'DARK' | 'SYSTEM';
 
+/** Work order detail → Overview tab body. Stored in the user's preferences
+ *  map, so a GET returns it under `additionalPreferences`. */
+export type WorkOrderOverviewLayout = 'compact' | 'detailed';
+
 export interface UserPreferencesResponse {
   theme: ThemePreference | null;
   additionalPreferences: Record<string, unknown>;
@@ -9,6 +13,7 @@ export interface UserPreferencesResponse {
 
 export interface UpdatePreferencesRequest {
   theme?: ThemePreference;
+  workOrderOverviewLayout?: WorkOrderOverviewLayout;
 }
 
 export const getUserPreferences = async (): Promise<UserPreferencesResponse> => {

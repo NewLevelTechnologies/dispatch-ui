@@ -204,10 +204,10 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit, workO
             aria-label={t('equipment.images.openFullSize')}
             className="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            <EquipmentThumbnail url={equipment.profileImageUrl} name={equipment.name} category={equipment.equipmentCategoryName} type={equipment.equipmentTypeName} monogram sizeClass="size-16" fit="contain" />
+            <EquipmentThumbnail url={equipment.profileImageUrl} name={equipment.name} category={equipment.equipmentCategoryName} type={equipment.equipmentTypeName} monogram sizeClass="size-16" />
           </button>
         ) : (
-          <EquipmentThumbnail url={equipment.profileImageUrl} name={equipment.name} category={equipment.equipmentCategoryName} type={equipment.equipmentTypeName} monogram sizeClass="size-16" fit="contain" />
+          <EquipmentThumbnail url={equipment.profileImageUrl} name={equipment.name} category={equipment.equipmentCategoryName} type={equipment.equipmentTypeName} monogram sizeClass="size-16" />
         )}
         <div className="min-w-0 flex-1">
           {editing && draft ? (
