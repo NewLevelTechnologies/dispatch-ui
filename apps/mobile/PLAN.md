@@ -140,11 +140,37 @@ that file in lockstep with web's if a token value changes there).
      nothing in `packages/api/src/*.ts`'s doc comments says either way. Treat
      client-side gating here as a UX-correctness fix, not a verified security
      boundary, until that's checked against the backend.
-6. **Completion**: signature + card-present payment (net-new, cross-repo).
-7. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self;
+6. **Preferred maps app**: both Directions buttons (Dispatch detail, Work order
+   detail) currently hardcode a Google Maps web URL
+   (`https://www.google.com/maps/search/...`), duplicated identically in
+   `src/app/dispatch/[id].tsx` and `src/app/work-order/[id].tsx`. On iOS that either
+   opens Safari or deep-links straight into Google Maps if it's installed — never
+   Apple Maps, which annoys a tech who prefers it. Replace both call sites with one
+   shared helper that:
+   - Always includes the platform's built-in default with no availability check
+     needed (Apple Maps `maps://` on iOS, the `geo:` intent on Android — both are
+     OS-level, not third-party schemes).
+   - Detects which other map apps are actually installed via `Linking.canOpenURL`
+     on their own schemes (`comgooglemaps://`, `waze://`) — these **do** need
+     `LSApplicationQueriesSchemes` added to `app.json`'s `ios.infoPlist`, since iOS
+     restricts `canOpenURL` to whitelisted third-party schemes; unlisted schemes
+     always report false regardless of whether the app is installed.
+   - Asks once, only when there's an actual choice (more than one app available) —
+     no prompt at all for a tech with only Apple Maps on their phone.
+   - Persists the choice so it's asked once, not on every tap — same plain-value
+     `AsyncStorage` pattern already used for the active-tenant-id
+     (`src/tenant/tenant.ts`), not the Keychain-backed `secureTokenStorage.ts`
+     (this isn't sensitive).
+   - Adds a "Preferred maps app" row to Profile (`src/app/(tabs)/profile.tsx`) so
+     the choice is visible and changeable later, not just set-once-and-forgotten.
+   Android's exact scheme conventions (`geo:`/`google.navigation:`, `waze://`) are
+   written from documented behavior, not live-tested — this project has only ever
+   been run against the iOS Simulator so far.
+7. **Completion**: signature + card-present payment (net-new, cross-repo).
+8. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self;
    gated behind `CREATE_WORK_ORDERS` per Phase 5.
-8. **Reference lookup**: customers/service-locations/equipment, read-only, no billing.
-9. **Push notifications** (needs new `dispatch-api` endpoints — device tokens, events).
+9. **Reference lookup**: customers/service-locations/equipment, read-only, no billing.
+10. **Push notifications** (needs new `dispatch-api` endpoints — device tokens, events).
 
 Profile/account (signed-in-as, sign out, workspace switcher) is **done** — folded into
 Phase 1 rather than staying its own numbered phase, since it was needed there to make
