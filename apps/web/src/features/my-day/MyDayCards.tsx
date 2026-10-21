@@ -8,7 +8,6 @@ import {
   CalendarIcon,
   CheckIcon,
   ChevronRightIcon,
-  ClipboardDocumentIcon,
   ExclamationTriangleIcon,
   MapIcon,
   MapPinIcon,
@@ -19,8 +18,7 @@ import {
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency, titleCaseAddress } from '@dispatch/utils';
 import {
-  dispatchRowTitle,
-  type DispatchBoardRow,
+  type MyDayStop,
   type QuoteListItem,
   type WorkOrder,
   type WorkOrderSummary,
@@ -43,8 +41,21 @@ import {
   onSiteMinutes,
 } from './myDayModel';
 
-const woLabel = (stop: Pick<DispatchBoardRow, 'workOrderNumber' | 'workOrderId'>) =>
+const woLabel = (stop: Pick<MyDayStop, 'workOrderNumber' | 'workOrderId'>) =>
   stop.workOrderNumber ?? `#${stop.workOrderId.slice(0, 8)}`;
+
+const stopTitle = (stop: MyDayStop) => stop.workOrderSummary || woLabel(stop);
+
+/** Only elevated priority is worth a pill. */
+function PriorityPill({ priority }: { priority: MyDayStop['priority'] }) {
+  const { t } = useTranslation();
+  if (priority !== 'URGENT' && priority !== 'HIGH') return null;
+  return (
+    <Pill tone={priority === 'URGENT' ? 'danger' : 'warning'}>
+      {t(`workOrders.priority.${priority.toLowerCase()}`)}
+    </Pill>
+  );
+}
 
 /** Universal directions link: opens the maps app on a phone, the web map on
  *  a desktop. */
@@ -59,8 +70,8 @@ export function ProgressStrip({
   focus,
   timeZone,
 }: {
-  stops: DispatchBoardRow[];
-  focus: DispatchBoardRow | null;
+  stops: MyDayStop[];
+  focus: MyDayStop | null;
   timeZone: string;
 }) {
   const { t } = useTranslation();
@@ -70,7 +81,7 @@ export function ProgressStrip({
     <div className="md-progress">
       <div className="md-progress-bar" role="img" aria-label={t('myDay.progress.aria')}>
         {stops.map((s) => (
-          <span key={s.id} className={clsx('md-seg', statusClass(s.status))} />
+          <span key={s.dispatchId} className={clsx('md-seg', statusClass(s.status))} />
         ))}
       </div>
       <div className="md-progress-txt">
@@ -96,11 +107,11 @@ export function FocusCard({
   onAdvance,
   onComplete,
 }: {
-  stop: DispatchBoardRow;
+  stop: MyDayStop;
   workOrder: WorkOrder | undefined;
   timeZone: string;
   pending: boolean;
-  onAdvance: (to: DispatchBoardRow['status']) => void;
+  onAdvance: (to: MyDayStop['status']) => void;
   onComplete: () => void;
 }) {
   const { t } = useTranslation();
@@ -115,19 +126,22 @@ export function FocusCard({
         ? t('myDay.focus.enRoute')
         : t('myDay.focus.upNext');
 
-  const site = workOrder?.serviceLocation;
-  const siteName = site?.locationName && site.locationName !== stop.customerName ? site.locationName : null;
-  const street = site?.address.streetAddress
-    ? `${titleCaseAddress(site.address.streetAddress)}, ${titleCaseAddress(site.address.city)}`
+  // Where and what come from the stop (as released); only who to call and the
+  // equipment need the work order.
+  const siteName =
+    stop.serviceLocationName && stop.serviceLocationName !== stop.customerName ? stop.serviceLocationName : null;
+  const street = stop.serviceLocationStreet
+    ? [titleCaseAddress(stop.serviceLocationStreet), titleCaseAddress(stop.serviceLocationCity)].filter(Boolean).join(', ')
     : null;
-  const fullAddress = site?.address.streetAddress
-    ? [site.address.streetAddress, site.address.city, site.address.state, site.address.zipCode]
+  const fullAddress = stop.serviceLocationStreet
+    ? [stop.serviceLocationStreet, stop.serviceLocationCity, stop.serviceLocationState, stop.serviceLocationZip]
         .filter(Boolean)
         .join(', ')
     : null;
+  const site = workOrder?.serviceLocation;
   const contactName = site?.siteContactName || workOrder?.customer?.name || null;
   const contactPhone = site?.siteContactPhone || workOrder?.customer?.phone || null;
-  const priority = workOrder?.priority;
+  const drive = stop.status === 'SCHEDULED' ? stop.driveMinFromPrev : null;
 
   return (
     <section className={clsx('card md-focus', live && 'live')} aria-label={t('myDay.focus.aria')}>
@@ -136,11 +150,7 @@ export function FocusCard({
           {eyebrow}
         </Pill>
         <div className="md-focus-tags">
-          {(priority === 'URGENT' || priority === 'HIGH') && (
-            <Pill tone={priority === 'URGENT' ? 'danger' : 'warning'}>
-              {t(`workOrders.priority.${priority.toLowerCase()}`)}
-            </Pill>
-          )}
+          <PriorityPill priority={stop.priority} />
           <Tag>{woLabel(stop)}</Tag>
         </div>
       </div>
@@ -154,7 +164,7 @@ export function FocusCard({
         {estimate && <span className="md-focus-est">{t('myDay.focus.estimate', { estimate })}</span>}
       </div>
 
-      <h2 className="md-focus-title">{dispatchRowTitle(stop) ?? woLabel(stop)}</h2>
+      <h2 className="md-focus-title">{stopTitle(stop)}</h2>
       {(stop.customerName || siteName) && (
         <div className="md-focus-cust">
           {stop.customerName}
@@ -167,19 +177,13 @@ export function FocusCard({
         <div className="md-focus-addr">
           <MapPinIcon className="md-icon" aria-hidden="true" />
           <span>{street ?? titleCaseAddress(stop.serviceLocationCity)}</span>
+          {drive != null && <span className="md-drive">{t('myDay.drive', { count: drive })}</span>}
         </div>
       )}
       {workOrder?.equip?.label && (
         <div className="md-focus-meta">
           <WrenchIcon className="md-icon" aria-hidden="true" />
           <span>{workOrder.equip.label}</span>
-        </div>
-      )}
-
-      {stop.notes?.trim() && (
-        <div className="md-note">
-          <div className="md-note-k">{t('myDay.focus.fromDispatch')}</div>
-          <div className="md-note-v">{stop.notes}</div>
         </div>
       )}
 
@@ -226,7 +230,7 @@ export function RouteCard({
   types,
   expandPast,
 }: {
-  stops: DispatchBoardRow[];
+  stops: MyDayStop[];
   focusId: string | null;
   timeZone: string;
   types: WorkOrderType[] | undefined;
@@ -256,9 +260,9 @@ export function RouteCard({
           </Button>
         )}
         {(showPast || !collapsible) &&
-          past.map((s) => <StopRow key={s.id} stop={s} past timeZone={timeZone} types={types} />)}
+          past.map((s) => <StopRow key={s.dispatchId} stop={s} past timeZone={timeZone} types={types} />)}
         {rest.map((s) => (
-          <StopRow key={s.id} stop={s} current={s.id === focusId} timeZone={timeZone} types={types} />
+          <StopRow key={s.dispatchId} stop={s} current={s.dispatchId === focusId} timeZone={timeZone} types={types} />
         ))}
       </CardBody>
     </Card>
@@ -272,7 +276,7 @@ function StopRow({
   timeZone,
   types,
 }: {
-  stop: DispatchBoardRow;
+  stop: MyDayStop;
   past?: boolean;
   current?: boolean;
   timeZone: string;
@@ -290,7 +294,9 @@ function StopRow({
           ? `${arrived}–${departed}`
           : null
         : formatEstimate(stop.estimatedDuration);
-  const place = [stop.customerName, titleCaseAddress(stop.serviceLocationCity)].filter(Boolean).join(' · ');
+  const place = [stop.serviceLocationName || stop.customerName, titleCaseAddress(stop.serviceLocationCity)]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <Link
@@ -308,8 +314,11 @@ function StopRow({
         </span>
       </div>
       <div className="md-stop-body">
+        {!past && stop.driveMinFromPrev != null && (
+          <div className="md-stop-drive">{t('myDay.drive', { count: stop.driveMinFromPrev })}</div>
+        )}
         <div className="md-stop-title">
-          <span>{dispatchRowTitle(stop) ?? woLabel(stop)}</span>
+          <span>{stopTitle(stop)}</span>
           {current && isLive(stop.status) && (
             <span className="md-now">
               {stop.status === 'IN_PROGRESS' ? t('myDay.route.onSite') : t('myDay.focus.enRoute')}
@@ -320,12 +329,8 @@ function StopRow({
         <div className="md-stop-chips">
           <Tag>{woLabel(stop)}</Tag>
           {type && <WorkOrderTypePill type={type} />}
-          {stop.notes?.trim() && !past && (
-            <span className="md-chip note">
-              <ClipboardDocumentIcon className="size-2.5" aria-hidden="true" />
-              {t('myDay.route.note')}
-            </span>
-          )}
+          {!past && <PriorityPill priority={stop.priority} />}
+          {stop.recurring && <span className="md-chip">{t('myDay.route.agreement')}</span>}
           {stop.status === 'NO_SHOW' && (
             <Pill tone={DISPATCH_PRESENTATION.NO_SHOW.tone}>{t('workOrders.dispatches.status.NO_SHOW')}</Pill>
           )}
@@ -413,7 +418,7 @@ export function TomorrowLink({
   href,
   timeZone,
 }: {
-  stops: DispatchBoardRow[];
+  stops: MyDayStop[];
   href: string;
   timeZone: string;
 }) {
@@ -442,7 +447,7 @@ export function TomorrowLink({
 
 // ── Edge states ──────────────────────────────────────────────────────
 
-export function DayDone({ stops }: { stops: DispatchBoardRow[] }) {
+export function DayDone({ stops }: { stops: MyDayStop[] }) {
   const { t } = useTranslation();
   const done = stops.filter((s) => s.status === 'COMPLETED').length;
   const noShows = stops.filter((s) => s.status === 'NO_SHOW').length;

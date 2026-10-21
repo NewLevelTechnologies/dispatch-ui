@@ -664,6 +664,9 @@ export {
   type LocationTechSummaryResponse,
 } from './schedulingApi';
 
+// My day (technician landing)
+export { myDayApi, type MyDayResponse, type MyDayStop } from './myDayApi';
+
 // Tenant Settings API
 export {
   tenantSettingsApi,
