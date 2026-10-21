@@ -346,7 +346,6 @@ export default function EquipmentPage() {
                               type={item.equipmentTypeName}
                               monogram
                               sizeClass="size-12"
-                              fit="contain"
                             />
                           </RouterLink>
                           <CellStack>
