@@ -17,24 +17,29 @@ import {
   type DispatchBoardRow,
   type PurchaseOrderListItem,
   type WorkItemDocument,
+  type WorkflowTransition,
   type WorkItemResponse,
+  type WorkItemStatus,
   type WorkOrderFile,
   type WorkOrderSummary,
 } from '../../../api/setup';
 import { useGlossary } from '../../../contexts/GlossaryContext';
 import { showError, extractApiError } from '../../../lib/toast';
-import { formatFilterSize } from '@dispatch/utils';
-import { PROGRESS_TONE, progressRailColor } from '../../../lib/workItemProgress';
+import { formatFilterSize, formatTimestamp } from '@dispatch/utils';
+import { progressRailColor } from '../../../lib/workItemProgress';
 import { isFinished } from '../../../lib/workItemSteps';
 import EquipmentThumbnail from '../../../components/EquipmentThumbnail';
 import { FileLightbox } from '../../../components/WorkOrderFilesTab';
-import { Pill } from '../../../components/ui/Pill';
 import { PartsSection } from '../../../components/work-items/WorkItemDetail';
+import WorkItemPrimaryButton from '../../../components/work-items/WorkItemPrimaryButton';
+import { useWorkItemActions } from '../../../components/work-items/useWorkItemActions';
+import WorkItemStatusPill from '../../../components/WorkItemStatusPill';
+import InlineComposer from '../../../components/InlineComposer';
 import WorkItemEquipmentPicker from '../../../components/work-items/WorkItemEquipmentPicker';
 import { ageInYears, localDate, shortDate } from '../../../components/work-items/format';
 import { warrantyState } from '../overviewModel';
 
-type Panel = 'equipment' | 'units' | 'parts' | 'notes' | 'photos' | 'history' | 'attach';
+type Panel = 'equipment' | 'units' | 'parts' | 'notes' | 'photos' | 'history';
 
 const PAST_JOBS = 3;
 
@@ -49,7 +54,10 @@ export interface CompactItemRowProps {
   serviceLocationId?: string;
   customerId?: string;
   wi: WorkItemResponse;
-  statusLabel: string;
+  /** Tenant statuses + workflow — the status picker and primary action. */
+  statuses: WorkItemStatus[];
+  transitions: WorkflowTransition[];
+  enforceWorkflow: boolean;
   readOnly: boolean;
   /** This item's photos/videos on this job. */
   media: WorkOrderFile[];
@@ -63,10 +71,14 @@ export interface CompactItemRowProps {
   onAttachEquipment: (wi: WorkItemResponse, equipmentId: string | null) => Promise<void> | void;
   onSetEquipmentNeeded: (wi: WorkItemResponse, needed: boolean) => Promise<void> | void;
   onAddEquipment?: (wi: WorkItemResponse) => void;
+  /** Same write as the Work items tab's findings section. */
+  onSaveDiagnosis: (wi: WorkItemResponse, next: string) => Promise<void>;
+  /** Open the dispatch form with this item preselected. */
+  onScheduleDispatch?: (wi: WorkItemResponse) => void;
 }
 
 export default function CompactItemRow(props: CompactItemRowProps) {
-  const { workOrderId, wi, statusLabel, readOnly, media, trips } = props;
+  const { workOrderId, wi, readOnly, media, trips } = props;
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const eq = wi.equipment;
@@ -75,7 +87,20 @@ export default function CompactItemRow(props: CompactItemRowProps) {
   // what a manager reads first. Finished rows start collapsed.
   const [panel, setPanel] = useState<Panel | null>(eq && !done ? 'equipment' : null);
   const toggle = (k: Panel) => setPanel((p) => (p === k ? null : k));
-  const tone = PROGRESS_TONE[wi.statusCategory];
+  const [attaching, setAttaching] = useState(false);
+  const [writing, setWriting] = useState(false);
+
+  // Status moves + the one next step: the Work items tab's rules, same hook.
+  const actions = useWorkItemActions({
+    workOrderId,
+    wi,
+    statuses: props.statuses,
+    transitions: props.transitions,
+    enforceWorkflow: props.enforceWorkflow,
+    purchaseOrders: props.purchaseOrders,
+    hasDispatches: trips.length > 0,
+    canSchedule: !readOnly && !!props.onScheduleDispatch,
+  });
   const equipmentWord = getName('equipment');
 
   // Counts that decide which links show. Prior photos + past jobs share the
@@ -125,7 +150,9 @@ export default function CompactItemRow(props: CompactItemRowProps) {
     : [];
 
   const findings = wi.diagnosis?.trim();
-  const findingsBy = [wi.diagnosedByName, wi.diagnosedAt && shortDate(wi.diagnosedAt)].filter(Boolean).join(', ');
+  // "— Ray T., 2h ago · edited". Findings from before authors were recorded carry none.
+  const findingsBy = [wi.diagnosedByName, wi.diagnosedAt && formatTimestamp(wi.diagnosedAt)].filter(Boolean).join(', ');
+  const findingsEdited = !!wi.diagnosisEditedAt;
 
   return (
     <div className={'ovc-item' + (done ? ' done' : '')} style={{ '--ovc-rail': progressRailColor(wi.statusCategory) } as CSSProperties}>
@@ -160,8 +187,8 @@ export default function CompactItemRow(props: CompactItemRowProps) {
           <button
             type="button"
             className="ovc-thumb attach"
-            aria-expanded={panel === 'attach'}
-            onClick={() => toggle('attach')}
+            aria-expanded={attaching}
+            onClick={() => setAttaching((v) => !v)}
           >
             <PlusIcon className="size-[18px]" />
             <span>{t('workOrders.detail.compact.attach', { equipment: equipmentWord })}</span>
@@ -187,15 +214,77 @@ export default function CompactItemRow(props: CompactItemRowProps) {
               </span>
             )}
             <span className="flex-1" />
-            <Pill tone={tone} dot>{statusLabel}</Pill>
+            <span className="flex shrink-0 items-center gap-2">
+              <WorkItemStatusPill
+                workOrderId={workOrderId}
+                workItem={wi}
+                statuses={props.statuses}
+                transitions={props.transitions}
+                enforceWorkflow={props.enforceWorkflow}
+                readOnly={readOnly}
+                guardComplete={actions.guardComplete}
+              />
+              {!readOnly && (
+                <WorkItemPrimaryButton
+                  action={actions.action}
+                  pending={actions.pending}
+                  onPartsArrived={actions.partsArrived}
+                  onSchedule={() => props.onScheduleDispatch?.(wi)}
+                  onFindings={() => setWriting(true)}
+                  onComplete={actions.markComplete}
+                />
+              )}
+            </span>
           </div>
-          {eq && <div className="ovc-complaint">{wi.description}</div>}
-          {findings && (
-            <div className="ovc-finding">
-              <span className="ovc-findlbl">{t('workOrders.detail.compact.found')}</span>
-              {findings}
-              {findingsBy && <span className="ovc-findwho"> — {findingsBy}</span>}
+          {attaching && !eq && !readOnly && (
+            <div className="mt-2 max-w-[420px]">
+              <AttachPicker {...props} onDone={() => setAttaching(false)} />
             </div>
+          )}
+          {eq && <div className="ovc-complaint">{wi.description}</div>}
+          {writing && !readOnly ? (
+            <div className="mt-2">
+              <InlineComposer
+                value={findings ?? ''}
+                rows={3}
+                placeholder={t('workOrders.workItems.findingsPlaceholder')}
+                ariaLabel={t('workOrders.workItems.findings')}
+                onCancel={() => setWriting(false)}
+                onSave={async (next) => {
+                  await props.onSaveDiagnosis(wi, next);
+                  setWriting(false);
+                }}
+              />
+            </div>
+          ) : findings ? (
+            <div className="ovc-findrow">
+              <div className="ovc-finding min-w-0 flex-1">
+                <span className="ovc-findlbl">{t('workOrders.detail.compact.found')}</span>
+                {findings}
+                {(findingsBy || findingsEdited) && (
+                  <span className="ovc-findwho">
+                    {findingsBy && ` — ${findingsBy}`}
+                    {findingsEdited && ` · ${t('workOrders.workItems.edited')}`}
+                  </span>
+                )}
+              </div>
+              {!readOnly && !done && (
+                <button type="button" className="card-action ovc-findedit" onClick={() => setWriting(true)}>
+                  {t('common.edit')}
+                </button>
+              )}
+            </div>
+          ) : (
+            !done &&
+            !readOnly && (
+              <div className="ovc-finding text-fg-muted">
+                {t('workOrders.detail.compact.noFindings')}
+                {' · '}
+                <button type="button" className="card-action" onClick={() => setWriting(true)}>
+                  {t('workOrders.workItems.addFindings')}
+                </button>
+              </div>
+            )
           )}
 
           <div className="ovc-links">
@@ -244,9 +333,6 @@ export default function CompactItemRow(props: CompactItemRowProps) {
 
       {panel && (
         <div className="ovc-panel">
-          {panel === 'attach' && !eq && (
-            <AttachPanel {...props} onDone={() => setPanel(null)} />
-          )}
           {panel === 'equipment' && eq && (
             <EquipmentPanel
               equipmentId={eq.id}
@@ -283,6 +369,7 @@ export default function CompactItemRow(props: CompactItemRowProps) {
           {panel === 'history' && eq && <HistoryPanel equipment={eq} jobs={pastJobs} />}
         </div>
       )}
+      {actions.confirmDialog}
     </div>
   );
 }
@@ -298,7 +385,7 @@ function PanelHead({ title, sub, action }: { title: string; sub?: string; action
   );
 }
 
-function AttachPanel(props: CompactItemRowProps & { onDone: () => void }) {
+function AttachPicker(props: CompactItemRowProps & { onDone: () => void }) {
   const { wi } = props;
   const [busy, setBusy] = useState(false);
   const run = async (fn: () => Promise<void> | void) => {

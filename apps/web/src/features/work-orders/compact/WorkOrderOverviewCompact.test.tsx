@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../../test/utils';
 import WorkOrderOverviewCompact from './WorkOrderOverviewCompact';
 import { apiClient } from '../../../api/setup';
-import type { DispatchBoardRow, Invoice, WorkOrder, WorkOrderFinancialSummary } from '../../../api/setup';
+import type { DispatchBoardRow, Invoice, WorkItemStatus, WorkOrder, WorkOrderFinancialSummary } from '../../../api/setup';
 
 vi.mock('@dispatch/api/src/client');
 
@@ -182,13 +182,27 @@ describe('WorkOrderOverviewCompact', () => {
     onOpenEquipment: vi.fn(),
     onAttachEquipment: vi.fn(),
     onSetEquipmentNeeded: vi.fn(),
+    onSaveDiagnosis: vi.fn().mockResolvedValue(undefined),
+    onScheduleDispatch: vi.fn(),
   };
+
+  // The tenant's seeded statuses the primary action targets.
+  const status = (id: string, code: string, statusCategory: string, name: string) =>
+    ({ id, code, name, statusCategory, isActive: true }) as unknown as WorkItemStatus;
+  const statuses = [
+    status('st-prog', 'IN_PROGRESS', 'IN_PROGRESS', 'In progress'),
+    status('st-parts', 'PENDING_PARTS', 'BLOCKED', 'Pending parts'),
+    status('st-arrived', 'PARTS_ARRIVED', 'IN_PROGRESS', 'Parts arrived'),
+    status('st-done', 'COMPLETE', 'COMPLETED', 'Complete'),
+  ];
 
   const render = (props: Partial<React.ComponentProps<typeof WorkOrderOverviewCompact>> = {}) =>
     renderWithProviders(
       <WorkOrderOverviewCompact
         workOrder={workOrder}
-        statuses={[]}
+        statuses={statuses}
+        transitions={[]}
+        enforceWorkflow={false}
         financialSummary={zeroSummary}
         dispatches={[completedVisit, scheduledVisit]}
         quotes={[]}
@@ -227,7 +241,8 @@ describe('WorkOrderOverviewCompact', () => {
 
     // No equipment needed: a quiet tile, and Parts is the only link.
     const drain = rowOf('Clear condensate drain');
-    expect(within(drain).getAllByRole('button').map((b) => b.textContent)).toEqual([
+    const links = drain.querySelector('.ovc-links') as HTMLElement;
+    expect(within(links).getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Parts0',
       expect.stringMatching(/1/), // trip chip (unscoped completed visit)
       expect.stringMatching(/2/), // trip chip (unscoped scheduled visit)
@@ -291,7 +306,9 @@ describe('WorkOrderOverviewCompact', () => {
   it('says to schedule from the board when there are no visits — no schedule button', () => {
     render({ dispatches: [] });
     expect(screen.getByText(/not scheduled yet · schedule from the dispatch board/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /schedule/i })).not.toBeInTheDocument();
+    // The rail itself offers no scheduling (rows may, for their own item).
+    const rail = screen.getByText(/not scheduled yet/i).closest('.card') as HTMLElement;
+    expect(within(rail).queryByRole('button', { name: /schedule/i })).not.toBeInTheDocument();
   });
 
   it('opens Money on Invoices when there are any, and hides Cost without cost visibility', () => {
@@ -318,5 +335,81 @@ describe('WorkOrderOverviewCompact', () => {
     unmount();
     render({ financialSummary: { ...zeroSummary, balance: '150.00' } });
     expect(screen.getByRole('button', { name: /balance due · \$150\.00/i })).toBeInTheDocument();
+  });
+
+  // ── Working items in place ─────────────────────────────────────────
+  it('offers the one next step: Add findings, else Mark complete; Schedule when nothing covers it', async () => {
+    const user = userEvent.setup();
+    render();
+    // Scheduled, no findings → Add findings opens the composer in the row.
+    const drain = rowOf('Clear condensate drain');
+    expect(within(drain).getByText(/No findings yet/)).toBeInTheDocument();
+    await user.click(within(drain).getAllByRole('button', { name: 'Add findings' })[0]);
+    await user.type(within(drain).getByRole('textbox', { name: 'Findings' }), 'Trap clogged');
+    await user.click(within(drain).getByRole('button', { name: 'Save' }));
+    expect(handlers.onSaveDiagnosis).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-2' }), 'Trap clogged');
+
+    // Findings + a visit → Mark complete.
+    expect(within(rowOf('Upstairs condenser')).getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
+  });
+
+  it('schedules with the item preselected when no visit covers it', async () => {
+    const user = userEvent.setup();
+    render({ dispatches: [] });
+    await user.click(within(rowOf('Clear condensate drain')).getByRole('button', { name: 'Schedule dispatch' }));
+    expect(handlers.onScheduleDispatch).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-2' }));
+  });
+
+  it('offers Parts arrived while an item waits on parts', () => {
+    const waiting = {
+      ...workOrder,
+      workItems: [{ ...workOrder.workItems![1], statusId: 'st-parts', statusCategory: 'BLOCKED' }],
+    } as unknown as WorkOrder;
+    render({ workOrder: waiting });
+    expect(screen.getByRole('button', { name: 'Parts arrived' })).toBeInTheDocument();
+  });
+
+  it('edits existing findings in place, marked edited once changed', async () => {
+    const user = userEvent.setup();
+    const edited = {
+      ...workOrder,
+      workItems: [{ ...workOrder.workItems![0], diagnosisEditedAt: '2026-05-15T00:00:00Z' }],
+    } as unknown as WorkOrder;
+    render({ workOrder: edited });
+    const row = rowOf('Upstairs condenser');
+    expect(within(row).getByText(/· edited/)).toBeInTheDocument();
+    await user.click(within(row).getByRole('button', { name: 'Edit' }));
+    expect(within(row).getByRole('textbox', { name: 'Findings' })).toHaveValue('Run capacitor failed');
+  });
+
+  it('attaches equipment from a picker under the row header', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getByRole('button', { name: /done · 1/i }));
+    const row = rowOf('Replace thermostat');
+    await user.click(within(row).getByRole('button', { name: /attach equipment/i }));
+    expect(row.querySelector('.ovc-panel')).toBeNull();
+    expect(within(row).getByRole('button', { name: /attach equipment/i })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('renders nothing writable when read-only', () => {
+    render({ readOnly: true });
+    expect(
+      screen.queryByRole('button', { name: /^(mark complete|add findings|schedule dispatch|parts arrived)$/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No findings yet/)).not.toBeInTheDocument();
+  });
+
+  it('lists every visit in a drawer from "All →", grouped, and swaps to the trip drawer on pick', async () => {
+    const user = userEvent.setup();
+    const live = { ...scheduledVisit, id: 'd-3', status: 'EN_ROUTE', assignedUserName: 'Lee Ng' } as DispatchBoardRow;
+    render({ dispatches: [completedVisit, scheduledVisit, live] });
+    await user.click(screen.getByRole('button', { name: 'All →' }));
+    const drawer = await screen.findByRole('dialog');
+    const groups = within(drawer).getAllByRole('region').map((r) => r.getAttribute('aria-label'));
+    expect(groups).toEqual(['Happening now', 'Upcoming', 'Completed']);
+    await user.click(within(drawer).getByRole('button', { name: /Ray Torres/ }));
+    expect(handlers.onSelectDispatch).toHaveBeenCalledWith(completedVisit);
   });
 });

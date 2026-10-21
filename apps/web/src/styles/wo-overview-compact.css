@@ -365,3 +365,38 @@ button.ovc-rowitem:hover { background: var(--bg-hover); }
   font-weight: 600;
   color: var(--fg-strong);
 }
+
+/* Inline findings: the Edit link shows on row hover and on keyboard focus. */
+.ovc-findrow { display: flex; gap: 8px; align-items: flex-start; }
+.ovc-findrow .ovc-findedit { flex-shrink: 0; margin-top: 6px; opacity: 0; }
+.ovc-item:hover .ovc-findedit,
+.ovc-findedit:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .ovc-findrow .ovc-findedit { opacity: 1; }
+}
+
+/* Dispatches drawer. */
+.ovc-dlgroup {
+  padding: 6px 24px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+.ovc-dlgroup.live { color: var(--violet-500); }
+.ovc-dlrow {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.ovc-dlrow:hover { background: var(--bg-hover); }
+.ovc-dlrow:focus-visible { outline: 2px solid var(--accent-500); outline-offset: -2px; }
