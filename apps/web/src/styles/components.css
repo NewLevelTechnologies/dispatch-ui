@@ -938,6 +938,17 @@
   gap: 4px;
   white-space: nowrap;
 }
+/* A trailing control (view switch) rides the right end of the row. The row
+   scrolls on x, which turns y into a scroll axis too — clip it so the control
+   can never raise a vertical scrollbar. */
+.tab-row--trailing { overflow-y: hidden; }
+.tab-row-trailing {
+  margin-left: auto;
+  padding-left: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
 .tab:hover { color: var(--fg-strong); }
 .tab.active { color: var(--accent-700); border-bottom-color: var(--accent-500); }
 .theme-dark .tab.active { color: var(--accent-300); }

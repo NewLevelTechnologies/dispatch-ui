@@ -131,6 +131,14 @@ export {
   type TenantMembership,
   type MembershipListResponse
 } from './userApi';
+export {
+  getUserPreferences,
+  updateUserPreferences,
+  type ThemePreference,
+  type UpdatePreferencesRequest,
+  type UserPreferencesResponse,
+  type WorkOrderOverviewLayout,
+} from './userPreferencesApi';
 
 // Work Order API
 export {

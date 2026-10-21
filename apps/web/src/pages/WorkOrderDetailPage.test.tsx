@@ -131,8 +131,15 @@ function AgreementsProbe() {
 }
 
 describe('WorkOrderDetailPage', () => {
+  // The user's stored Overview layout. Most Overview tests below cover the
+  // Detailed layout; the Compact block sets this to 'compact' (or null = none
+  // stored → the Compact default).
+  let storedLayout: 'compact' | 'detailed' | null = 'detailed';
+
   beforeEach(() => {
     vi.clearAllMocks();
+    storedLayout = 'detailed';
+    window.localStorage.clear();
   });
 
   const ZERO_SUMMARY: WorkOrderFinancialSummary = {
@@ -151,6 +158,14 @@ describe('WorkOrderDetailPage', () => {
     location: ServiceLocationDetailDto | null = mockServiceLocation,
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/me/preferences') {
+        return Promise.resolve({
+          data: {
+            theme: null,
+            additionalPreferences: storedLayout ? { workOrderOverviewLayout: storedLayout } : {},
+          },
+        });
+      }
       if (url.match(/\/financial\/work-orders\/[^/]+\/summary$/)) {
         return Promise.resolve({ data: summary });
       }
@@ -482,14 +497,14 @@ describe('WorkOrderDetailPage', () => {
     renderPage();
     // The card hydrates from getServiceLocationById (async); the header address
     // comes from the nested projection, so wait on a card-only value.
-    expect(await screen.findByText('4821')).toBeInTheDocument(); // gate arrival fact
+    // Gate, access and contact also ride the header's arrival line, so each
+    // shows twice on Detailed (header + card).
+    expect(await screen.findAllByText('4821')).toHaveLength(2); // gate arrival fact
     expect(screen.getAllByText(/1942 Lenox Rd Ne/i).length).toBeGreaterThan(0); // title-cased
-    expect(screen.getByText(/side gate, dog in yard/i)).toBeInTheDocument(); // access
+    expect(screen.getAllByText(/side gate, dog in yard/i)).toHaveLength(2); // access
     expect(screen.getByText(/two small kids in home/i)).toBeInTheDocument(); // pinned site note
     // Site contact phone is a tel link, formatted.
-    expect(
-      screen.getByRole('link', { name: /\(555\) 987-6543/ }),
-    ).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /\(555\) 987-6543/ }).length).toBeGreaterThan(0);
   });
 
   // ── Overview: work-items peek ────────────────────────────────────────
@@ -714,5 +729,70 @@ describe('WorkOrderDetailPage', () => {
     const row = await screen.findByTestId('callback-backref');
     expect(row).toHaveTextContent('WO-1302');
     expect(row).toHaveTextContent('callbacks.daysAfter');
+  });
+
+  // ── Overview layout switch + header arrival line ─────────────────────
+  describe('Overview layout', () => {
+    it('defaults to Compact when nothing is stored, with the switch only on the Overview tab', async () => {
+      const user = userEvent.setup();
+      storedLayout = null;
+      mockApiResponses();
+      renderPage();
+
+      const compact = await screen.findByRole('radio', { name: 'Compact' });
+      expect(compact).toBeChecked();
+      // Compact body: Dispatch rail with no visits, no Location card.
+      expect(await screen.findByText(/schedule from the dispatch board/i)).toBeInTheDocument();
+      expect(screen.queryByText(/open location/i)).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('tab', { name: /work items/i }));
+      expect(screen.queryByRole('radio', { name: 'Compact' })).not.toBeInTheDocument();
+    });
+
+    it('saves the choice to the user preferences and swaps the body in place', async () => {
+      const user = userEvent.setup();
+      storedLayout = 'compact';
+      vi.mocked(apiClient.put).mockResolvedValue({
+        data: { theme: null, additionalPreferences: { workOrderOverviewLayout: 'detailed' } },
+      });
+      mockApiResponses();
+      renderPage();
+
+      await user.click(await screen.findByRole('radio', { name: 'Detailed' }));
+      expect(apiClient.put).toHaveBeenCalledWith('/users/me/preferences', { workOrderOverviewLayout: 'detailed' });
+      expect(await screen.findByText(/open location/i)).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Detailed' })).toBeChecked();
+      // The browser keeps a copy so the next page paints the right layout first.
+      expect(window.localStorage.getItem('wo.overviewLayout')).toBe('detailed');
+    });
+
+    it('puts gate, access and the on-site contact in the header', async () => {
+      storedLayout = 'compact';
+      mockApiResponses();
+      renderPage();
+
+      // Compact has no Location card, so each shows once — in the header.
+      expect(await screen.findByText('4821')).toBeInTheDocument();
+      expect(screen.getByText('Side gate, dog in yard')).toBeInTheDocument();
+      expect(screen.getByText('Paul Wilcox')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '(555) 987-6543' })).toHaveAttribute('href', 'tel:5559876543');
+    });
+
+    it('leaves the arrival line out when the location has none of it', async () => {
+      storedLayout = 'compact';
+      mockApiResponses(mockWorkOrder, ZERO_SUMMARY, {
+        ...mockServiceLocation,
+        siteContactName: null,
+        siteContactPhone: null,
+        accessInstructions: null,
+        arrivalFacts: [],
+      } as unknown as ServiceLocationDetailDto);
+      renderPage();
+
+      // The premise tag renders once the location record has loaded.
+      expect(await screen.findByText(/^(residence|business)$/i)).toBeInTheDocument();
+      expect(screen.queryByText('On site')).not.toBeInTheDocument();
+      expect(screen.queryByText('Side gate, dog in yard')).not.toBeInTheDocument();
+    });
   });
 });
