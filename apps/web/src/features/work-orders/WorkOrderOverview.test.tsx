@@ -225,6 +225,11 @@ describe('WorkOrderOverview', () => {
     expect(screen.getByText('4821')).toBeInTheDocument(); // gate arrival fact
     expect(screen.getByText(/side gate, dog in yard/i)).toBeInTheDocument();
     expect(screen.getByText(/two small kids/i)).toBeInTheDocument();
+    // Opening the location carries this job, so its back-link returns here.
+    expect(screen.getByRole('link', { name: /open location/i })).toHaveAttribute(
+      'href',
+      '/service-locations/loc-1?from=work-order&woId=wo-1&woNo=WO-1',
+    );
     expect(screen.getByText(/bills to/i)).toBeInTheDocument();
     expect(screen.getByText('Reyes Residence Inc.')).toBeInTheDocument();
   });
