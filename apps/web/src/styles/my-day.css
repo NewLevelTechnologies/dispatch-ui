@@ -10,6 +10,29 @@
 
 .md-wrap { max-width: 1040px; }
 .md-head { margin-bottom: 12px; }
+.md-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* ‹ Today › — a segmented control, not a toolbar: the label is the current
+   day, and tapping it (off today) returns to today. */
+.md-stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-elev);
+}
+.md-step { width: 34px; padding-inline: 0; justify-content: center; color: var(--fg-muted); }
+.md-step-label { min-width: 76px; justify-content: center; font-weight: 600; color: var(--fg-strong); }
+.md-step-label.today { color: var(--fg-accent); }
+/* The disabled "Today" label is the current state, not a dead control. */
+.md-step-label.today:disabled { opacity: 1; }
+@media (max-width: 899px) {
+  .md-step { width: 40px; min-height: 36px; }
+  .md-step-label { min-height: 36px; }
+}
 .md-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--fg-muted); }
 
 .md-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
@@ -139,6 +162,14 @@
 .md-chip { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; background: var(--bg-active); color: var(--fg-muted); }
 .md-stop-right { align-self: center; display: grid; place-items: center; min-width: 24px; color: var(--fg-muted); }
 .md-stop.past .md-stop-right { color: var(--success-500); }
+
+.md-route-foot {
+  padding: 9px 14px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-elev-2);
+  font-size: 11.5px;
+  color: var(--fg-muted);
+}
 
 /* ── Unfinished ─────────────────────────────────────────────────── */
 .md-carry {

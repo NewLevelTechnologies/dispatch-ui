@@ -5441,6 +5441,18 @@
       "description": "Nothing is on your route yet. Work shows up here as soon as it’s released to you.",
       "title": "No stops today"
     },
+    "other": {
+      "futureSub_one": "{{date}} · {{count}} stop released · {{first}} – {{last}}",
+      "futureSub_other": "{{date}} · {{count}} stops released · {{first}} – {{last}}",
+      "noStopsPast": "No stops that day",
+      "nothingReleased": "Nothing released yet",
+      "nothingReleasedBody": "Stops show up here once they’re released to you.",
+      "pastSub": "{{date}} · {{done}} of {{count}} completed",
+      "pastSubEmpty": "{{date}} · no stops",
+      "releasedFoot": "Dispatch may still add or move stops before the day is released in full.",
+      "releasedRoute": "Released route",
+      "route": "Route"
+    },
     "progress": {
       "aria": "Day progress",
       "dayComplete": "day complete",
@@ -5459,6 +5471,15 @@
       "stops_one": "{{count}} stop",
       "stops_other": "{{count}} stops",
       "title": "Today’s route"
+    },
+    "stepper": {
+      "aria": "Day",
+      "backToToday": "Back to today",
+      "next": "Next day",
+      "previous": "Previous day",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "yesterday": "Yesterday"
     },
     "subtitle_one": "{{date}} · {{count}} stop · {{first}} – {{last}}",
     "subtitle_other": "{{date}} · {{count}} stops · {{first}} – {{last}}",

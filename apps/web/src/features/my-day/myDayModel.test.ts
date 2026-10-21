@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { MyDayStop } from '../../api/setup';
 import {
+  DAY_KEYS,
   focusAction,
   formatDuration,
   formatEstimate,
@@ -8,6 +9,7 @@ import {
   pickFocus,
   routeStops,
   showTomorrow,
+  swipeStep,
 } from './myDayModel';
 
 const row = (over: Partial<MyDayStop>): MyDayStop =>
@@ -84,5 +86,20 @@ describe('showTomorrow', () => {
     expect(showTomorrow(0, '2026-10-24')).toBe(false); // Saturday
     expect(showTomorrow(2, '2026-10-24')).toBe(true);
     expect(showTomorrow(0, '2026-10-22')).toBe(true); // Thursday
+  });
+});
+
+describe('day stepper', () => {
+  it('spans a week either side of today', () => {
+    expect(DAY_KEYS[0]).toBe('-7');
+    expect(DAY_KEYS).toContain('0');
+    expect(DAY_KEYS[DAY_KEYS.length - 1]).toBe('7');
+  });
+
+  it('steps only on a swipe longer than 70px', () => {
+    expect(swipeStep(-71)).toBe(1);
+    expect(swipeStep(71)).toBe(-1);
+    expect(swipeStep(70)).toBe(0);
+    expect(swipeStep(-20)).toBe(0);
   });
 });

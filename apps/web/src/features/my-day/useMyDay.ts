@@ -42,9 +42,10 @@ export function useMyDayStops(date?: string, { enabled = true }: { enabled?: boo
   return { ...query, stops };
 }
 
-/** Tomorrow, once today's response has told us what "today" is. */
-export function useTomorrowStops(today: string | undefined) {
-  return useMyDayStops(today ? shiftDay(today, 1) : undefined, { enabled: !!today });
+/** The day `offset` days from today, once today's response has told us
+ *  what "today" is. Released work only, like every My day read. */
+export function useDayAt(today: string | undefined, offset: number) {
+  return useMyDayStops(today ? shiftDay(today, offset) : undefined, { enabled: !!today && offset !== 0 });
 }
 
 /** The focus stop's work order — only for who to call and what equipment,
