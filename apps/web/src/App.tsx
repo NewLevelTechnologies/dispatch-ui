@@ -8,6 +8,7 @@ import { GlossaryProvider } from './contexts/GlossaryContext';
 import { useTheme } from './components/ThemeProvider';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import MyDayPage from './pages/MyDayPage';
 import CustomersPage from './pages/CustomersPage';
 import PayersPage from './pages/PayersPage';
 import PayerFormPage from './pages/PayerFormPage';
@@ -91,7 +92,7 @@ const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElem
 };
 
 // Post-login landing. Field roles limited to their own work (the Technician
-// template) start on their assigned work orders; everyone else on the
+// template) start on My day — today's route; everyone else on the
 // dashboard. Rendered inside ProtectedRoute so the user is tenant-scoped.
 const HomeRedirect = () => {
   const { data: user, isLoading } = useCurrentUser();
@@ -103,7 +104,7 @@ const HomeRedirect = () => {
     );
   }
   if (user && isAssignedOnly(user)) {
-    return <Navigate to={`/work-orders?assigned=${user.id}`} replace />;
+    return <Navigate to="/my-day" replace />;
   }
   return <Navigate to="/dashboard" replace />;
 };
@@ -226,6 +227,7 @@ function App() {
         }
       />
       <Route path="/dashboard" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DashboardPage />} />} />
+      <Route path="/my-day" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<MyDayPage />} />} />
       <Route path="/customers" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomersPage />} />} />
       <Route path="/payers" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PayersPage />} />} />
       <Route path="/payers/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PayerFormPage />} />} />

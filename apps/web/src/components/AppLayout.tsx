@@ -25,6 +25,7 @@ import {
   BellIcon,
   CheckBadgeIcon,
   ArrowPathRoundedSquareIcon,
+  SunIcon,
 } from '@heroicons/react/24/outline';
 import { approvalsApi, quotePriceApprovalsApi, tenantSettingsApi, type ApprovalsBellSummary } from '../api/setup';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
@@ -34,7 +35,7 @@ import { Dropdown, DropdownButton, DropdownDescription, DropdownDivider, Dropdow
 import WorkspaceBrand from './workspace/WorkspaceBrand';
 import { useTheme } from './ThemeProvider';
 import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
-import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
+import { isAssignedOnly, useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
 import { useApprovalsVisible } from '../hooks/useApprovalsVisible';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { roleColor } from '@dispatch/utils';
@@ -130,7 +131,26 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
 
   type NavItem = { name: string; href: string; icon: typeof HomeIcon; badge?: number };
   type NavGroup = { section?: string; items: NavItem[] };
-  const navGroups: NavGroup[] = [
+  // Field roles limited to their own work get a trimmed nav: their day, their
+  // work orders, and settings if they hold it. The rest is hidden rather than
+  // disabled — they can't open it.
+  const fieldNav: NavGroup[] = [
+    {
+      section: t('myDay.nav.field'),
+      items: [
+        { name: t('myDay.title'), href: '/my-day', icon: SunIcon },
+        {
+          name: t('myDay.nav.myWorkOrders', { entities: getName('work_order', true) }),
+          href: '/work-orders',
+          icon: ClipboardDocumentListIcon,
+        },
+      ],
+    },
+    ...(canViewSettings
+      ? [{ items: [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] }]
+      : []),
+  ];
+  const officeNav: NavGroup[] = [
     {
       items: [
         { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
@@ -196,6 +216,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
       ],
     },
   ];
+  const navGroups = isAssignedOnly(currentUser) ? fieldNav : officeNav;
 
   // Breadcrumbs: find the nav group the current route belongs to, then surface
   // "Section / Page" in the topbar. Unlabelled groups show just the page.
