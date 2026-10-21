@@ -657,7 +657,37 @@
     "activity": {
       "empty": "No activity yet.",
       "error": "Couldn't load activity",
-      "title": "Activity"
+      "title": "Activity",
+      "verb": {
+        "callbackChanged": "changed the callback on {{obj}} from {{fromWorkOrderNumber}} to {{toWorkOrderNumber}}",
+        "callbackLinked": "linked {{obj}} as a callback of {{toWorkOrderNumber}}",
+        "callbackUnlinked": "unlinked {{obj}} as a callback of {{fromWorkOrderNumber}}",
+        "dispatchArrived": "arrived at {{obj}}",
+        "dispatchAssigned": "assigned {{assignedUserName}} to {{obj}}",
+        "dispatchCancelled": "cancelled the {{entity, lowercase}} on {{obj}}",
+        "dispatchCheckedOut": "checked out of {{obj}}",
+        "dispatchDeparted": "left {{obj}}",
+        "dispatchEnRoute": "headed to {{obj}}",
+        "dispatchReassigned": "reassigned {{obj}} from {{fromAssignedUserName}} to {{assignedUserName}}",
+        "dispatchRescheduled": "rescheduled {{obj}} to {{window}}",
+        "filesUploaded": "uploaded {{count}} {{what}} to {{obj}}",
+        "invoiceMarkedSent": "marked {{obj}} sent · {{amount}}",
+        "invoicePaid": "paid {{obj}} in full · {{amount}}",
+        "invoiceSent": "sent {{obj}}{{via}} · {{amount}}",
+        "noteAdded": "added a note to {{obj}}: “{{bodyExcerpt}}”",
+        "noteDeleted": "deleted a note on {{obj}}",
+        "workItemCreated": "added {{entity, lowercase}} to {{obj}}",
+        "workItemDeleted": "removed {{entity, lowercase}} from {{obj}}",
+        "workItemStatusChanged": "moved a {{workItem, lowercase}} on {{obj}} from {{fromStatusName}} to {{toStatusName}}",
+        "workItemUpdated": "changed {{field, lowercase}} on {{obj}}",
+        "workOrderArchived": "archived {{obj}}",
+        "workOrderCancelled": "cancelled {{obj}}",
+        "workOrderCompleted": "completed {{obj}}",
+        "workOrderCreated": "created {{obj}}",
+        "workOrderUnarchived": "unarchived {{obj}}",
+        "workOrderUpdated": "changed {{field, lowercase}} on {{obj}} from {{fromValue}} to {{toValue}}",
+        "workOrderUpdatedFieldOnly": "changed {{field, lowercase}} on {{obj}}"
+      }
     },
     "attention": {
       "actions": {

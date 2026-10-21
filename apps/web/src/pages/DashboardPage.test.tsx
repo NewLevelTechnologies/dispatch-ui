@@ -243,7 +243,7 @@ describe('DashboardPage — Operations', () => {
         {
           id: 'f1', kind: 'INVOICE_PAID', category: 'FINANCIAL', timestamp: '2026-10-21T13:00:00Z',
           actor: { type: 'CUSTOMER', userId: null, userName: 'Ridgeview HOA' }, data: { totalAmount: 3860 },
-          subject: { type: 'INVOICE', id: 'inv1', number: 'INV-1180' }, workOrderId: null, serviceLocationId: null,
+          subject: { type: 'INVOICE', id: 'inv1', label: 'INV-1180' }, workOrderId: null, serviceLocationId: null,
         },
       ],
       nextCursor: null,
@@ -251,15 +251,20 @@ describe('DashboardPage — Operations', () => {
     });
     renderWithProviders(<DashboardPage />);
 
+    // Staff: avatar, then a verb-first sentence with the object as the link.
     const staff = await screen.findByText('Maria Chen');
     expect(staff.tagName).toBe('STRONG');
+    expect(staff.parentElement).toHaveTextContent('Maria Chen created WO-1042');
     expect(screen.getByLabelText('Maria Chen')).toHaveTextContent('MC');
 
+    // Customer: named and verb-first, never avatared.
     const customer = await screen.findByText('Ridgeview HOA');
-    expect(customer.tagName).toBe('STRONG');
+    expect(customer.parentElement).toHaveTextContent('Ridgeview HOA paid INV-1180 in full · $3,860.00');
     expect(screen.queryByLabelText('Ridgeview HOA')).not.toBeInTheDocument();
 
-    expect(screen.getByText(/Rescheduled to Thu 8–10a/)).toBeInTheDocument();
+    // System: never named, so the object leads.
+    const system = screen.getByText(/Rescheduled to Thu 8–10a/);
+    expect(system).toHaveTextContent(/^WO-1042 · Rescheduled to Thu 8–10a$/);
     expect(screen.queryByText('System')).not.toBeInTheDocument();
   });
 

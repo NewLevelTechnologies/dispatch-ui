@@ -18,6 +18,7 @@ import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { buildRecentActivity, type RecentActivityItem } from '../../lib/locationActivityRows';
+import { verbSentence } from './activitySentence';
 
 const SHOWN = 9;
 
@@ -28,6 +29,64 @@ function systemGlyph(kind: string) {
   if (kind.startsWith('DISPATCH_')) return CalendarIcon;
   if (kind.startsWith('PO_')) return CubeIcon;
   return Cog6ToothIcon;
+}
+
+/**
+ * The row's sentence. A person who acted leads it, verb first: "Marcus Bell
+ * completed WO-3901 · No cooling". The system is never named, so its rows
+ * lead with the object instead: "WO-3888 · Rescheduled to Thu 8–10a". The
+ * object is the link; the name never is.
+ */
+function ActivityText({ item, named }: { item: RecentActivityItem; named: boolean }) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const link = (label: string) =>
+    item.objHref ? (
+      <Link href={item.objHref} className="text-fg-accent hover:underline">
+        {label}
+      </Link>
+    ) : (
+      label
+    );
+  const detail = item.objDetail ? ` · ${item.objDetail}` : '';
+
+  if (named) {
+    const verb = item.objLabel ? verbSentence(item.event, item.stream, item.actor, t, getName) : null;
+    if (verb && item.objLabel) {
+      return (
+        <>
+          <strong>{item.actor}</strong> {verb.before}
+          {link(item.objLabel)}
+          {verb.after}
+          {detail}
+        </>
+      );
+    }
+    // No verb template for this kind: name, then the event as the tabs say it.
+    return (
+      <>
+        <strong>{item.actor}</strong>
+        {' · '}
+        {item.text}
+        {item.obj && (
+          <>
+            {' · '}
+            {link(item.obj)}
+          </>
+        )}
+      </>
+    );
+  }
+
+  if (!item.objLabel) return <>{item.text}</>;
+  return (
+    <>
+      {link(item.objLabel)}
+      {' · '}
+      {item.text}
+      {detail}
+    </>
+  );
 }
 
 /** Today reads as a clock time ("10:12"); anything older as the usual
@@ -119,21 +178,7 @@ export function ActivityCard({ regionIds }: { regionIds: string[] | undefined })
                   </span>
                 )}
                 <div className="home-act-text">
-                  {named && (
-                    <>
-                      <strong>{item.actor}</strong>
-                      {' · '}
-                    </>
-                  )}
-                  {item.text}
-                  {item.obj && item.objHref && (
-                    <>
-                      {' · '}
-                      <Link href={item.objHref} className="text-fg-accent hover:underline">
-                        {item.obj}
-                      </Link>
-                    </>
-                  )}
+                  <ActivityText item={item} named={named} />
                 </div>
                 <div className="home-act-time" title={item.tsExact}>
                   {rowTime(item)}

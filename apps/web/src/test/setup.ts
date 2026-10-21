@@ -282,6 +282,8 @@ vi.mock('react-i18next', async () => {
     'customers.tabs.financial': 'Financial',
     'customers.tabs.overview': 'Overview',
     'dashboard.attention.quietTitle': 'Nothing needs you right now',
+    'dashboard.activity.verb.invoicePaid': 'paid {{obj}} in full · {{amount}}',
+    'dashboard.activity.verb.workOrderCreated': 'created {{obj}}',
     'dashboard.greeting.afternoonNamed': 'Good afternoon, {{name}}',
     'dashboard.greeting.eveningNamed': 'Good evening, {{name}}',
     'dashboard.greeting.morningNamed': 'Good morning, {{name}}',
