@@ -6,6 +6,7 @@
 // can reuse buildRecentActivity without tripping react-refresh.
 // ─────────────────────────────────────────────────────────────────
 import type {
+  ActivityActor,
   ActivityWorkOrderRef,
   FinancialActivityEvent,
   LocationActivityEvent,
@@ -66,9 +67,14 @@ export function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n).trimEnd()}…` : s;
 }
 
-function actorOf(name: string | undefined, t: TFunc): { actor: string; isPerson: boolean } {
+function actorOf(
+  name: string | undefined,
+  t: TFunc,
+  type?: ActivityActor['type'],
+): { actor: string; isPerson: boolean } {
   const raw = name?.trim();
-  const isPerson = !!raw && raw.toLowerCase() !== 'unknown';
+  // A SYSTEM actor can still carry a display name ("System"); it isn't a person.
+  const isPerson = type !== 'SYSTEM' && !!raw && raw.toLowerCase() !== 'unknown';
   return { actor: isPerson ? raw! : t('workOrders.activity.systemActor'), isPerson };
 }
 
@@ -180,7 +186,7 @@ export function buildDays({
 
 function singleRowModel(evt: LocationActivityEvent, t: TFunc, getName: GetName): SingleRow {
   const { glyph, tone } = glyphFor(evt);
-  const { actor, isPerson } = actorOf(evt.actor?.userName, t);
+  const { actor, isPerson } = actorOf(evt.actor?.userName, t, evt.actor?.type);
   const { obj, objHref } = woBacklink(evt.workOrder);
   return {
     kind: 'single',
@@ -305,6 +311,15 @@ export interface RecentActivityItem {
   id: string;
   glyph: string;
   tone: ActivityTone;
+  /** Who did it, or the system label when no person did. */
+  actor: string;
+  isPerson: boolean;
+  /** Staff act as people; a customer is named but never avatared; the rest is the system. */
+  actorType: 'staff' | 'customer' | 'system';
+  /** The source event's kind, for surfaces that pick a glyph by it. */
+  kind: string;
+  /** The event's instant, unformatted. */
+  at: string;
   text: string;
   obj: string | null;
   objHref: string | null;
@@ -326,15 +341,30 @@ export function buildRecentActivity(
   getName: GetName,
   limit = 3
 ): RecentActivityItem[] {
-  const rows: { ts: string; row: BaseRow }[] = [
-    ...streams.events.map((e) => ({ ts: e.timestamp, row: singleRowModel(e, t, getName) })),
-    ...streams.financial.map((f) => ({ ts: f.timestamp, row: financialRowModel(f, t, getName) })),
+  const rows: { ts: string; row: BaseRow; kind: string; customer: boolean }[] = [
+    ...streams.events.map((e) => ({
+      ts: e.timestamp,
+      row: singleRowModel(e, t, getName),
+      kind: e.kind,
+      customer: e.actor?.type === 'CUSTOMER',
+    })),
+    ...streams.financial.map((f) => ({
+      ts: f.timestamp,
+      row: financialRowModel(f, t, getName),
+      kind: f.kind,
+      customer: f.actor?.type === 'CUSTOMER',
+    })),
   ];
   rows.sort((a, b) => b.ts.localeCompare(a.ts));
-  return rows.slice(0, limit).map(({ row }) => ({
+  return rows.slice(0, limit).map(({ ts, row, kind, customer }) => ({
     id: row.id,
     glyph: row.glyph,
     tone: row.tone,
+    actor: row.actor,
+    isPerson: row.isPerson,
+    actorType: customer ? 'customer' : row.isPerson ? 'staff' : 'system',
+    kind,
+    at: ts,
     text: row.text,
     obj: row.obj,
     objHref: row.objHref,

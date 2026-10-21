@@ -1,4 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
+import {
+  CalendarIcon,
+  ClipboardDocumentListIcon,
+  Cog6ToothIcon,
+  CreditCardIcon,
+  CubeIcon,
+} from '@heroicons/react/24/outline';
 import { useTranslation } from '@dispatch/i18n';
 import { activityApi, financialActivityApi } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
@@ -6,22 +13,30 @@ import { useHasCapability } from '../../hooks/useCurrentUser';
 import { Button } from '../../components/catalyst/button';
 import { Link } from '../../components/catalyst/link';
 import { Card, CardBody, CardHead, CardTitle } from '../../components/ui/Card';
-import { Timeline, type TimelineEntry } from '../../components/ui/Timeline';
+import { Avatar } from '../../components/ui/Avatar';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
-import type { ActivityTone } from '../../lib/activityGlyph';
-import { buildRecentActivity } from '../../lib/locationActivityRows';
+import { buildRecentActivity, type RecentActivityItem } from '../../lib/locationActivityRows';
 
 const SHOWN = 9;
 
-const DOT: Record<ActivityTone, TimelineEntry['dot']> = {
-  info: 'info',
-  success: 'success',
-  warning: 'warning',
-  accent: '',
-  neutral: 'muted',
-};
+/** The glyph in a non-staff row's circle, by what the event is about. */
+function systemGlyph(kind: string) {
+  if (kind.startsWith('QUOTE_')) return ClipboardDocumentListIcon;
+  if (kind.startsWith('INVOICE_') || kind.startsWith('PAYMENT_')) return CreditCardIcon;
+  if (kind.startsWith('DISPATCH_')) return CalendarIcon;
+  if (kind.startsWith('PO_')) return CubeIcon;
+  return Cog6ToothIcon;
+}
+
+/** Today reads as a clock time ("10:12"); anything older as the usual
+ *  relative / dated timestamp. */
+function rowTime(item: RecentActivityItem): string {
+  const at = new Date(item.at);
+  if (Number.isNaN(at.getTime()) || at.toDateString() !== new Date().toDateString()) return item.ts;
+  return at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/, '');
+}
 
 /**
  * The most recent events in scope: the work-order stream and the financial
@@ -85,25 +100,48 @@ export function ActivityCard({ regionIds }: { regionIds: string[] | undefined })
       recent.length === 0 ? (
         <EmptyState compact title={t('dashboard.activity.empty')} />
       ) : (
-        <Timeline
-          items={recent.map((item) => ({
-            dot: DOT[item.tone],
-            time: <span title={item.tsExact}>{item.ts}</span>,
-            text: (
-              <>
-                {item.text}
-                {item.obj && item.objHref && (
-                  <>
-                    {' · '}
-                    <Link href={item.objHref} className="text-fg-accent hover:underline">
-                      {item.obj}
-                    </Link>
-                  </>
+        <div className="home-act-list">
+          {recent.map((item) => {
+            const Glyph = systemGlyph(item.kind);
+            // A customer with no name on record is just the glossary word —
+            // the sentence already says who, so don't prefix it.
+            const named =
+              item.actorType === 'staff' || (item.actorType === 'customer' && item.actor !== getName('customer'));
+            return (
+              <div className="home-act" key={item.id}>
+                {/* An avatar means staff. Customers are named in the text;
+                    the system gets a glyph and is never named. */}
+                {item.actorType === 'staff' ? (
+                  <Avatar name={item.actor} size="sm" />
+                ) : (
+                  <span className="home-act-sys" aria-hidden="true">
+                    <Glyph className="size-3" />
+                  </span>
                 )}
-              </>
-            ),
-          }))}
-        />
+                <div className="home-act-text">
+                  {named && (
+                    <>
+                      <strong>{item.actor}</strong>
+                      {' · '}
+                    </>
+                  )}
+                  {item.text}
+                  {item.obj && item.objHref && (
+                    <>
+                      {' · '}
+                      <Link href={item.objHref} className="text-fg-accent hover:underline">
+                        {item.obj}
+                      </Link>
+                    </>
+                  )}
+                </div>
+                <div className="home-act-time" title={item.tsExact}>
+                  {rowTime(item)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       );
   }
 
