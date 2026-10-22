@@ -9,6 +9,7 @@ import { useUpdateDispatchStatus } from '../../dispatches/useUpdateDispatchStatu
 import { dispatchLifecycleSteps } from '../../dispatches/dispatchLifecycleSteps';
 import { formatAddress } from '../../dispatches/formatAddress';
 import { canComplete, canMarkArrived, canMarkEnRoute } from '../../dispatches/dispatchActions';
+import { useWorkOrderAccess } from '../../permissions/useWorkOrderAccess';
 import { statusTone } from '../../schedule/statusTone';
 import { formatArrivalTime } from '../../schedule/formatArrivalTime';
 
@@ -30,6 +31,10 @@ export default function DispatchDetailScreen() {
   const { dispatch, isLoading, error, refetch } = useDispatchDetail(id);
   const contact = useWorkOrderContact(workOrderId);
   const updateStatus = useUpdateDispatchStatus(id);
+  // The tenant decides which roles may move a job along; a tech who can only
+  // read their schedule gets the same screen without the action buttons,
+  // rather than buttons the server would refuse.
+  const { canEdit } = useWorkOrderAccess(dispatch?.assignedUserId);
 
   if (isLoading) {
     return (
@@ -116,7 +121,7 @@ export default function DispatchDetailScreen() {
         </Card>
 
         <View style={{ gap: spacing.sm }}>
-          {canMarkEnRoute(dispatch.status) && (
+          {canEdit && canMarkEnRoute(dispatch.status) && (
             <Button
               label={t('workOrders.dispatches.drawer.markEnRoute')}
               variant="primary"
@@ -124,7 +129,7 @@ export default function DispatchDetailScreen() {
               disabled={updateStatus.isPending}
             />
           )}
-          {canMarkArrived(dispatch.status) && (
+          {canEdit && canMarkArrived(dispatch.status) && (
             <Button
               label={t('workOrders.dispatches.drawer.markArrived')}
               variant={dispatch.status === 'EN_ROUTE' ? 'primary' : 'secondary'}
@@ -132,7 +137,7 @@ export default function DispatchDetailScreen() {
               disabled={updateStatus.isPending}
             />
           )}
-          {canComplete(dispatch.status) && (
+          {canEdit && canComplete(dispatch.status) && (
             <Button
               label={t('workOrders.dispatches.markCompleted')}
               variant="secondary"

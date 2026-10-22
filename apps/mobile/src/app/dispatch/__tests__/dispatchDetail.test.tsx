@@ -6,6 +6,7 @@ import DispatchDetailScreen from '../[id]';
 import { useDispatchDetail } from '../../../dispatches/useDispatchDetail';
 import { useWorkOrderContact } from '../../../dispatches/useWorkOrderContact';
 import { useUpdateDispatchStatus } from '../../../dispatches/useUpdateDispatchStatus';
+import { useWorkOrderAccess } from '../../../permissions/useWorkOrderAccess';
 import type { Dispatch } from '@dispatch/api';
 
 const mockPush = jest.fn();
@@ -17,10 +18,12 @@ jest.mock('expo-router', () => ({
 jest.mock('../../../dispatches/useDispatchDetail', () => ({ useDispatchDetail: jest.fn() }));
 jest.mock('../../../dispatches/useWorkOrderContact', () => ({ useWorkOrderContact: jest.fn() }));
 jest.mock('../../../dispatches/useUpdateDispatchStatus', () => ({ useUpdateDispatchStatus: jest.fn() }));
+jest.mock('../../../permissions/useWorkOrderAccess', () => ({ useWorkOrderAccess: jest.fn() }));
 
 const mockUseDispatchDetail = useDispatchDetail as jest.Mock;
 const mockUseWorkOrderContact = useWorkOrderContact as jest.Mock;
 const mockUseUpdateDispatchStatus = useUpdateDispatchStatus as jest.Mock;
+const mockUseWorkOrderAccess = useWorkOrderAccess as jest.Mock;
 const mockRefetch = jest.fn();
 const mockMutate = jest.fn();
 
@@ -65,6 +68,7 @@ const renderDetail = () =>
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseUpdateDispatchStatus.mockReturnValue({ mutate: mockMutate, isPending: false });
+  mockUseWorkOrderAccess.mockReturnValue({ canEdit: true });
   mockUseWorkOrderContact.mockReturnValue(BASE_CONTACT);
   jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
 });
@@ -170,6 +174,26 @@ describe('DispatchDetailScreen', () => {
     mockUseDispatchDetail.mockReturnValue({ dispatch: BASE_DISPATCH, isLoading: false, error: null, refetch: mockRefetch });
     await renderDetail();
     expect(screen.queryByText('Call')).toBeNull();
+  });
+
+  it('hides every status action when the role may not edit this job', async () => {
+    mockUseWorkOrderAccess.mockReturnValue({ canEdit: false });
+    mockUseDispatchDetail.mockReturnValue({ dispatch: BASE_DISPATCH, isLoading: false, error: null, refetch: mockRefetch });
+    await renderDetail();
+
+    expect(screen.queryByText('Mark en route')).toBeNull();
+    expect(screen.queryByText('Mark arrived')).toBeNull();
+    expect(screen.queryByText('Mark completed')).toBeNull();
+    // The screen still reads — only acting on it is gated.
+    expect(screen.getByText('123 Main St, Phoenix, AZ 85001')).toBeTruthy();
+    expect(screen.getAllByText('En route').length).toBeGreaterThan(0);
+  });
+
+  it('asks about access for the dispatch’s own assignee', async () => {
+    mockUseDispatchDetail.mockReturnValue({ dispatch: BASE_DISPATCH, isLoading: false, error: null, refetch: mockRefetch });
+    await renderDetail();
+
+    expect(mockUseWorkOrderAccess).toHaveBeenCalledWith('user-1');
   });
 
   it('offers only "Mark arrived" and "Mark completed" while en route', async () => {
