@@ -114,12 +114,9 @@ export default function EquipmentThumbnail({
         .join(' ')}
     >
       {url ? (
-        <img
-          src={url}
-          alt={name}
-          loading="lazy"
-          className={`block size-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
-        />
+        // Sizing + fit come from `.eq-thumb-img` (components.css, unlayered) so
+        // no inherited img rule can override the fit and squash the photo.
+        <img src={url} alt={name} loading="lazy" className="eq-thumb-img" data-fit={fit} />
       ) : (
         <div className="flex size-full items-center justify-center">
           <PhotoIcon

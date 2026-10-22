@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { documentBack, withDocumentBack } from './backContext';
+import { documentBack, withDocumentBack, withWorkOrderBack } from './backContext';
+
+describe('work order back-context', () => {
+  it('adds the work order id and number to a link', () => {
+    expect(withWorkOrderBack('/service-locations/l1', 'wo-1', 'WO-00208')).toBe(
+      '/service-locations/l1?from=work-order&woId=wo-1&woNo=WO-00208',
+    );
+    expect(withWorkOrderBack('/service-locations/l1', 'wo-1', null)).toBe('/service-locations/l1?from=work-order&woId=wo-1');
+  });
+});
 
 describe('document back-context', () => {
   it('adds the document to a link, keeping a query the path already has', () => {

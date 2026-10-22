@@ -2,13 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
-import {
-  ArchiveBoxIcon,
-  CalendarIcon,
-  CheckIcon,
-  EllipsisHorizontalIcon,
-  PlusIcon,
-} from '@heroicons/react/16/solid';
+import { EllipsisHorizontalIcon, PlusIcon } from '@heroicons/react/16/solid';
 import {
   workOrderApi,
   workOrderFilesApi,
@@ -23,13 +17,7 @@ import {
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { showError, extractApiError } from '../../lib/toast';
 import { workItemLabel } from '@dispatch/utils';
-import {
-  allowedTargetStatuses,
-  completeTarget,
-  partsArrivedTarget,
-  PENDING_PARTS_CODE,
-} from '../../lib/workItemStatusTargets';
-import { deriveWorkItemSteps, isFinished, openPurchaseOrders, primaryAction } from '../../lib/workItemSteps';
+import { deriveWorkItemSteps } from '../../lib/workItemSteps';
 import InlineComposer from '../InlineComposer';
 import WorkItemStatusPill from '../WorkItemStatusPill';
 import ConfirmDialog from '../ConfirmDialog';
@@ -39,6 +27,8 @@ import { Button } from '../catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../catalyst/dropdown';
 import { Pill } from '../ui/Pill';
 import WorkItemSteps from './WorkItemSteps';
+import WorkItemPrimaryButton from './WorkItemPrimaryButton';
+import { useWorkItemActions } from './useWorkItemActions';
 import WorkItemEquipmentCard from './WorkItemEquipmentCard';
 import WorkItemEquipmentHistory from './WorkItemEquipmentHistory';
 import WorkItemHistory from './WorkItemHistory';
@@ -99,45 +89,21 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingFindings, setEditingFindings] = useState(false);
-  const [confirmComplete, setConfirmComplete] = useState<(() => void) | null>(null);
   const [deleteBlocked, setDeleteBlocked] = useState(false);
 
-  const status = statuses.find((s) => s.id === wi.statusId) ?? null;
-  const allowed = allowedTargetStatuses(wi, statuses, transitions, enforceWorkflow);
-  const finished = isFinished(wi);
   const findings = wi.diagnosis?.trim() ?? '';
-  const openPOs = openPurchaseOrders(purchaseOrders);
   const steps = deriveWorkItemSteps(wi, purchaseOrders, props.documents);
-  const toComplete = completeTarget(allowed);
-  const toPartsArrived = partsArrivedTarget(allowed);
-  const awaitingParts = status?.code === PENDING_PARTS_CODE;
-
-  const action = primaryAction({
-    finished,
-    awaitingParts,
-    hasDispatches: dispatches.length > 0,
-    hasFindings: !!findings,
-    canPartsArrived: !!toPartsArrived,
-    canSchedule: !!props.onSchedule,
-    canComplete: !!toComplete,
-  });
-
-  const setStatus = useMutation({
-    mutationFn: (statusId: string) => workOrderApi.updateWorkItemStatus(workOrderId, wi.id, { statusId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
-      queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
-    },
-    onError: (err) => showError(t('workOrders.workItems.statusUpdateError'), extractApiError(err) ?? undefined),
-  });
-
-  // Completing while parts are still on order is allowed, but asked first.
-  const guardComplete = (proceed: () => void) => {
-    if (openPOs.length > 0) setConfirmComplete(() => proceed);
-    else proceed();
-  };
-  const markComplete = () => toComplete && guardComplete(() => setStatus.mutate(toComplete.id));
+  const { action, pending, finished, awaitingParts, openPOs, toComplete, guardComplete, markComplete, partsArrived, confirmDialog } =
+    useWorkItemActions({
+      workOrderId,
+      wi,
+      statuses,
+      transitions,
+      enforceWorkflow,
+      purchaseOrders,
+      hasDispatches: dispatches.length > 0,
+      canSchedule: !!props.onSchedule,
+    });
 
   // Reopen is the server's rule: back to the status held before Done (from its
   // status history), else In progress. Only Completed items reopen.
@@ -203,10 +169,10 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
                 />
                 <span className="flex-1" />
                 {!readOnly && (
-                  <PrimaryButton
+                  <WorkItemPrimaryButton
                     action={action}
-                    pending={setStatus.isPending}
-                    onPartsArrived={() => toPartsArrived && setStatus.mutate(toPartsArrived.id)}
+                    pending={pending}
+                    onPartsArrived={partsArrived}
                     onSchedule={() => props.onSchedule?.(wi)}
                     onFindings={() => setEditingFindings(true)}
                     onComplete={markComplete}
@@ -324,19 +290,7 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
         </div>
       </div>
 
-      <ConfirmDialog
-        isOpen={!!confirmComplete}
-        onClose={() => setConfirmComplete(null)}
-        onConfirm={() => {
-          confirmComplete?.();
-          setConfirmComplete(null);
-        }}
-        title={t('workOrders.workItems.completeWithPartsTitle')}
-        message={t('workOrders.workItems.completeWithPartsMessage', {
-          pos: openPOs.map((po) => po.poNumber).join(', '),
-        })}
-        confirmLabel={t('workOrders.workItems.markComplete')}
-      />
+      {confirmDialog}
       {/* Delete is refused (not confirmed) once a visit has worked the item —
           the explanation plus the move that's actually wanted. */}
       <Alert open={deleteBlocked} onClose={() => setDeleteBlocked(false)}>
@@ -368,56 +322,6 @@ export default function WorkItemDetail(props: WorkItemDetailProps) {
       </Alert>
     </>
   );
-}
-
-function PrimaryButton({
-  action,
-  pending,
-  onPartsArrived,
-  onSchedule,
-  onFindings,
-  onComplete,
-}: {
-  action: ReturnType<typeof primaryAction>;
-  pending: boolean;
-  onPartsArrived: () => void;
-  onSchedule: () => void;
-  onFindings: () => void;
-  onComplete: () => void;
-}) {
-  const { t } = useTranslation();
-  const { getName } = useGlossary();
-  switch (action) {
-    case 'partsArrived':
-      return (
-        <Button color="accent" size="xs" onClick={onPartsArrived} disabled={pending}>
-          <ArchiveBoxIcon data-slot="icon" />
-          {t('workOrders.workItems.partsArrived')}
-        </Button>
-      );
-    case 'schedule':
-      return (
-        <Button color="accent" size="xs" onClick={onSchedule}>
-          <CalendarIcon data-slot="icon" />
-          {t('workOrders.workItems.scheduleEntity', { entity: getName('dispatch').toLowerCase() })}
-        </Button>
-      );
-    case 'findings':
-      return (
-        <Button color="accent" size="xs" onClick={onFindings}>
-          {t('workOrders.workItems.addFindings')}
-        </Button>
-      );
-    case 'complete':
-      return (
-        <Button color="accent" size="xs" onClick={onComplete} disabled={pending}>
-          <CheckIcon data-slot="icon" />
-          {t('workOrders.workItems.markComplete')}
-        </Button>
-      );
-    default:
-      return null;
-  }
 }
 
 function FindingsSection({
@@ -596,13 +500,17 @@ const PO_TONE: Record<string, 'warning' | 'success' | 'neutral'> = {
   CANCELLED: 'neutral',
 };
 
-function PartsSection({
+/** Parts & labor for one item: its POs, the labor estimate, and where it sits
+ *  on a quote/invoice. Also the Compact overview's inline Parts panel, which
+ *  supplies its own frame via `className`. */
+export function PartsSection({
   workOrderId,
   customerId,
   wi,
   readOnly,
   purchaseOrders,
   documents,
+  className = 'wit-sec',
 }: {
   workOrderId: string;
   customerId?: string;
@@ -610,6 +518,7 @@ function PartsSection({
   readOnly: boolean;
   purchaseOrders: PurchaseOrderListItem[];
   documents: WorkItemDocument[];
+  className?: string;
 }) {
   const { t } = useTranslation();
   const base = `/purchase-orders/new?workOrderId=${workOrderId}&workItemId=${wi.id}`;
@@ -618,7 +527,7 @@ function PartsSection({
   const showLabor = hasLabor || addingLabor;
 
   return (
-    <div className="wit-sec">
+    <div className={className}>
       <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
         <span className="text-[13px] font-semibold text-fg-strong">{t('workOrders.workItems.partsAndLabor')}</span>
         <span className="flex-1" />

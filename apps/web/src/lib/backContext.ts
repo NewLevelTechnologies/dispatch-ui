@@ -20,6 +20,15 @@ export function resolveBack(listPath: string, back: string | null): string {
   return back ? `${listPath}?${back}` : listPath;
 }
 
+/**
+ * A link out of one work order's page (to its location): `from=work-order`,
+ * the WO id for the href and its number for the back-link label.
+ */
+export function withWorkOrderBack(path: string, workOrderId: string, workOrderNumber: string | null | undefined): string {
+  const qs = new URLSearchParams({ from: 'work-order', woId: workOrderId, ...(workOrderNumber ? { woNo: workOrderNumber } : {}) });
+  return `${path}${path.includes('?') ? '&' : '?'}${qs.toString()}`;
+}
+
 export type DocumentBackKind = 'quote' | 'invoice';
 
 /**

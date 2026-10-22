@@ -582,6 +582,15 @@ describe('ServiceLocationDetailPage', () => {
     expect(backLink).toHaveAttribute('href', '/work-orders');
   });
 
+  it('back-link returns to the work order it was opened from', async () => {
+    mockApiResponses();
+    renderDetailPage('location-1?from=work-order&woId=wo-1&woNo=WO-00208');
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /← WO-00208/ })).toHaveAttribute('href', '/work-orders/wo-1');
+  });
+
   it('back-link returns to the quote it was opened from', async () => {
     mockApiResponses();
     renderDetailPage('location-1?from=quote&docId=q-1&docNo=QTE-00025');

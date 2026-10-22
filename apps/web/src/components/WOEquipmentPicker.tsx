@@ -131,7 +131,6 @@ export default function WOEquipmentPicker({
                 type={e.equipmentTypeName}
                 monogram
                 sizeClass="size-[30px]"
-                fit="contain"
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1.5">

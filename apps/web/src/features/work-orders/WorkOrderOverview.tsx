@@ -37,11 +37,11 @@ import {
   type WorkOrderFinancialSummary,
   type Dispatch,
   type DispatchBoardRow,
-  type DispatchStatus,
   type ServiceLocationDetailDto,
   type ProgressCategory,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { withWorkOrderBack } from '../../lib/backContext';
 import { Card } from '../../components/catalyst/card';
 import { CardTitle, CardLink } from '../../components/customer-detail/shared';
 import { Pill, Tag } from '../../components/ui/Pill';
@@ -52,128 +52,18 @@ import EquipmentThumbnail from '../../components/EquipmentThumbnail';
 import { ActivityRow } from '../../components/ActivityRow';
 import { PROGRESS_TONE } from '../../lib/workItemProgress';
 
-type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
-
-const moneyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-const money = (n: number) => moneyFmt.format(n);
-const num = (s: string | number | null | undefined): number => {
-  if (s == null) return 0;
-  const n = typeof s === 'number' ? s : parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
-};
-
-// Dispatch (trip) status → { tone, label, live }. IN_PROGRESS is the live
-// state (tech on site / working); there's no separate en-route state and no
-// GPS signal, so the strip leads with self-reported status, never a fake ETA.
-const DISPATCH_PRESENTATION: Record<DispatchStatus, { tone: PillTone; label: string; live?: boolean }> = {
-  SCHEDULED: { tone: 'info', label: 'Scheduled' },
-  EN_ROUTE: { tone: 'violet', label: 'En route', live: true },
-  IN_PROGRESS: { tone: 'violet', label: 'On site', live: true },
-  COMPLETED: { tone: 'success', label: 'Completed' },
-  NO_SHOW: { tone: 'warning', label: 'No show' },
-  CANCELLED: { tone: 'neutral', label: 'Cancelled' },
-};
-
-// En route + on site both count as "live now".
-const isLiveDispatch = (s: DispatchStatus) => s === 'EN_ROUTE' || s === 'IN_PROGRESS';
-
-// ── Same-day arrival window: "Fri 8–10 AM"; cross-date degrades to both sides.
-const ETA_DATE = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-const ETA_TIME = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
-function formatWindow(startIso: string, endIso: string): string {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  const sameDay =
-    start.getFullYear() === end.getFullYear() &&
-    start.getMonth() === end.getMonth() &&
-    start.getDate() === end.getDate();
-  if (sameDay) return `${ETA_DATE.format(start)} ${ETA_TIME.format(start)}–${ETA_TIME.format(end)}`;
-  return `${ETA_DATE.format(start)} ${ETA_TIME.format(start)} – ${ETA_DATE.format(end)} ${ETA_TIME.format(end)}`;
-}
-
-// Warranty pill state from the equipment summary's parts-coverage expiry
-// (equipment.warrantyExpiresAt — already on the wire). Future = covered, past =
-// expired, absent/unparseable = no pill (never fabricate coverage).
-function warrantyState(expiresAt?: string | null): 'covered' | 'expired' | null {
-  if (!expiresAt) return null;
-  const ms = new Date(expiresAt).getTime();
-  if (Number.isNaN(ms)) return null;
-  return ms >= Date.now() ? 'covered' : 'expired';
-}
-
-function firstNameLastInitial(name: string | null | undefined): string {
-  if (!name) return '—';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0];
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-}
-
-// ── Attention items — derived, ordered live → blocker → money. Self-hides when
-// empty. Mirrors woAttentionItems() from the mock; the PO link on the blocker
-// is deferred until work-item parts/PO land (BE ask #1 + procurement).
-interface AttentionItem {
-  key: string;
-  severity: 'live' | 'warning' | 'money';
-  title: string;
-  sub: string;
-  actionLabel: string;
-  onAction: () => void;
-}
-
-function deriveAttention(args: {
-  workOrder: WorkOrder;
-  dispatches: DispatchBoardRow[];
-  summary?: WorkOrderFinancialSummary;
-  onOpenTab: (tab: string) => void;
-  onOpenFinancial: (tab: 'invoices' | 'quotes') => void;
-  t: (key: string, opts?: Record<string, unknown>) => string;
-  getName: (code: string, plural?: boolean) => string;
-}): AttentionItem[] {
-  const { workOrder, dispatches, summary, onOpenTab, onOpenFinancial, t, getName } = args;
-  const items: AttentionItem[] = [];
-
-  const live = dispatches.find((d) => isLiveDispatch(d.status));
-  if (live) {
-    items.push({
-      key: 'live',
-      severity: 'live',
-      title: t('workOrders.detail.overview.attnLive', { name: firstNameLastInitial(live.assignedUserName) }),
-      sub: formatWindow(live.arrivalWindowStart, live.arrivalWindowEnd),
-      actionLabel: t('workOrders.detail.overview.view', { entity: getName('dispatch') }),
-      onAction: () => onOpenTab('trips'),
-    });
-  }
-
-  const blocked = (workOrder.workItems ?? []).find((wi) => wi.statusCategory === 'BLOCKED');
-  if (blocked) {
-    items.push({
-      key: 'blocked',
-      severity: 'warning',
-      title: t('workOrders.progress.blocked'),
-      sub: blocked.description,
-      actionLabel: t('workOrders.detail.overview.view', { entity: getName('work_item') }),
-      onAction: () => onOpenTab('items'),
-    });
-  }
-
-  const balance = num(summary?.balance);
-  if (balance > 0) {
-    const paid = num(summary?.paid);
-    items.push({
-      key: 'money',
-      severity: 'money',
-      title: t('workOrders.detail.overview.balanceDue', { amount: money(balance) }),
-      sub:
-        paid > 0
-          ? t('workOrders.detail.overview.collectedAmount', { amount: money(paid) })
-          : t('workOrders.detail.overview.quoteApproved', { entity: getName('quote') }),
-      actionLabel: t('workOrders.detail.overview.view', { entity: getName('invoice', true) }),
-      onAction: () => onOpenFinancial('invoices'),
-    });
-  }
-
-  return items;
-}
+import {
+  DISPATCH_PRESENTATION,
+  ETA_DATE,
+  ETA_TIME,
+  deriveAttention,
+  firstNameLastInitial,
+  isLiveDispatch,
+  money,
+  num,
+  warrantyState,
+  type AttentionItem,
+} from './overviewModel';
 
 function AttentionStrip({ items }: { items: AttentionItem[] }) {
   const { t } = useTranslation();
@@ -338,7 +228,6 @@ function WorkItemPeekRow({
           type={eq.equipmentTypeName}
           monogram
           sizeClass="size-12"
-          fit="contain"
           className="mt-0.5"
         />
       )}
@@ -546,9 +435,14 @@ function TripCell({
 function LocationCard({
   location,
   fallbackContact,
+  workOrderId,
+  workOrderNumber,
 }: {
   location: ServiceLocationDetailDto;
   fallbackContact?: { name?: string; phone?: string; email?: string };
+  /** For the Location page's back-link to this job. */
+  workOrderId: string;
+  workOrderNumber?: string | null;
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -566,7 +460,7 @@ function LocationCard({
     <Card
       title={<CardTitle icon={<MapPinIcon className="size-3.5" />}>{getName('service_location')}</CardTitle>}
       action={
-        <CardLink to={`/service-locations/${location.id}`}>
+        <CardLink to={withWorkOrderBack(`/service-locations/${location.id}`, workOrderId, workOrderNumber)}>
           {t('workOrders.detail.overview.openLocation', { entity: getName('service_location') })}
         </CardLink>
       }
@@ -694,7 +588,7 @@ function MoneyCard({
   );
 }
 
-function RollupStat({
+export function RollupStat({
   label,
   value,
   tone,
@@ -854,7 +748,14 @@ export default function WorkOrderOverview({
         </div>
 
         <div className="flex flex-col gap-3">
-          {location && <LocationCard location={location} fallbackContact={customerContact} />}
+          {location && (
+            <LocationCard
+              location={location}
+              fallbackContact={customerContact}
+              workOrderId={workOrder.id}
+              workOrderNumber={workOrder.workOrderNumber}
+            />
+          )}
           <MoneyCard
             workOrder={workOrder}
             summary={financialSummary}

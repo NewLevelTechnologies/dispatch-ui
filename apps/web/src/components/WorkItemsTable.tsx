@@ -244,7 +244,6 @@ export default function WorkItemsTable({
                       type={wi.equipment.equipmentTypeName}
                       monogram
                       sizeClass="size-8"
-                      fit="contain"
                     />
                   ) : (
                     <div className="size-8 shrink-0" aria-hidden />
@@ -561,7 +560,6 @@ function EquipmentBlockBody({
       type={equipment.equipmentTypeName}
       monogram
       sizeClass="size-12"
-      fit="contain"
     />
   );
 
