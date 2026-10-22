@@ -69,11 +69,18 @@ jobs:
       # AND mobile — but a mobile-only or docs-only PR stops paying for web's
       # ~2000-test suite, which is ~6m44s of a typical 8m38s run.
       #
-      # Anything that can change how every package resolves or builds is
-      # excluded from scoping and forces a full run. Turbo's
+      # Anything that can change how every package resolves, builds, or is
+      # JUDGED is excluded from scoping and forces a full run. Turbo's
       # `globalDependencies` does NOT cover this — it feeds cache hashing, not
-      # `--affected`'s package selection, so without this guard a lockfile bump
-      # would select no packages and quietly test nothing.
+      # `--affected`'s package selection — so a root-level file belongs to no
+      # package and selects nothing at all.
+      #
+      # The list is deliberately wider than "things that build". Every project's
+      # test config imports `coverage-thresholds.mjs` and every package's eslint
+      # config extends `eslint.config.base.mjs`; both were verified to select
+      # ZERO packages on their own, meaning a PR that lowered the coverage bar or
+      # disabled a lint rule would have passed without running a single test or
+      # linting a single file. Keep anything with that property in here.
       #
       # Both failure modes here fall back to running everything, never less.
       - name: Determine scope
@@ -98,7 +105,7 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED" | sed 's/^/  /'
 
-          if echo "$CHANGED" | grep -qE '^(pnpm-lock\.yaml|package\.json|pnpm-workspace\.yaml|turbo\.json|\.github/workflows/)'; then
+          if echo "$CHANGED" | grep -qE '^(pnpm-lock\.yaml|package\.json|pnpm-workspace\.yaml|turbo\.json|coverage-thresholds\.mjs|eslint\.config\.base\.mjs|check-dep-drift\.mjs|\.github/workflows/)'; then
             echo "Workspace-wide change — running everything."
             echo "scope=" >> "$GITHUB_OUTPUT"
           else
