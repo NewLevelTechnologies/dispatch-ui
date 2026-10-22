@@ -159,7 +159,6 @@ export default function WorkItemEquipmentBlock({
               type={equipment.equipmentTypeName}
               monogram
               sizeClass="size-7"
-              fit="contain"
             />
           </button>
           <button type="button" onClick={openDrawer} className="min-w-0 flex-1 text-left">

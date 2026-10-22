@@ -20,6 +20,7 @@
 //   ]} />
 // ─────────────────────────────────────────────────────────────────
 import clsx from 'clsx';
+import type { ReactNode } from 'react';
 
 type Tone = 'info' | 'success' | 'warning' | 'danger' | 'accent';
 
@@ -27,29 +28,47 @@ type Tab = { id: string; label: string; count?: number | string };
 type ViewTab = Tab & { tone?: Tone };
 
 export function Tabs({
-  value, onChange, tabs, className,
+  value, onChange, tabs, className, trailing,
 }: {
   value: string;
   onChange: (id: string) => void;
   tabs: Tab[];
   className?: string;
+  // Right-aligned control on the tab row (e.g. a view switch for the active
+  // tab). Sits outside the tablist semantics; keep it no taller than a tab.
+  // Pass `null` while it's hidden so the row keeps one DOM shape (tab focus
+  // survives the switch).
+  trailing?: ReactNode;
 }) {
+  const buttons = tabs.map((t) => (
+    <button
+      key={t.id}
+      role="tab"
+      aria-selected={value === t.id}
+      onClick={() => onChange(t.id)}
+      className={clsx('tab', value === t.id && 'active')}
+    >
+      {t.label}
+      {t.count != null && (
+        <span className="tag" style={{ marginLeft: 4 }}>{t.count}</span>
+      )}
+    </button>
+  ));
+  if (trailing === undefined) {
+    return (
+      <div className={clsx('tab-row', className)} role="tablist">
+        {buttons}
+      </div>
+    );
+  }
+  // The tablist wraps only the tabs (display: contents keeps them in the row's
+  // flex flow), so the trailing control isn't announced as part of it.
   return (
-    <div className={clsx('tab-row', className)} role="tablist">
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          role="tab"
-          aria-selected={value === t.id}
-          onClick={() => onChange(t.id)}
-          className={clsx('tab', value === t.id && 'active')}
-        >
-          {t.label}
-          {t.count != null && (
-            <span className="tag" style={{ marginLeft: 4 }}>{t.count}</span>
-          )}
-        </button>
-      ))}
+    <div className={clsx('tab-row tab-row--trailing', className)}>
+      <div role="tablist" className="contents">
+        {buttons}
+      </div>
+      <div className="tab-row-trailing">{trailing}</div>
     </div>
   );
 }

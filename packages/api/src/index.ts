@@ -131,6 +131,14 @@ export {
   type TenantMembership,
   type MembershipListResponse
 } from './userApi';
+export {
+  getUserPreferences,
+  updateUserPreferences,
+  type ThemePreference,
+  type UpdatePreferencesRequest,
+  type UserPreferencesResponse,
+  type WorkOrderOverviewLayout,
+} from './userPreferencesApi';
 
 // Work Order API
 export {
@@ -655,6 +663,9 @@ export {
   type WorkOrderTech,
   type LocationTechSummaryResponse,
 } from './schedulingApi';
+
+// My day (technician landing)
+export { myDayApi, type MyDayResponse, type MyDayStop } from './myDayApi';
 
 // Tenant Settings API
 export {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
@@ -27,7 +27,7 @@ import {
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import WorkOrderActivityTab from '../features/work-orders/WorkOrderActivityTab';
-import { resolveBack } from '../lib/backContext';
+import { resolveBack, withWorkOrderBack } from '../lib/backContext';
 import { useDocumentBack } from '../hooks/useDocumentBack';
 import AppLayout from '../components/AppLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -43,6 +43,10 @@ import WorkItemsTab from '../components/WorkItemsTab';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
 import WorkOrderOverview from '../features/work-orders/WorkOrderOverview';
+import WorkOrderOverviewCompact from '../features/work-orders/compact/WorkOrderOverviewCompact';
+import { useOverviewLayout } from '../hooks/useOverviewLayout';
+import { useHasCapability } from '../hooks/useCurrentUser';
+import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { formatExactTimestamp, formatPhone, formatTimestamp, roleAccent, titleCaseAddress, tripsByWorkItem } from '@dispatch/utils';
 import WorkOrderFilesTab from '../components/WorkOrderFilesTab';
 import WorkOrderPurchasingTab from '../components/WorkOrderPurchasingTab';
@@ -171,6 +175,11 @@ export default function WorkOrderDetailPage() {
 
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
   const [tab, setTab] = useUrlTab<WorkOrderTab>(TAB_IDS, 'overview');
+  // Overview body: Compact (job-first) or Detailed (attention-first), per user.
+  const [overviewLayout, setOverviewLayout] = useOverviewLayout();
+  // Internal job cost + margin on the Compact Money card — the same people who
+  // set labor cost rates and pricing.
+  const canSeeCost = useHasCapability('MANAGE_PRICING');
   // Linking a callback from the header menu opens the Callback card on Overview.
   const [callbackEditing, setCallbackEditing] = useState(false);
   // Bumped by the "Add work item" affordances (header button, overview card,
@@ -205,7 +214,8 @@ export default function WorkOrderDetailPage() {
   const handleAddEquipmentToWorkItem = (wi: WorkItemResponse) => {
     navigate(
       equipmentCreateUrl({
-        returnTo: `/work-orders/${id}?tab=items`,
+        // Back to the tab it was started from (Work items or the Overview row).
+        returnTo: tab === 'overview' ? `/work-orders/${id}` : `/work-orders/${id}?tab=items`,
         locationId: workOrder?.serviceLocationId || workOrder?.serviceLocation?.id,
         attachTo: workItemAttachToken(wi.id),
       })
@@ -645,6 +655,16 @@ export default function WorkOrderDetailPage() {
   const essence = summary || (firstItem ? (moreItems > 0 ? `${firstItem} +${moreItems} more` : firstItem) : null);
 
   const sitePhone = location?.siteContactPhone || customer?.phone;
+  // The Location page's back-link returns here, labelled with this WO number.
+  const locationHref = serviceLocationId
+    ? withWorkOrderBack(`/service-locations/${serviceLocationId}`, workOrder.id, workOrder.workOrderNumber)
+    : null;
+  // Header arrival line — from the full location record (the same gate match
+  // the Detailed layout's Location card uses).
+  const gateFact = (locationDetail?.arrivalFacts ?? []).find((f) => /gate|code|lockbox/i.test(f.label));
+  const accessText = locationDetail?.accessInstructions?.trim() || null;
+  const siteContactName = locationDetail?.siteContactName || null;
+  const siteContactPhone = locationDetail?.siteContactPhone || null;
   // DB stores addresses uppercase — title-case street + city for display
   // (state code stays as-is); keep a raw query string for the maps link.
   const addr = location?.address;
@@ -673,6 +693,34 @@ export default function WorkOrderDetailPage() {
     });
   };
   const focusWorkItemId = searchParams.get('item');
+
+  // Callback cards ride the Overview rail in either layout (the header's
+  // "Link as callback" opens the editor there).
+  const overviewExtraRail = (
+    <>
+      {(workOrder.callbackOf || callbackEditing) && (
+        <WorkOrderCallbackCard
+          workOrder={workOrder}
+          typeName={woType?.name ?? null}
+          isCallbackType={isSeededCallbackType(woType)}
+          frozen={editLocked}
+          canPick={access.canViewAll}
+          editing={callbackEditing}
+          onEditingChange={setCallbackEditing}
+        />
+      )}
+      <WorkOrderCallbacksBackCard
+        workOrderId={workOrder.id}
+        callbacks={workOrder.callbacks ?? []}
+        completedDate={workOrder.completedDate}
+        statusPill={(c) => (
+          <Pill tone={PROGRESS_PILL_TONE[c.progressCategory]} dot>
+            {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[c.progressCategory]}`)}
+          </Pill>
+        )}
+      />
+    </>
+  );
 
   const tabItems: { id: WorkOrderTab; label: string; count?: number }[] = [
     { id: 'overview', label: t('workOrders.detail.tabs.overview') },
@@ -713,7 +761,20 @@ export default function WorkOrderDetailPage() {
             )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                <Heading level={1} size="page-sm" className="m-0">{headerTitle}</Heading>
+                <Heading level={1} size="page-sm" className="m-0">
+                  {/* The site name opens its Location page. */}
+                  {location?.locationName && locationHref ? (
+                    <Link
+                      to={locationHref}
+                      title={t('workOrders.detail.openLocationTitle', { entity: getName('service_location') })}
+                      className="text-inherit no-underline underline-offset-[3px] hover:text-fg-accent hover:underline"
+                    >
+                      {headerTitle}
+                    </Link>
+                  ) : (
+                    headerTitle
+                  )}
+                </Heading>
                 {premiseLabel && <Tag>{premiseLabel}</Tag>}
                 {/* Priority — click-to-change on active WOs, read-only when frozen. */}
                 {(() => {
@@ -767,6 +828,14 @@ export default function WorkOrderDetailPage() {
               {/* Meta line — render only populated items. */}
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
                 {displayAddress && <span className="font-medium text-fg-strong">{displayAddress}</span>}
+                {locationHref && (
+                  <Link
+                    to={locationHref}
+                    className="whitespace-nowrap font-semibold text-fg-accent no-underline hover:underline"
+                  >
+                    {t('workOrders.detail.viewLocation', { entity: getName('service_location') })}
+                  </Link>
+                )}
                 {displayAddress && <span className="text-fg-dim">·</span>}
                 <span className="font-mono">{woDisplayNumber}</span>
                 {workOrder.customerOrderNumber && (
@@ -811,6 +880,40 @@ export default function WorkOrderDetailPage() {
                   {t('workOrders.detail.lastUpdated', { time: formatTimestamp(workOrder.updatedAt) })}
                 </span>
               </div>
+
+              {/* Arrival line — what the tech needs at the curb: gate code,
+                  access notes, who's on site. Only when the location has any. */}
+              {(gateFact || accessText || siteContactName || siteContactPhone) && (
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
+                  {gateFact && (
+                    <span className="inline-flex items-center gap-1.5">
+                      {gateFact.label}
+                      <span className="rounded-xs bg-bg-active px-1.5 py-px font-mono font-semibold tracking-[0.06em] text-fg-strong">
+                        {gateFact.value}
+                      </span>
+                    </span>
+                  )}
+                  {gateFact && accessText && <span className="text-fg-dim">·</span>}
+                  {accessText && <span className="text-fg-strong">{accessText}</span>}
+                  {(gateFact || accessText) && (siteContactName || siteContactPhone) && (
+                    <span className="text-fg-dim">·</span>
+                  )}
+                  {(siteContactName || siteContactPhone) && (
+                    <span className="inline-flex items-center gap-1.5">
+                      {t('workOrders.detail.onSiteContact')}
+                      {siteContactName && <span className="font-semibold text-fg-strong">{siteContactName}</span>}
+                      {siteContactPhone && (
+                        <a
+                          href={`tel:${siteContactPhone.replace(/\D/g, '')}`}
+                          className="font-mono font-semibold text-fg-accent no-underline hover:underline"
+                        >
+                          {formatPhone(siteContactPhone)}
+                        </a>
+                      )}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Action cluster */}
@@ -894,12 +997,60 @@ export default function WorkOrderDetailPage() {
 
         {/* Tab row */}
         <div className="mt-3">
-          <Tabs value={tab} onChange={(id) => setTab(id as WorkOrderTab)} tabs={tabItems} />
+          <Tabs
+            value={tab}
+            onChange={(id) => setTab(id as WorkOrderTab)}
+            tabs={tabItems}
+            trailing={
+              tab === 'overview' ? (
+                <ToggleGroup
+                  size="sm"
+                  value={overviewLayout}
+                  onChange={setOverviewLayout}
+                  aria-label={t('workOrders.detail.layout.label')}
+                >
+                  <ToggleGroupOption value="compact">{t('workOrders.detail.layout.compact')}</ToggleGroupOption>
+                  <ToggleGroupOption value="detailed">{t('workOrders.detail.layout.detailed')}</ToggleGroupOption>
+                </ToggleGroup>
+              ) : null
+            }
+          />
         </div>
 
         {/* Tab bodies */}
         <div className="mt-4">
-          {tab === 'overview' && (
+          {tab === 'overview' && overviewLayout === 'compact' && (
+            <WorkOrderOverviewCompact
+              workOrder={workOrder}
+              statuses={workItemStatuses}
+              transitions={workflowTransitions}
+              enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
+              location={locationDetail}
+              financialSummary={financialSummary}
+              dispatches={dispatches}
+              quotes={quotesForCount}
+              invoices={invoicesForCount}
+              readOnly={editLocked}
+              canEditNotes={access.canEdit}
+              canSeeCost={canSeeCost}
+              onOpenTab={(t2) => setTab(t2 as WorkOrderTab)}
+              onOpenFinancial={openFinancialTab}
+              onOpenWorkItem={openWorkItem}
+              onSelectDispatch={(d) => setSelectedDispatch(d)}
+              onOpenEquipment={handleSelectSubUnit}
+              onAttachEquipment={handleAttachEquipmentToWorkItem}
+              onSetEquipmentNeeded={handleSetWorkItemEquipmentNeeded}
+              onAddEquipment={handleAddEquipmentToWorkItem}
+              onSaveDiagnosis={handleSaveWorkItemDiagnosis}
+              onScheduleDispatch={(wi) => {
+                setEditingDispatch(null);
+                setScheduleWorkItemIds(wi ? [wi.id] : null);
+                setAssignDispatchDialogOpen(true);
+              }}
+              extraRail={overviewExtraRail}
+            />
+          )}
+          {tab === 'overview' && overviewLayout === 'detailed' && (
             <WorkOrderOverview
               workOrder={workOrder}
               statuses={workItemStatuses}
@@ -916,31 +1067,7 @@ export default function WorkOrderDetailPage() {
                 setEditingDispatch(null);
                 setAssignDispatchDialogOpen(true);
               }}
-              extraRail={
-                <>
-                  {(workOrder.callbackOf || callbackEditing) && (
-                    <WorkOrderCallbackCard
-                      workOrder={workOrder}
-                      typeName={woType?.name ?? null}
-                      isCallbackType={isSeededCallbackType(woType)}
-                      frozen={editLocked}
-                      canPick={access.canViewAll}
-                      editing={callbackEditing}
-                      onEditingChange={setCallbackEditing}
-                    />
-                  )}
-                  <WorkOrderCallbacksBackCard
-                    workOrderId={workOrder.id}
-                    callbacks={workOrder.callbacks ?? []}
-                    completedDate={workOrder.completedDate}
-                    statusPill={(c) => (
-                      <Pill tone={PROGRESS_PILL_TONE[c.progressCategory]} dot>
-                        {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[c.progressCategory]}`)}
-                      </Pill>
-                    )}
-                  />
-                </>
-              }
+              extraRail={overviewExtraRail}
             />
           )}
 
