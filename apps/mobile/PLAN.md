@@ -51,8 +51,13 @@ Two directions were mocked up side by side in a Claude Design project
 ("Dispatch Mobile — Technician UI Directions") before any screen was built for real:
 
 - **A — Dashboard Continuity** (chosen): reuses the web app's exact color tokens
-  (`apps/web/src/styles/tokens.css`) and the "warm trade orange" accent exactly as
-  it's used today — a trim/accent color, not a dominant one. Dark app bar + tab bar
+  (`apps/web/src/styles/tokens.css`) — a trim/accent color, not a dominant one.
+  **Corrected 2026-10-21**: this originally read "the warm trade orange accent
+  exactly as it's used today", and the token port followed `:root`. Web never
+  ships that orange — `ThemeProvider` initialises the accent to `cool` and so does
+  the pre-hydration script, so every running web client is steel teal. Mobile spent
+  seven phases in an orange no web user has seen. The ramp now comes from
+  `.accent-cool`. Dark app bar + tab bar
   mirror the web sidebar, which tokens.css calls out as "intentionally dark in both
   themes." Same card density and status-pill conventions a dispatcher already reads
   all day.

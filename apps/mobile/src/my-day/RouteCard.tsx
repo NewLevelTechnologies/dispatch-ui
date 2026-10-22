@@ -46,9 +46,9 @@ function StopRow({
         {
           padding: spacing.sm,
           gap: spacing.sm,
-          // The stop the card above is about, tinted so the eye can tie the
-          // two together without re-reading the title.
-          backgroundColor: pressed ? colors.bgHover : isFocus ? colors.accentTint : 'transparent',
+          // The stop the card above is about. Barely a tint on purpose — it
+          // ties the two together without competing with the card itself.
+          backgroundColor: pressed ? colors.bgHover : isFocus ? colors.rowCurrent : 'transparent',
         },
       ]}
     >
