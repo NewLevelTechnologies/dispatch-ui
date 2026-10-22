@@ -67,6 +67,12 @@ export type ColorTokens = {
   accent700: string;
   /** Soft tint for accent-toned surfaces (status pills, selection). */
   accentTint: string;
+  /**
+   * The row the screen is currently about. Web mixes 5% violet into the card
+   * surface (`color-mix(in oklch, var(--violet-500) 5%, var(--bg-elev))`) —
+   * barely a tint, deliberately. A full `accentTint` here shouts.
+   */
+  rowCurrent: string;
   info: string;
   infoTint: string;
   success: string;
@@ -77,8 +83,16 @@ export type ColorTokens = {
   dangerTint: string;
 };
 
-// Generated from apps/web/src/styles/tokens.css (`:root` + `.theme-light`)
-// via the CSS Color 4 oklch->sRGB conversion. Keep in lockstep with web.
+// Generated from apps/web/src/styles/tokens.css via the CSS Color 4
+// oklch->sRGB conversion. Keep in lockstep with web.
+//
+// The accent ramp comes from `.accent-cool`, NOT `:root`. tokens.css defaults
+// to a warm orange, but web never ships it: ThemeProvider initialises accent
+// to 'cool' and the pre-hydration script does too, so every running web client
+// is steel teal. Phase 0 ported `:root` and gave this app an orange no web user
+// has ever seen. There is no user-facing accent picker on either side — the
+// toggle in ThemeProvider is reachable only from an unused AppShell — so this
+// follows web's shipped default rather than adding a setting web lacks.
 const light: ColorTokens = {
   bg: '#fbf9f7',
   bgSunken: '#f4f2ef',
@@ -94,10 +108,11 @@ const light: ColorTokens = {
   fgMuted: '#67635c',
   border: '#e4e1db',
   borderSoft: '#edebe7',
-  accent500: '#ee6d00',
-  accent600: '#d64d00',
-  accent700: '#b43a00',
-  accentTint: '#ffe8d1',
+  accent500: '#0085a2',
+  accent600: '#006c86',
+  accent700: '#005469',
+  accentTint: '#cfeef7',
+  rowCurrent: '#f8f7fe',
   info: '#0092d7',
   infoTint: '#dcf1fc',
   success: '#1a9951',
@@ -124,10 +139,12 @@ const dark: ColorTokens = {
   fgMuted: '#b9bec4',
   border: '#394149',
   borderSoft: '#2a3138',
-  accent500: '#ee6d00',
-  accent600: '#d64d00',
-  accent700: '#ffa460',
-  accentTint: '#3a2a1c',
+  accent500: '#0085a2',
+  accent600: '#006c86',
+  // Dark remaps web's --fg-accent to accent-300 so accent text stays legible.
+  accent700: '#67c0d5',
+  accentTint: '#183238',
+  rowCurrent: '#1c242e',
   info: '#0092d7',
   infoTint: '#1c3340',
   success: '#1a9951',

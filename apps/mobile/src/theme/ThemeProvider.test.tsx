@@ -37,6 +37,6 @@ describe('ThemeProvider', () => {
         <Probe />
       </ThemeProvider>
     );
-    expect(screen.getByText('light:#ee6d00')).toBeTruthy();
+    expect(screen.getByText('light:#0085a2')).toBeTruthy();
   });
 });
