@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dispatch Mobile",
     "slug": "dispatch-mobile",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "dispatch",
