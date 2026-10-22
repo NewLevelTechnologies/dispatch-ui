@@ -9,6 +9,11 @@ on:
 
 env:
   NODE_VERSION: '24'
+  # What `--affected` diffs against. Turbo defaults this to `main`, which does
+  # not exist in this repo — `dev` is the default branch — and an unresolvable
+  # base makes turbo fall back to "everything changed", silently turning the
+  # flag into a no-op.
+  TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
 
 jobs:
   test:
@@ -22,6 +27,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Turbo diffs this PR against its base to work out which packages it
+          # can affect; the default depth-1 clone has no base commit to diff
+          # against, and turbo then treats everything as changed.
+          fetch-depth: 0
 
       # pnpm must be installed before setup-node so its cache resolver can
       # find the store. Version comes from the root package.json
@@ -54,8 +64,50 @@ jobs:
       - name: Check dependency drift
         run: pnpm check:deps
 
+      # Scope the rest of the run to what this PR can actually affect. Turbo
+      # walks the dependency graph, so a change under packages/ still tests web
+      # AND mobile — but a mobile-only or docs-only PR stops paying for web's
+      # ~2000-test suite, which is ~6m44s of a typical 8m38s run.
+      #
+      # Anything that can change how every package resolves or builds is
+      # excluded from scoping and forces a full run. Turbo's
+      # `globalDependencies` does NOT cover this — it feeds cache hashing, not
+      # `--affected`'s package selection, so without this guard a lockfile bump
+      # would select no packages and quietly test nothing.
+      #
+      # Both failure modes here fall back to running everything, never less.
+      - name: Determine scope
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${BASE_SHA:-}" ] || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            echo "Base commit unavailable — running everything."
+            echo "scope=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! CHANGED=$(git diff --name-only "$BASE_SHA...HEAD"); then
+            echo "Could not diff against the base — running everything."
+            echo "scope=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED" | sed 's/^/  /'
+
+          if echo "$CHANGED" | grep -qE '^(pnpm-lock\.yaml|package\.json|pnpm-workspace\.yaml|turbo\.json|\.github/workflows/)'; then
+            echo "Workspace-wide change — running everything."
+            echo "scope=" >> "$GITHUB_OUTPUT"
+          else
+            echo "Scoping to packages affected since $BASE_SHA."
+            echo "scope=--affected" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run linter
-        run: pnpm turbo run lint
+        run: pnpm turbo run lint ${{ steps.scope.outputs.scope }}
 
       # apps/web gets type-checked for free — its build script is `tsc -b &&
       # vite build`, run below. apps/mobile has no build script (it ships via
@@ -66,7 +118,7 @@ jobs:
       # `typecheck` script — only apps/mobile today — same convention as the
       # test:coverage step below.
       - name: Run typecheck
-        run: pnpm turbo run typecheck
+        run: pnpm turbo run typecheck ${{ steps.scope.outputs.scope }}
 
       # Runs every suite — apps/web plus the @dispatch/* packages — and
       # enforces the coverage thresholds in apps/web/vitest.config.ts. One pass
@@ -80,10 +132,10 @@ jobs:
       # nothing and failed. Each package's own script is self-contained
       # instead, so this step stays runner-agnostic.
       - name: Run tests with coverage
-        run: pnpm turbo run test:coverage
+        run: pnpm turbo run test:coverage ${{ steps.scope.outputs.scope }}
 
       - name: Build
-        run: pnpm turbo run build --filter=web
+        run: pnpm turbo run build --filter=web ${{ steps.scope.outputs.scope }}
         env:
           # Use example values for build validation
           VITE_COGNITO_USER_POOL_ID: us-east-1_EXAMPLE
@@ -92,8 +144,15 @@ jobs:
           VITE_API_BASE_URL: https://api.example.com
           VITE_ENV: development
 
+      # dist/ only exists when the step above actually built web, which a
+      # mobile- or docs-only PR skips. Absence is a pass, not a failure.
       - name: Check build size
         run: |
+          if [ ! -d apps/web/dist ]; then
+            echo "⏭️  Web was not rebuilt for this PR — nothing to measure."
+            exit 0
+          fi
+
           BUILD_SIZE=$(du -sh apps/web/dist/ | cut -f1)
           echo "📦 Build size: $BUILD_SIZE"
 
@@ -108,9 +167,10 @@ jobs:
       - name: Summary
         run: |
           echo "✅ All checks passed!"
-          echo "- Lint: Passed"
-          echo "- Typecheck: Passed"
-          echo "- Dependency drift: Passed"
-          echo "- Tests: Passed"
+          if [ -n "${{ steps.scope.outputs.scope }}" ]; then
+            echo "Scope: packages affected by this PR (and everything depending on them)."
+          else
+            echo "Scope: every package — this PR touches the lockfile, a root manifest, or CI itself."
+          fi
+          echo "- Lint, typecheck, tests + coverage, build: passed for everything in scope"
           echo "- Coverage: ≥80% lines/branches/statements, ≥75% functions"
-          echo "- Build: Success"

@@ -222,9 +222,18 @@ dev (default) ──→ qa ──→ main (production)
 
 **PR Checks** (`.github/workflows/pr-checks.yml`):
 - Uses pnpm for package management
-- Runs `pnpm turbo run lint`
-- Runs `pnpm turbo run test`
-- Runs `pnpm turbo run build`
+- Runs lint, typecheck, `test:coverage` and the web build
+- **Scoped to what the PR affects.** Each turbo command gets `--affected`, so a
+  mobile-only or docs-only PR doesn't pay for web's ~2000-test suite. Turbo walks
+  the dependency graph, so a change under `packages/` still tests web *and* mobile.
+- Touching the lockfile, a root manifest, `turbo.json` or `.github/workflows/`
+  skips the scoping and runs everything — those can change how every package
+  resolves. (Turbo's `globalDependencies` does not cover this: it feeds cache
+  hashing, not `--affected`'s package selection.)
+- The job itself always runs and always reports, so the required status check
+  never goes missing. Don't swap this for a workflow-level `paths:` filter —
+  branch protection requires this check by name, and a skipped workflow never
+  reports, leaving PRs blocked forever.
 
 **Deploy Web** (`.github/workflows/deploy.yml`):
 - Triggers on push to `dev` (with path filters)
