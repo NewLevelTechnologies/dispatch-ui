@@ -218,15 +218,22 @@ describe('TodayScreen', () => {
     expect(screen.getByText('Tomorrow · 1 stop')).toBeTruthy();
   });
 
-  it('steps to another day, which is read-only', async () => {
+  it('has no day switching — other days are the Schedule tab’s job', async () => {
     mockUseMyDayStops.mockReturnValue(dayResult([stop()]));
-    mockUseDayAt.mockReturnValue(dayResult([stop({ dispatchId: 'x', status: 'SCHEDULED' })]));
     await renderToday();
 
-    await fireEvent.press(screen.getByLabelText('Next day'));
+    expect(screen.getByText('Today')).toBeTruthy();
+    expect(screen.queryByText('My day')).toBeNull();
+    expect(screen.queryByLabelText('Next day')).toBeNull();
+    expect(screen.queryByLabelText('Previous day')).toBeNull();
+  });
 
-    // No focus card, so no way to advance a visit you aren't working.
-    expect(screen.queryByText('Start driving')).toBeNull();
-    expect(screen.getByText('Route')).toBeTruthy();
+  it('sends the tomorrow teaser to Schedule rather than switching the day in place', async () => {
+    mockUseMyDayStops.mockReturnValue(dayResult([stop()]));
+    mockUseDayAt.mockReturnValue(dayResult([stop({ dispatchId: 't1' })]));
+    await renderToday();
+
+    await fireEvent.press(screen.getByText('Tomorrow · 1 stop'));
+    expect(mockPush).toHaveBeenCalledWith('/schedule');
   });
 });

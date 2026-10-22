@@ -89,39 +89,10 @@ export function showTomorrow(count: number, tomorrow: string): boolean {
   return day !== 0 && day !== 6;
 }
 
-/**
- * Days reachable from the stepper either side of today. Further out is the
- * Schedule tab's job — this screen is one day in depth, not a calendar.
- */
-export const DAY_RANGE = 7;
-
 /** Shift a tenant-local YYYY-MM-DD by whole days, staying in that calendar. */
 export function shiftDay(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number);
   const t = new Date(Date.UTC(y!, (m ?? 1) - 1, d ?? 1));
   t.setUTCDate(t.getUTCDate() + days);
   return t.toISOString().slice(0, 10);
-}
-
-/** Clamp a step to the range the stepper can reach. */
-export function clampOffset(offset: number): number {
-  return Math.max(-DAY_RANGE, Math.min(DAY_RANGE, offset));
-}
-
-/**
- * The step a horizontal swipe asks for: left = forward a day, right = back.
- * Short drags are scrolling or taps, not steps.
- */
-export function swipeStep(dx: number): -1 | 0 | 1 {
-  if (Math.abs(dx) <= 70) return 0;
-  return dx < 0 ? 1 : -1;
-}
-
-/** "Today" / "Yesterday" / "Tomorrow", else the weekday. */
-export function dayName(offset: number, date: string | undefined, t: (k: string) => string): string {
-  if (offset === 0) return t('myDay.stepper.today');
-  if (offset === -1) return t('myDay.stepper.yesterday');
-  if (offset === 1) return t('myDay.stepper.tomorrow');
-  if (!date) return '';
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
 }

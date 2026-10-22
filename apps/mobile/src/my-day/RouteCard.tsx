@@ -108,19 +108,17 @@ export function RouteCard({
   focusId,
   timeZone,
   onOpenStop,
-  title,
 }: {
   stops: MyDayStop[];
   focusId: string | null;
   timeZone: string;
   onOpenStop: (stop: MyDayStop) => void;
-  title?: string;
 }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
   return (
-    <Card title={title ?? t('myDay.route.title')}>
+    <Card title={t('myDay.route.title')}>
       <View>
         {stops.map((stop, i) => (
           <View

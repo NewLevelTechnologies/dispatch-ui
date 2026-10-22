@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View, StyleSheet, type GestureResponderEvent } from 'react-native';
+import { useMemo } from 'react';
+import { ActivityIndicator, ScrollView, Text, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from '@dispatch/i18n';
 import type { MyDayStop } from '@dispatch/api';
@@ -8,51 +8,44 @@ import { AppHeader, Button } from '../../components';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useWorkOrderAccess } from '../../permissions/useWorkOrderAccess';
 import { useAdvanceStop, useDayAt, useFocusWorkOrder, useMyDayStops } from '../../my-day/useMyDay';
-import { clampOffset, dayName, pickFocus, shiftDay, showTomorrow, swipeStep } from '../../my-day/myDayModel';
+import { pickFocus, shiftDay, showTomorrow } from '../../my-day/myDayModel';
 import { ProgressStrip } from '../../my-day/ProgressStrip';
 import { FocusCard } from '../../my-day/FocusCard';
 import { RouteCard } from '../../my-day/RouteCard';
 import { DayDone, NoStops, TomorrowCard } from '../../my-day/DayCards';
-import { DayStepper } from '../../my-day/DayStepper';
 import { UnfinishedCard } from '../../my-day/UnfinishedCard';
 import { useCarryover } from '../../my-day/useCarryover';
 
 /**
- * The technician's day, mirroring web's `/my-day`
+ * The technician's day, after web's `/my-day`
  * (`apps/web/src/pages/MyDayPage.tsx`). Answers three questions in order:
  * what am I doing right now, what does the rest of the day look like, and
- * what's coming next.
+ * what's hanging over me.
  *
- * Deliberately different from web in two places: no greeting or date line
- * (the header already names the day, and a phone has less room to spend),
- * and the live/en-route accent follows mobile's own `statusTone` rather than
- * web's violet — every other status pill in this app already reads that way,
- * and a one-off colour here would be the odd one out.
+ * This screen is **today only**. Web can page back and forth through the
+ * week; here that competed with vertical scrolling and made the screen feel
+ * unsteady, and the Schedule tab already answers "what about other days"
+ * properly. The tomorrow teaser stays, and leads there.
  *
- * Only today can be acted on. Other days are a read-only route: the stops
- * are real, but the actions belong to the day you're actually working.
+ * Departs from web in two more places: no greeting or date line (the header
+ * names the day and a phone has less room to spend), and the live/en-route
+ * accent follows mobile's own `statusTone` rather than web's violet, since
+ * every other status pill in this app already reads that way.
  */
 export default function TodayScreen() {
   const { t } = useTranslation();
   const { colors, spacing } = useTheme();
   const router = useRouter();
 
-  const [offset, setOffset] = useState(0);
-  const step = (to: number) => setOffset(clampOffset(to));
-
   // The server resolves "today" in the tenant's zone and tells us which day
   // and zone it used — the client never computes either.
   const today = useMyDayStops();
   const todayDate = today.data?.date;
   const timeZone = today.data?.timeZone ?? 'UTC';
+  const stops = today.stops;
+  const focus = pickFocus(stops);
 
-  const other = useDayAt(todayDate, offset);
   const tomorrow = useDayAt(todayDate, 1);
-
-  const viewed = offset === 0 ? today : other;
-  const stops = viewed.stops;
-  // Acting on a day you aren't working would be a mis-tap waiting to happen.
-  const focus = offset === 0 ? pickFocus(stops) : null;
 
   const { data: focusWorkOrder } = useFocusWorkOrder(focus?.workOrderId);
   // Every stop this endpoint returns is the signed-in tech's own work — it has
@@ -65,30 +58,14 @@ export default function TodayScreen() {
 
   // What's hanging over the tech beyond the route. Today's own jobs are left
   // to the route above rather than listed twice on one screen.
-  const onRoute = useMemo(() => new Set(today.stops.map((s) => s.workOrderId)), [today.stops]);
+  const onRoute = useMemo(() => new Set(stops.map((s) => s.workOrderId)), [stops]);
   const carryover = useCarryover(me?.id, onRoute);
 
   const openWorkOrder = (workOrderId: string) =>
     router.push({ pathname: '/work-order/[id]', params: { id: workOrderId } });
 
-  // Horizontal drags step a day; short ones are a scroll or a tap.
-  const [touchX, setTouchX] = useState<number | null>(null);
-  const onTouchStart = (e: GestureResponderEvent) => setTouchX(e.nativeEvent.pageX);
-  const onTouchEnd = (e: GestureResponderEvent) => {
-    if (touchX == null) return;
-    const by = swipeStep(e.nativeEvent.pageX - touchX);
-    setTouchX(null);
-    if (by) step(offset + by);
-  };
-
-  const viewedDate = offset === 0 ? todayDate : todayDate && shiftDay(todayDate, offset);
-  const headerTitle = offset === 0 ? t('myDay.title') : dayName(offset, viewedDate, t);
-  const stepper = todayDate ? (
-    <DayStepper offset={offset} label={dayName(offset, viewedDate, t)} onStep={step} />
-  ) : undefined;
-
   const body = () => {
-    if (viewed.isLoading) {
+    if (today.isLoading) {
       return (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent500} />
@@ -96,22 +73,20 @@ export default function TodayScreen() {
       );
     }
 
-    if (viewed.error) {
+    if (today.error) {
       return (
         <View style={[styles.center, { padding: spacing.xl, gap: spacing.md }]}>
           <Text style={{ color: colors.fgStrong, fontSize: 15, fontWeight: '700' }}>{t('myDay.errors.load')}</Text>
-          <Button label={t('common.actions.tryAgain')} variant="secondary" onPress={() => void viewed.refetch()} />
+          <Button label={t('common.actions.tryAgain')} variant="secondary" onPress={() => void today.refetch()} />
         </View>
       );
     }
 
-    const allDone = stops.length > 0 && !focus && offset === 0;
+    const allDone = stops.length > 0 && !focus;
 
     return (
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        {offset === 0 && stops.length > 0 && (
-          <ProgressStrip stops={stops} focus={focus} timeZone={timeZone} />
-        )}
+        {stops.length > 0 && <ProgressStrip stops={stops} focus={focus} timeZone={timeZone} />}
 
         {stops.length === 0 && <NoStops />}
         {allDone && <DayDone stops={stops} />}
@@ -135,36 +110,30 @@ export default function TodayScreen() {
             stops={stops}
             focusId={focus?.dispatchId ?? null}
             timeZone={timeZone}
-            title={offset === 0 ? undefined : t('myDay.other.route')}
             onOpenStop={(stop: MyDayStop) => openWorkOrder(stop.workOrderId)}
           />
         )}
 
-        {offset === 0 && (
-          <UnfinishedCard
-            awaitingParts={carryover.awaitingParts}
-            quotes={carryover.quotes}
-            onOpenWorkOrder={openWorkOrder}
-            // Reachable through the job it belongs to — useCarryover drops any
-            // quote that has none, so this always has somewhere to go.
-            onOpenQuote={(quote) => quote.workOrderId && openWorkOrder(quote.workOrderId)}
-          />
-        )}
+        <UnfinishedCard
+          awaitingParts={carryover.awaitingParts}
+          quotes={carryover.quotes}
+          onOpenWorkOrder={openWorkOrder}
+          // Reachable through the job it belongs to — useCarryover drops any
+          // quote that has none, so this always has somewhere to go.
+          onOpenQuote={(quote) => quote.workOrderId && openWorkOrder(quote.workOrderId)}
+        />
 
-        {offset === 0 && todayDate && showTomorrow(tomorrow.stops.length, shiftDay(todayDate, 1)) && (
-          <TomorrowCard stops={tomorrow.stops} timeZone={timeZone} onPress={() => step(1)} />
+        {todayDate && showTomorrow(tomorrow.stops.length, shiftDay(todayDate, 1)) && (
+          // Anything past today belongs to Schedule, which shows the week.
+          <TomorrowCard stops={tomorrow.stops} timeZone={timeZone} onPress={() => router.push('/schedule')} />
         )}
       </ScrollView>
     );
   };
 
   return (
-    <View
-      style={{ flex: 1, backgroundColor: colors.bgSunken }}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-    >
-      <AppHeader title={headerTitle} trailing={stepper} />
+    <View style={{ flex: 1, backgroundColor: colors.bgSunken }}>
+      <AppHeader title={t('nav.today')} />
       {body()}
     </View>
   );

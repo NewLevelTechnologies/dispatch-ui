@@ -1,7 +1,5 @@
 import type { MyDayStop } from '@dispatch/api';
 import {
-  clampOffset,
-  dayName,
   focusAction,
   formatDuration,
   formatEstimate,
@@ -12,7 +10,6 @@ import {
   routeStops,
   shiftDay,
   showTomorrow,
-  swipeStep,
 } from './myDayModel';
 
 const stop = (over: Partial<MyDayStop> = {}): MyDayStop =>
@@ -167,43 +164,5 @@ describe('shiftDay', () => {
   });
 });
 
-describe('clampOffset', () => {
-  it('keeps the stepper inside a week either side', () => {
-    expect(clampOffset(0)).toBe(0);
-    expect(clampOffset(7)).toBe(7);
-    expect(clampOffset(8)).toBe(7);
-    expect(clampOffset(-8)).toBe(-7);
-  });
-});
 
-describe('swipeStep', () => {
-  it('treats short drags as scrolling, not a day change', () => {
-    expect(swipeStep(0)).toBe(0);
-    expect(swipeStep(70)).toBe(0);
-    expect(swipeStep(-70)).toBe(0);
-  });
 
-  it('swiping left goes forward, right goes back', () => {
-    expect(swipeStep(-120)).toBe(1);
-    expect(swipeStep(120)).toBe(-1);
-  });
-});
-
-describe('dayName', () => {
-  const t = (k: string) => k;
-
-  it('names the three days around today', () => {
-    expect(dayName(0, '2026-10-21', t)).toBe('myDay.stepper.today');
-    expect(dayName(-1, '2026-10-20', t)).toBe('myDay.stepper.yesterday');
-    expect(dayName(1, '2026-10-22', t)).toBe('myDay.stepper.tomorrow');
-  });
-
-  it('uses the weekday further out', () => {
-    expect(dayName(3, '2026-10-24', t)).toBe('Saturday');
-    expect(dayName(-3, '2026-10-18', t)).toBe('Sunday');
-  });
-
-  it('says nothing when the date is not known yet', () => {
-    expect(dayName(3, undefined, t)).toBe('');
-  });
-});

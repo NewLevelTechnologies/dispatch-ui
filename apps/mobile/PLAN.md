@@ -198,13 +198,14 @@ that file in lockstep with web's if a token value changes there).
      (time window, "Up next"/live pill, priority + WO tag, one primary action from
      `focusAction` plus Navigate / Call / Open WO), the route timeline with its
      connecting rail and drive-time-between-stops, the Unfinished/carryover card, the
-     Tomorrow teaser, the day-done and no-stops states, and the ±7-day stepper with
-     swipe.
+     Tomorrow teaser, and the day-done and no-stops states.
    - **Decided**: no greeting or date line in the header (mobile's `AppHeader` already
      carries the title). Route rows link to the **work order**, matching web — not to
-     Dispatch detail as they do today. Today gains the day stepper, and the Schedule
-     tab **stays** (one day in depth vs. a week at a glance read differently enough to
-     justify both).
+     Dispatch detail as they do today. The Schedule tab **stays**.
+     **Reversed after building**: the ±7-day stepper and swipe navigation were built,
+     tried, and removed. Paging days competed with vertical scrolling and made the
+     screen feel unsteady, and Schedule already answers "what about other days"
+     properly. Today is today only; the tomorrow teaser leads to Schedule.
    - **Genuinely new data for mobile**: the carryover queries behind the Unfinished
      card (open work orders assigned to me whose work-item status maps to the tenant's
      "pending parts" code — resolved via `workItemStatusesApi` plus web's
