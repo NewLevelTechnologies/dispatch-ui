@@ -7,10 +7,12 @@ import { useDispatchDetail } from '../../../dispatches/useDispatchDetail';
 import { useWorkOrderContact } from '../../../dispatches/useWorkOrderContact';
 import { useUpdateDispatchStatus } from '../../../dispatches/useUpdateDispatchStatus';
 import { useWorkOrderAccess } from '../../../permissions/useWorkOrderAccess';
+import { openDirections } from '../../../maps/openDirections';
 import type { Dispatch } from '@dispatch/api';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+jest.mock('../../../maps/openDirections', () => ({ openDirections: jest.fn() }));
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'd1', workOrderId: 'wo1' }),
   useRouter: () => ({ push: mockPush, back: mockBack }),
@@ -24,6 +26,7 @@ const mockUseDispatchDetail = useDispatchDetail as jest.Mock;
 const mockUseWorkOrderContact = useWorkOrderContact as jest.Mock;
 const mockUseUpdateDispatchStatus = useUpdateDispatchStatus as jest.Mock;
 const mockUseWorkOrderAccess = useWorkOrderAccess as jest.Mock;
+const mockOpenDirections = openDirections as jest.Mock;
 const mockRefetch = jest.fn();
 const mockMutate = jest.fn();
 
@@ -164,9 +167,9 @@ describe('DispatchDetailScreen', () => {
     await renderDetail();
 
     await fireEvent.press(screen.getByText('Directions'));
-    expect(Linking.openURL).toHaveBeenCalledWith(
-      'https://www.google.com/maps/search/?api=1&query=123%20Main%20St%2C%20Phoenix%2C%20AZ%2085001'
-    );
+    // Which app it lands in is the helper's call (and the tech's) — the screen's
+    // job is just handing over the address. See src/maps/openDirections.test.ts.
+    expect(mockOpenDirections).toHaveBeenCalledWith('123 Main St, Phoenix, AZ 85001', expect.any(Function));
   });
 
   it('omits Call when there is no contact phone', async () => {

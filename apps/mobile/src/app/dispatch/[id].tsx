@@ -8,6 +8,7 @@ import { useWorkOrderContact } from '../../dispatches/useWorkOrderContact';
 import { useUpdateDispatchStatus } from '../../dispatches/useUpdateDispatchStatus';
 import { dispatchLifecycleSteps } from '../../dispatches/dispatchLifecycleSteps';
 import { formatAddress } from '../../dispatches/formatAddress';
+import { openDirections } from '../../maps/openDirections';
 import { canComplete, canMarkArrived, canMarkEnRoute } from '../../dispatches/dispatchActions';
 import { useWorkOrderAccess } from '../../permissions/useWorkOrderAccess';
 import { statusTone } from '../../schedule/statusTone';
@@ -112,9 +113,7 @@ export default function DispatchDetailScreen() {
               <Button
                 label={t('workOrders.detail.directions')}
                 variant="secondary"
-                onPress={() =>
-                  void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`)
-                }
+                onPress={() => void openDirections(address, t)}
               />
             )}
           </View>
