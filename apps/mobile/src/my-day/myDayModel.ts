@@ -40,7 +40,10 @@ export function pickFocus(stops: readonly MyDayStop[]): MyDayStop | null {
  * closed out properly — it is never flipped blindly from here.
  */
 export type FocusAction =
-  | { kind: 'status'; to: DispatchStatus; labelKey: 'startDriving' | 'arrived' }
+  // Narrower than web's `DispatchStatus` on purpose: these are the only two
+  // statuses this action ever sets, and saying so lets the callback that
+  // receives it be honest about what it accepts.
+  | { kind: 'status'; to: 'EN_ROUTE' | 'IN_PROGRESS'; labelKey: 'startDriving' | 'arrived' }
   | { kind: 'complete'; labelKey: 'completeVisit' };
 
 export function focusAction(status: DispatchStatus): FocusAction | null {

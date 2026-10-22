@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import type { DispatchStatus, MyDayStop } from '@dispatch/api';
-import { dispatchesApi, myDayApi } from '../api/setup';
+import { dispatchesApi, myDayApi, workOrderApi } from '../api/setup';
 import { routeStops, shiftDay } from './myDayModel';
 import { errorCode, errorStatus, extractApiError, isConflict } from './apiError';
 
@@ -43,6 +43,19 @@ export function useMyDayStops(date?: string, { enabled = true }: { enabled?: boo
  */
 export function useDayAt(today: string | undefined, offset: number) {
   return useMyDayStops(today ? shiftDay(today, offset) : undefined, { enabled: !!today && offset !== 0 });
+}
+
+/**
+ * The focus stop's work order — only for who to call, which the stop itself
+ * doesn't carry. Never for the schedule: the authoritative window is the
+ * released one already on the stop.
+ */
+export function useFocusWorkOrder(workOrderId: string | undefined) {
+  return useQuery({
+    queryKey: ['work-orders', workOrderId],
+    queryFn: () => workOrderApi.getById(workOrderId!),
+    enabled: !!workOrderId,
+  });
 }
 
 /**
