@@ -13,6 +13,7 @@ import { useWorkOrderNotes } from '../../work-orders/useWorkOrderNotes';
 import { groupFilesByWorkItem } from '../../work-orders/groupFilesByWorkItem';
 import { workItemStatusTone } from '../../work-orders/workItemStatusTone';
 import { formatAddress } from '../../dispatches/formatAddress';
+import { openDirections } from '../../maps/openDirections';
 
 const NOTE_DATE = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 
@@ -114,9 +115,7 @@ export default function WorkOrderDetailScreen() {
               <Button
                 label={t('workOrders.detail.directions')}
                 variant="secondary"
-                onPress={() =>
-                  void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`)
-                }
+                onPress={() => void openDirections(address, t)}
               />
             )}
           </View>
