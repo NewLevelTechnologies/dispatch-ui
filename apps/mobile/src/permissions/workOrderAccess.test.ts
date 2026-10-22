@@ -48,3 +48,10 @@ describe('workOrderAccess', () => {
     expect(workOrderAccess(user(['EDIT_ASSIGNED_WORK_ORDERS'])).canEdit).toBe(false);
   });
 });
+
+// DELIBERATE FAILURE — proving CI actually gates mobile tests. To be reverted.
+describe('CI falsification probe', () => {
+  it('fails on purpose', () => {
+    expect(workOrderAccess(undefined, 'me').canEdit).toBe(true);
+  });
+});
