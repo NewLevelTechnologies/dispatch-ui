@@ -7,6 +7,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { AppHeader, Button, Card } from '../../components';
 import { WorkspaceRow } from '../../tenant/WorkspaceRow';
 import { MapsPreferenceCard } from '../../maps/MapsPreferenceCard';
+import { ThemePreferenceCard } from '../../theme/ThemePreferenceCard';
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
@@ -36,6 +37,8 @@ export default function ProfileScreen() {
             </View>
           </Card>
         )}
+
+        <ThemePreferenceCard />
 
         <MapsPreferenceCard />
 
