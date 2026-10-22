@@ -226,10 +226,16 @@ dev (default) ──→ qa ──→ main (production)
 - **Scoped to what the PR affects.** Each turbo command gets `--affected`, so a
   mobile-only or docs-only PR doesn't pay for web's ~2000-test suite. Turbo walks
   the dependency graph, so a change under `packages/` still tests web *and* mobile.
-- Touching the lockfile, a root manifest, `turbo.json` or `.github/workflows/`
-  skips the scoping and runs everything — those can change how every package
-  resolves. (Turbo's `globalDependencies` does not cover this: it feeds cache
-  hashing, not `--affected`'s package selection.)
+- Touching the lockfile, a root manifest, `turbo.json`, `.github/workflows/`,
+  or a shared standard (`coverage-thresholds.mjs`, `eslint.config.base.mjs`,
+  `check-dep-drift.mjs`) skips the scoping and runs everything. Those change how
+  every package resolves, builds, or is *judged*. (Turbo's `globalDependencies`
+  does not cover this: it feeds cache hashing, not `--affected`'s package
+  selection, so a root-level file belongs to no package and selects nothing.)
+- **If you add a root file that every package consumes, add it to that list.**
+  Otherwise a PR changing it alone runs zero tests and still goes green — which
+  is exactly how `coverage-thresholds.mjs` and `eslint.config.base.mjs` were
+  missed the first time.
 - The job itself always runs and always reports, so the required status check
   never goes missing. Don't swap this for a workflow-level `paths:` filter —
   branch protection requires this check by name, and a skipped workflow never
