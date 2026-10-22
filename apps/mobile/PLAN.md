@@ -169,7 +169,7 @@ that file in lockstep with web's if a token value changes there).
    Android's exact scheme conventions (`geo:`/`google.navigation:`, `waze://`) are
    written from documented behavior, not live-tested — this project has only ever
    been run against the iOS Simulator so far.
-7. **Today → "My day" rework**: web grew its own technician landing at `/my-day`
+7. **Today → "My day" rework** (done): web grew its own technician landing at `/my-day`
    (`apps/web/src/pages/MyDayPage.tsx` + `src/features/my-day/`), itself partly
    inspired by this app's Phase 2 screens. Mobile's Today tab mirrors it — **full
    parity**, decided 2026-10-21. The page answers three questions in order: what am
@@ -217,12 +217,14 @@ that file in lockstep with web's if a token value changes there).
      hardcodes a Google Maps URL, the exact behavior Phase 6 exists to fix, so don't
      copy it. Doing 5 and 6 first means this lands correct rather than needing an
      immediate retrofit.
-   - **Loose ends to check before building**: mobile's `PillTone` has no `violet`, the
-     tone web uses for the live/en-route state — either add the token or substitute
-     deliberately. Not yet read: `shiftDay` (`apps/web/src/lib/boardMove.ts`),
-     `PENDING_PARTS_CODE` (`src/lib/workItemStatusTargets.ts`),
-     `invalidateDispatchConsumers`, and the `myDay.*` i18n key set (shared locale, so
-     most copy should already be there).
+   - **Resolved while building**: the `violet` question — mobile keeps its own
+     `statusTone` (EN_ROUTE → accent) rather than adding web's violet, because every
+     other status pill in the app already reads that way and a one-off colour here
+     would orphan a token outside Phase 0's ported set. The `myDay.*` copy was already
+     in the shared locale, so no new keys were needed. Two further departures from
+     web, both deliberate: quotes in the Unfinished card are filtered to those with a
+     work order (mobile has no quote screen, so the rest would be rows that go
+     nowhere), and only today is actionable — other days render a read-only route.
 8. **Completion**: signature + card-present payment (net-new, cross-repo).
 9. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self;
    gated behind `CREATE_WORK_ORDERS` per Phase 5.

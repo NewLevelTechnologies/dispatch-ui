@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View, StyleSheet, type GestureResponderEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from '@dispatch/i18n';
@@ -14,6 +14,8 @@ import { FocusCard } from '../../my-day/FocusCard';
 import { RouteCard } from '../../my-day/RouteCard';
 import { DayDone, NoStops, TomorrowCard } from '../../my-day/DayCards';
 import { DayStepper } from '../../my-day/DayStepper';
+import { UnfinishedCard } from '../../my-day/UnfinishedCard';
+import { useCarryover } from '../../my-day/useCarryover';
 
 /**
  * The technician's day, mirroring web's `/my-day`
@@ -60,6 +62,11 @@ export default function TodayScreen() {
   const { data: me } = useCurrentUser();
   const { canEdit } = useWorkOrderAccess(me?.id);
   const advance = useAdvanceStop();
+
+  // What's hanging over the tech beyond the route. Today's own jobs are left
+  // to the route above rather than listed twice on one screen.
+  const onRoute = useMemo(() => new Set(today.stops.map((s) => s.workOrderId)), [today.stops]);
+  const carryover = useCarryover(me?.id, onRoute);
 
   const openWorkOrder = (workOrderId: string) =>
     router.push({ pathname: '/work-order/[id]', params: { id: workOrderId } });
@@ -130,6 +137,17 @@ export default function TodayScreen() {
             timeZone={timeZone}
             title={offset === 0 ? undefined : t('myDay.other.route')}
             onOpenStop={(stop: MyDayStop) => openWorkOrder(stop.workOrderId)}
+          />
+        )}
+
+        {offset === 0 && (
+          <UnfinishedCard
+            awaitingParts={carryover.awaitingParts}
+            quotes={carryover.quotes}
+            onOpenWorkOrder={openWorkOrder}
+            // Reachable through the job it belongs to — useCarryover drops any
+            // quote that has none, so this always has somewhere to go.
+            onOpenQuote={(quote) => quote.workOrderId && openWorkOrder(quote.workOrderId)}
           />
         )}
 

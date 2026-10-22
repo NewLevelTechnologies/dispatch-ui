@@ -5,6 +5,7 @@ import TodayScreen from '../index';
 import { useAdvanceStop, useDayAt, useFocusWorkOrder, useMyDayStops } from '../../../my-day/useMyDay';
 import { useCurrentUser } from '../../../hooks/useCurrentUser';
 import { useWorkOrderAccess } from '../../../permissions/useWorkOrderAccess';
+import { useCarryover } from '../../../my-day/useCarryover';
 import type { MyDayStop } from '@dispatch/api';
 
 const mockPush = jest.fn();
@@ -18,6 +19,7 @@ jest.mock('../../../my-day/useMyDay', () => ({
 jest.mock('../../../hooks/useCurrentUser', () => ({ useCurrentUser: jest.fn() }));
 jest.mock('../../../permissions/useWorkOrderAccess', () => ({ useWorkOrderAccess: jest.fn() }));
 jest.mock('../../../maps/openDirections', () => ({ openDirections: jest.fn() }));
+jest.mock('../../../my-day/useCarryover', () => ({ useCarryover: jest.fn() }));
 
 const mockUseMyDayStops = useMyDayStops as jest.Mock;
 const mockUseDayAt = useDayAt as jest.Mock;
@@ -25,6 +27,7 @@ const mockUseFocusWorkOrder = useFocusWorkOrder as jest.Mock;
 const mockUseAdvanceStop = useAdvanceStop as jest.Mock;
 const mockUseCurrentUser = useCurrentUser as jest.Mock;
 const mockUseWorkOrderAccess = useWorkOrderAccess as jest.Mock;
+const mockUseCarryover = useCarryover as jest.Mock;
 const mockMutate = jest.fn();
 const mockRefetch = jest.fn();
 
@@ -82,6 +85,7 @@ beforeEach(() => {
   mockUseCurrentUser.mockReturnValue({ data: { id: 'me', capabilities: [] } });
   mockUseWorkOrderAccess.mockReturnValue({ canEdit: true });
   mockUseDayAt.mockReturnValue(dayResult([]));
+  mockUseCarryover.mockReturnValue({ awaitingParts: [], quotes: [] });
 });
 
 describe('TodayScreen', () => {
@@ -185,6 +189,25 @@ describe('TodayScreen', () => {
     expect(screen.getByText('Day complete')).toBeTruthy();
     expect(screen.getByText(/1 of 1 stops completed/)).toBeTruthy();
     expect(screen.getByText(/1h on site/)).toBeTruthy();
+  });
+
+  it('lists what is hanging over the tech, and opens the job behind it', async () => {
+    mockUseMyDayStops.mockReturnValue(dayResult([stop()]));
+    mockUseCarryover.mockReturnValue({
+      awaitingParts: [{ id: 'wo9', workOrderNumber: 'WO-00077', summary: 'Compressor on order' }],
+      quotes: [],
+    });
+    await renderToday();
+
+    expect(screen.getByText('Unfinished')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Compressor on order'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/work-order/[id]', params: { id: 'wo9' } });
+  });
+
+  it('says nothing when there is nothing hanging over the tech', async () => {
+    mockUseMyDayStops.mockReturnValue(dayResult([stop()]));
+    await renderToday();
+    expect(screen.queryByText('Unfinished')).toBeNull();
   });
 
   it('teases tomorrow', async () => {
