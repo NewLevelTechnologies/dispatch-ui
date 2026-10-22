@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { AuthProvider } from '../../auth/AuthContext';
 import SignInScreen from '../sign-in';
+import { ThemeProvider } from '../../theme/ThemeProvider';
 
 /**
  * Drives the screen against the REAL auth context with Amplify stubbed, so the
@@ -25,9 +26,13 @@ jest.mock('expo-router', () => ({ Stack: { Screen: () => null } }));
 
 const renderSignIn = async () => {
   const result = await render(
-    <AuthProvider>
-      <SignInScreen />
-    </AuthProvider>
+    // The screen reads the palette now; at runtime the provider comes from
+    // app/_layout.tsx, which wraps everything including sign-in.
+    <ThemeProvider>
+      <AuthProvider>
+        <SignInScreen />
+      </AuthProvider>
+    </ThemeProvider>
   );
   // Wait past the session-restore effect so the form is settled.
   await waitFor(() => expect(screen.getByText('Sign in')).toBeTruthy());

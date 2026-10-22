@@ -14,6 +14,36 @@ import { Stack } from 'expo-router';
 import { useTranslation } from '@dispatch/i18n';
 import { useAuth } from '../auth/AuthContext';
 import type { Challenge } from '../auth/AuthContext';
+import { useTheme } from '../theme/ThemeProvider';
+
+/**
+ * Colours for this screen, from the active palette.
+ *
+ * Everything else in the app composes theme colours inline over a geometry-only
+ * StyleSheet; this screen predates that and hard-coded a light palette, so it
+ * rendered light-on-light the moment dark mode became reachable. Geometry stays
+ * in `styles` below — only the colours live here.
+ */
+function useSignInColors() {
+  const { colors } = useTheme();
+  return {
+    screen: { backgroundColor: colors.bgSunken },
+    title: { color: colors.fgStrong },
+    subtitle: { color: colors.fgMuted },
+    label: { color: colors.fgMuted },
+    input: { borderColor: colors.border, backgroundColor: colors.bgElev, color: colors.fgStrong },
+    secretBox: { backgroundColor: colors.bgElev2 },
+    secret: { color: colors.fgStrong },
+    option: { borderColor: colors.border, backgroundColor: colors.bgElev },
+    optionText: { color: colors.fgStrong },
+    error: { color: colors.danger },
+    button: { backgroundColor: colors.accent500 },
+    buttonDisabled: { backgroundColor: colors.border },
+    linkText: { color: colors.accent700 },
+    hint: { color: colors.fgMuted },
+    step: { color: colors.fgMuted },
+  };
+}
 
 export default function SignInScreen() {
   const { challenge } = useAuth();
@@ -30,6 +60,7 @@ export default function SignInScreen() {
 }
 
 function PasswordForm() {
+  const c = useSignInColors();
   const { t } = useTranslation();
   const { submit } = useAuth();
   const [email, setEmail] = useState('');
@@ -50,14 +81,14 @@ function PasswordForm() {
   return (
     <>
       <Stack.Screen options={{ title: t('auth.signIn') }} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={[styles.flex, c.screen]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.title}>{t('app.name')}</Text>
-          <Text style={styles.subtitle}>{t('auth.signInPrompt')}</Text>
+          <Text style={[styles.title, c.title]}>{t('app.name')}</Text>
+          <Text style={[styles.subtitle, c.subtitle]}>{t('auth.signInPrompt')}</Text>
 
-          <Text style={styles.label}>{t('auth.emailLabel')}</Text>
+          <Text style={[styles.label, c.label]}>{t('auth.emailLabel')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, c.input]}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -69,9 +100,9 @@ function PasswordForm() {
             placeholder={t('auth.emailPlaceholder')}
           />
 
-          <Text style={styles.label}>{t('auth.passwordLabel')}</Text>
+          <Text style={[styles.label, c.label]}>{t('auth.passwordLabel')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, c.input]}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -83,17 +114,17 @@ function PasswordForm() {
             returnKeyType="go"
           />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={[styles.error, c.error]}>{error}</Text> : null}
 
           <Pressable
-            style={[styles.button, !canSubmit && styles.buttonDisabled]}
+            style={[styles.button, c.button, !canSubmit && c.buttonDisabled]}
             disabled={!canSubmit}
             onPress={onSubmit}
           >
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{t('auth.signIn')}</Text>}
           </Pressable>
 
-          <Text style={styles.hint}>{t('auth.sameCredentialsAsWeb')}</Text>
+          <Text style={[styles.hint, c.hint]}>{t('auth.sameCredentialsAsWeb')}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </>
@@ -101,6 +132,7 @@ function PasswordForm() {
 }
 
 function ChallengeForm({ challenge }: { challenge: Challenge }) {
+  const c = useSignInColors();
   const { t } = useTranslation();
   const { respond, cancelChallenge } = useAuth();
   const [entry, setEntry] = useState('');
@@ -128,18 +160,18 @@ function ChallengeForm({ challenge }: { challenge: Challenge }) {
   return (
     <>
       <Stack.Screen options={{ title: t('auth.verify') }} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={[styles.flex, c.screen]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.title}>{heading}</Text>
+          <Text style={[styles.title, c.title]}>{heading}</Text>
 
           {challenge.kind === 'code' && (
             <>
               {challenge.hintKey ? (
-                <Text style={styles.subtitle}>{t(challenge.hintKey, challenge.hintValues)}</Text>
+                <Text style={[styles.subtitle, c.subtitle]}>{t(challenge.hintKey, challenge.hintValues)}</Text>
               ) : null}
-              <Text style={styles.label}>{t(challenge.promptKey)}</Text>
+              <Text style={[styles.label, c.label]}>{t(challenge.promptKey)}</Text>
               <TextInput
-                style={[styles.input, styles.code]}
+                style={[styles.input, c.input, styles.code]}
                 value={entry}
                 onChangeText={setEntry}
                 keyboardType="number-pad"
@@ -156,15 +188,15 @@ function ChallengeForm({ challenge }: { challenge: Challenge }) {
 
           {challenge.kind === 'totpSetup' && (
             <>
-              <Text style={styles.subtitle}>{t('auth.totpSetupHint')}</Text>
-              <View style={styles.secretBox}>
-                <Text selectable style={styles.secret}>
+              <Text style={[styles.subtitle, c.subtitle]}>{t('auth.totpSetupHint')}</Text>
+              <View style={[styles.secretBox, c.secretBox]}>
+                <Text selectable style={[styles.secret, c.secret]}>
                   {challenge.secret}
                 </Text>
               </View>
-              <Text style={styles.label}>{t('auth.authenticatorCode')}</Text>
+              <Text style={[styles.label, c.label]}>{t('auth.authenticatorCode')}</Text>
               <TextInput
-                style={[styles.input, styles.code]}
+                style={[styles.input, c.input, styles.code]}
                 value={entry}
                 onChangeText={setEntry}
                 keyboardType="number-pad"
@@ -178,10 +210,10 @@ function ChallengeForm({ challenge }: { challenge: Challenge }) {
 
           {challenge.kind === 'mfaSelection' && (
             <>
-              <Text style={styles.subtitle}>{t('auth.mfaMultipleEnabled')}</Text>
+              <Text style={[styles.subtitle, c.subtitle]}>{t('auth.mfaMultipleEnabled')}</Text>
               {challenge.options.map((option) => (
-                <Pressable key={option} style={styles.option} disabled={busy} onPress={() => send(option)}>
-                  <Text style={styles.optionText}>{option}</Text>
+                <Pressable key={option} style={[styles.option, c.option]} disabled={busy} onPress={() => send(option)}>
+                  <Text style={[styles.optionText, c.optionText]}>{option}</Text>
                 </Pressable>
               ))}
             </>
@@ -189,10 +221,10 @@ function ChallengeForm({ challenge }: { challenge: Challenge }) {
 
           {challenge.kind === 'newPassword' && (
             <>
-              <Text style={styles.subtitle}>{t('auth.newPasswordRequired')}</Text>
-              <Text style={styles.label}>{t('auth.newPassword')}</Text>
+              <Text style={[styles.subtitle, c.subtitle]}>{t('auth.newPasswordRequired')}</Text>
+              <Text style={[styles.label, c.label]}>{t('auth.newPassword')}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, c.input]}
                 value={entry}
                 onChangeText={setEntry}
                 secureTextEntry
@@ -203,11 +235,11 @@ function ChallengeForm({ challenge }: { challenge: Challenge }) {
             </>
           )}
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={[styles.error, c.error]}>{error}</Text> : null}
 
           {!isChoice && (
             <Pressable
-              style={[styles.button, !canSend && styles.buttonDisabled]}
+              style={[styles.button, c.button, !canSend && c.buttonDisabled]}
               disabled={!canSend}
               onPress={() => send(entry.trim())}
             >
@@ -216,12 +248,12 @@ function ChallengeForm({ challenge }: { challenge: Challenge }) {
           )}
 
           <Pressable style={styles.link} disabled={busy} onPress={cancelChallenge}>
-            <Text style={styles.linkText}>{t('auth.startOver')}</Text>
+            <Text style={[styles.linkText, c.linkText]}>{t('auth.startOver')}</Text>
           </Pressable>
 
           {/* Raw Cognito step, deliberately shown: if an unexpected challenge
               arrives, this is the first thing anyone debugging it needs. */}
-          <Text style={styles.step}>{challenge.step}</Text>
+          <Text style={[styles.step, c.step]}>{challenge.step}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </>
@@ -232,42 +264,37 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { padding: 24, paddingTop: 48 },
   title: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
-  subtitle: { fontSize: 15, color: '#6b7280', marginBottom: 24 },
-  label: { fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 6 },
+  subtitle: { fontSize: 15, marginBottom: 24 },
+  label: { fontSize: 12, textTransform: 'uppercase', marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
     marginBottom: 16,
-    backgroundColor: '#fff',
   },
   code: { fontSize: 22, letterSpacing: 4, textAlign: 'center' },
-  secretBox: { backgroundColor: '#f3f4f6', borderRadius: 8, padding: 14, marginBottom: 20 },
+  secretBox: { borderRadius: 8, padding: 14, marginBottom: 20 },
   secret: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 14 },
   option: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 12,
   },
-  optionText: { fontSize: 16, fontWeight: '600', color: '#374151' },
-  error: { color: '#dc2626', marginBottom: 12 },
+  optionText: { fontSize: 16, fontWeight: '600' },
+  error: { marginBottom: 12 },
   button: {
-    backgroundColor: '#2563eb',
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 4,
   },
-  buttonDisabled: { backgroundColor: '#9ca3af' },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   link: { alignItems: 'center', marginTop: 16 },
-  linkText: { color: '#2563eb', fontSize: 15 },
-  hint: { fontSize: 13, color: '#9ca3af', textAlign: 'center', marginTop: 24 },
-  step: { fontSize: 11, color: '#d1d5db', textAlign: 'center', marginTop: 24 },
+  linkText: { fontSize: 15 },
+  hint: { fontSize: 13, textAlign: 'center', marginTop: 24 },
+  step: { fontSize: 11, textAlign: 'center', marginTop: 24 },
 });
