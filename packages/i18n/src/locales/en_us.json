@@ -5421,6 +5421,18 @@
     "errorTitle": "Couldn’t load your availability",
     "title": "My Availability"
   },
+  "mobileMaps": {
+    "apps": {
+      "apple": "Apple Maps",
+      "default": "Default maps app",
+      "google": "Google Maps",
+      "waze": "Waze"
+    },
+    "chooseBody": "You can change this later in your profile.",
+    "chooseTitle": "Open directions in",
+    "preferenceTitle": "Directions",
+    "usesDeviceDefault": "Opens in your only maps app."
+  },
   "mobileSchedule": {
     "emptyBodyToday": "Nothing assigned to you for today.",
     "emptyBodyWeek": "No visits assigned to you in the next 7 days.",
