@@ -40,7 +40,8 @@
   "submit": {
     "production": {
       "ios": {
-        "bundleIdentifier": "net.newleveltech.dispatch"
+        "bundleIdentifier": "net.newleveltech.dispatch",
+        "ascAppId": "6807215279"
       }
     }
   }

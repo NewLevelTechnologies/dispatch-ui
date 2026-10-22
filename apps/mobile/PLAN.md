@@ -9,11 +9,14 @@ admin screens to show them.
 ## Grounding facts (from a codebase research pass, 2026-10-20)
 
 - The unit of field work is the **Dispatch** (a scheduled visit, `assignedUserId` = one
-  tech), not the WorkOrder — a WorkOrder can have many dispatches/trips. There is
-  **no "my jobs today" view anywhere today**; the web app (`DispatchesPage`) is 100%
-  dispatcher-perspective and is itself a stop-gap (the real dispatch board isn't merged
-  yet — see branches `feat/dispatch-board` / `feat/board-map`). The mobile "Today"
-  screen is net-new UX, not a port.
+  tech), not the WorkOrder — a WorkOrder can have many dispatches/trips. There was
+  **no "my jobs today" view anywhere** when this plan was written; the web app
+  (`DispatchesPage`) was 100% dispatcher-perspective, so the mobile "Today" screen
+  started as net-new UX rather than a port.
+  **Superseded 2026-10-21**: web now has one — a technician landing page at `/my-day`
+  (`apps/web/src/pages/MyDayPage.tsx`), built partly from what this app's Phase 2/3
+  screens established, with a purpose-built `myDayApi` behind it. Today is no longer
+  net-new UX; it mirrors that page. See Phase 7.
 - **Parts-used logging doesn't exist anywhere** (web or backend) — explicitly deferred
   placeholders throughout. Left out of this plan; it would need its own cross-platform
   design effort later.
@@ -28,6 +31,16 @@ admin screens to show them.
   bundles. `Role.performsFieldWork: boolean` is the one purpose-built signal (already
   consumed by dispatch-board/assignment pickers), but it is **not** used to gate
   sign-in — scope is limited by which screens exist, not by blocking login.
+- **The mobile app currently has zero permission checks** — every signed-in user can
+  do everything the built screens allow (status transitions, adding notes), regardless
+  of their tenant-assigned role. Web already has the full system to port: a tenant
+  admin assigns a flat `capabilities: string[]` to each `Role` (no enum — raw strings
+  like `CREATE_WORK_ORDERS`, `EDIT_ALL_WORK_ORDERS`, `EDIT_ASSIGNED_WORK_ORDERS`) via
+  `userApi.updateRoleCapabilities`; the signed-in user's own effective set comes back
+  denormalized on `User.capabilities` from `GET /users/me` (`userApi.getCurrentUser`,
+  no client-side merge-from-roles step). Mobile's own `useCurrentUser()`
+  (`src/hooks/useCurrentUser.ts`) already fetches that same `User` for `user.id` but
+  has never read `.capabilities`. See Phase 5.
 - Technicians **can belong to multiple tenants** — the mobile shell needs a
   lightweight port of web's `TenantGate`/workspace switcher, not a single-tenant
   assumption.
@@ -107,10 +120,114 @@ that file in lockstep with web's if a token value changes there).
    which exist yet), and the Activity feed (`activityApi` — held back partly
    because its `ActivityKind`/`ActivityCategory` enum values weren't confirmed
    in this pass). No Purchasing tab, no Estimate-tab editing, no billing.
-5. **Completion**: signature + card-present payment (net-new, cross-repo).
-6. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self.
-7. **Reference lookup**: customers/service-locations/equipment, read-only, no billing.
-8. **Push notifications** (needs new `dispatch-api` endpoints — device tokens, events).
+5. **Permission-aware actions** (next up): every signed-in user can currently do
+   everything the app allows — no capability checks exist anywhere in mobile. Reads
+   `user.capabilities` off the existing `useCurrentUser()` and ports web's access
+   logic rather than reinventing it:
+   - **Dispatch status actions retrofit** (Mark en route / Mark arrived / Complete,
+     shipped capability-free in Phase 3): web gates its equivalent buttons on
+     `useWorkOrderAccess(workOrder).canEdit` (`apps/web/src/hooks/
+     useWorkOrderAccess.ts`) — `EDIT_ALL_WORK_ORDERS`, or `EDIT_ASSIGNED_WORK_ORDERS`
+     plus the dispatch being assigned to the signed-in user — not a separate
+     dispatch-specific capability. Port the same `canEdit` logic as a pure function
+     (mirroring how `statusTone.ts`/`dispatchLifecycleSteps.ts` ported web logic
+     elsewhere) and gate those three buttons on it.
+   - **On-site work order creation** (Phase 9, below): gates on `CREATE_WORK_ORDERS`,
+     an existing, already-in-use capability string — no new backend work needed.
+   - **Add note stays ungated**: confirmed web deliberately lets "anyone who can see
+     [the work order] add one" (`apps/web/src/components/NotesCard.tsx` — only
+     editing/pinning/deleting an *existing* note needs edit access), so Phase 4's
+     notes feature needs no change.
+   - **Open question**: whether `dispatch-api` enforces any of this server-side (a
+     403 regardless of what the client checks) is unconfirmed from this repo alone —
+     nothing in `packages/api/src/*.ts`'s doc comments says either way. Treat
+     client-side gating here as a UX-correctness fix, not a verified security
+     boundary, until that's checked against the backend.
+6. **Preferred maps app**: both Directions buttons (Dispatch detail, Work order
+   detail) currently hardcode a Google Maps web URL
+   (`https://www.google.com/maps/search/...`), duplicated identically in
+   `src/app/dispatch/[id].tsx` and `src/app/work-order/[id].tsx`. On iOS that either
+   opens Safari or deep-links straight into Google Maps if it's installed — never
+   Apple Maps, which annoys a tech who prefers it. Replace both call sites with one
+   shared helper that:
+   - Always includes the platform's built-in default with no availability check
+     needed (Apple Maps `maps://` on iOS, the `geo:` intent on Android — both are
+     OS-level, not third-party schemes).
+   - Detects which other map apps are actually installed via `Linking.canOpenURL`
+     on their own schemes (`comgooglemaps://`, `waze://`) — these **do** need
+     `LSApplicationQueriesSchemes` added to `app.json`'s `ios.infoPlist`, since iOS
+     restricts `canOpenURL` to whitelisted third-party schemes; unlisted schemes
+     always report false regardless of whether the app is installed.
+   - Asks once, only when there's an actual choice (more than one app available) —
+     no prompt at all for a tech with only Apple Maps on their phone.
+   - Persists the choice so it's asked once, not on every tap — same plain-value
+     `AsyncStorage` pattern already used for the active-tenant-id
+     (`src/tenant/tenant.ts`), not the Keychain-backed `secureTokenStorage.ts`
+     (this isn't sensitive).
+   - Adds a "Preferred maps app" row to Profile (`src/app/(tabs)/profile.tsx`) so
+     the choice is visible and changeable later, not just set-once-and-forgotten.
+   Android's exact scheme conventions (`geo:`/`google.navigation:`, `waze://`) are
+   written from documented behavior, not live-tested — this project has only ever
+   been run against the iOS Simulator so far.
+7. **Today → "My day" rework**: web grew its own technician landing at `/my-day`
+   (`apps/web/src/pages/MyDayPage.tsx` + `src/features/my-day/`), itself partly
+   inspired by this app's Phase 2 screens. Mobile's Today tab mirrors it — **full
+   parity**, decided 2026-10-21. The page answers three questions in order: what am
+   I doing right now, what does the rest of the day look like, what's hanging over me.
+   - **Data source switch**: from `dispatchBoardApi.getBoard({date})` + client-side
+     "is this mine" filtering to `myDayApi.getDay(date?)` (`GET /scheduling/my-day`,
+     already exported from the `@dispatch/api` barrel). It's purpose-built for this:
+     server-side filtered to the signed-in tech, resolves "today" in the tenant's own
+     timezone (the client never computes it), arrival-ordered, `driveMinFromPrev`
+     precomputed, and — the semantic that matters — returns the window the tech was
+     **actually sent** ("as released"), not live values that may contain unreleased
+     dispatcher changes. `MyDayStop` also carries a `version` for conflict-guarded
+     status writes. Phase 2's board-API correction stands; this is a further step to
+     the endpoint built for exactly this view.
+   - **Pure logic to port** from `myDayModel.ts` (no React/DOM, so it transfers
+     directly into mobile's existing pure-helper style): `pickFocus` (first live stop,
+     else first `SCHEDULED`), the `focusAction` state machine (`SCHEDULED` → "Start
+     driving"/EN_ROUTE, `EN_ROUTE` → "Arrived"/IN_PROGRESS, `IN_PROGRESS` → "Complete
+     visit", which hands off to the work order rather than flipping status in place),
+     `isPast`/`isLive`, `routeStops`, `formatEstimate`/`formatDuration`,
+     `onSiteMinutes`, `showTomorrow`, `dayName`, `swipeStep`, `DAY_RANGE = 7`. Note
+     `clock()` produces the compact `"10a"` / `"10:42a"` / `"12p"` style the design
+     depends on — mobile's existing `formatArrivalTime.ts` emits `"8:00 AM"`, so this
+     needs a new formatter (web's algorithm is in `apps/web/src/lib/boardTime.ts`).
+   - **Surfaces**: progress strip ("0 of 3 stops done · next at 10a"), focus card
+     (time window, "Up next"/live pill, priority + WO tag, one primary action from
+     `focusAction` plus Navigate / Call / Open WO), the route timeline with its
+     connecting rail and drive-time-between-stops, the Unfinished/carryover card, the
+     Tomorrow teaser, the day-done and no-stops states, and the ±7-day stepper with
+     swipe.
+   - **Decided**: no greeting or date line in the header (mobile's `AppHeader` already
+     carries the title). Route rows link to the **work order**, matching web — not to
+     Dispatch detail as they do today. Today gains the day stepper, and the Schedule
+     tab **stays** (one day in depth vs. a week at a glance read differently enough to
+     justify both).
+   - **Genuinely new data for mobile**: the carryover queries behind the Unfinished
+     card (open work orders assigned to me whose work-item status maps to the tenant's
+     "pending parts" code — resolved via `workItemStatusesApi` plus web's
+     `PENDING_PARTS_CODE` lookup — and quotes I sent that are still unanswered), and
+     version-guarded status updates with 404 ("this changed on you") and 409
+     (`DISPATCH_VERSION_CONFLICT`) handling. Mobile's `useUpdateDispatchStatus` sends
+     no `version` and has no error branching, so it needs extending or replacing.
+   - **Sequencing**: the focus card's status buttons need Phase 5's capability gating,
+     and its Navigate button needs Phase 6's maps picker — web's own Navigate
+     hardcodes a Google Maps URL, the exact behavior Phase 6 exists to fix, so don't
+     copy it. Doing 5 and 6 first means this lands correct rather than needing an
+     immediate retrofit.
+   - **Loose ends to check before building**: mobile's `PillTone` has no `violet`, the
+     tone web uses for the live/en-route state — either add the token or substitute
+     deliberately. Not yet read: `shiftDay` (`apps/web/src/lib/boardMove.ts`),
+     `PENDING_PARTS_CODE` (`src/lib/workItemStatusTargets.ts`),
+     `invalidateDispatchConsumers`, and the `myDay.*` i18n key set (shared locale, so
+     most copy should already be there).
+8. **Completion**: signature + card-present payment (net-new, cross-repo).
+9. **On-site work order creation**: trimmed intake, auto-assigns a dispatch to self;
+   gated behind `CREATE_WORK_ORDERS` per Phase 5.
+10. **Reference lookup**: customers/service-locations/equipment, read-only, no billing.
+11. **Push notifications** (needs new `dispatch-api` endpoints — device tokens, events).
 
 Profile/account (signed-in-as, sign out, workspace switcher) is **done** — folded into
 Phase 1 rather than staying its own numbered phase, since it was needed there to make
